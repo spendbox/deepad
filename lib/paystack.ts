@@ -1,67 +1,116 @@
 import 'server-only';
 
 // Paystack API calls. Amounts are in kobo, exactly as Paystack expects.
-// Docs: https://paystack.com/docs/api/charge/ (Pay with Transfer)
+// Docs: https://paystack.com/docs/api/
 
-const API = 'https://api.paystack.co';
+// PAYSTACK_API_BASE is only for automated testing against a pretend Paystack.
+const API = process.env.PAYSTACK_API_BASE || 'https://api.paystack.co';
 
-function secret(): string {
-  const key = process.env.PAYSTACK_SECRET_KEY;
-  if (!key) throw new Error('PAYSTACK_SECRET_KEY is not set');
-  return key;
+export function paystackConfigured(): boolean {
+  return !!process.env.PAYSTACK_SECRET_KEY;
 }
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+export function paystackIsLive(): boolean {
+  return (process.env.PAYSTACK_SECRET_KEY ?? '').startsWith('sk_live_');
+}
+
+export class PaystackError extends Error {}
+
+async function call<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+  if (!key) throw new PaystackError('Payments are not connected yet (PAYSTACK_SECRET_KEY is missing).');
   const res = await fetch(API + path, {
-    method: body ? 'POST' : 'GET',
-    headers: { Authorization: `Bearer ${secret()}`, 'Content-Type': 'application/json' },
+    method,
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
   });
   const json = (await res.json().catch(() => null)) as { status?: boolean; message?: string; data?: T } | null;
-  if (!res.ok || !json?.status || !json.data) {
-    throw new Error(`Paystack ${path} failed: ${json?.message ?? res.status}`);
+  if (!res.ok || !json?.status) {
+    throw new PaystackError(json?.message ?? `Paystack request failed (${res.status})`);
   }
-  return json.data;
+  return json.data as T;
 }
 
-export type TransferAccount = {
-  accountNumber: string;
-  bankName: string;
-  accountName: string;
-  expiresAt: string;
-};
+export type Bank = { name: string; code: string };
+
+export async function listBanks(): Promise<Bank[]> {
+  const data = await call<{ name: string; code: string; active?: boolean }[]>('GET', '/bank?country=nigeria&perPage=200');
+  const seen = new Set<string>();
+  return data
+    .filter((b) => b.active !== false && b.code && !seen.has(b.code) && seen.add(b.code))
+    .map((b) => ({ name: b.name, code: b.code }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Look up the name on a bank account, so people can see they typed it right. */
+export async function resolveAccount(accountNumber: string, bankCode: string): Promise<string> {
+  const data = await call<{ account_name: string }>(
+    'GET',
+    `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+  );
+  return data.account_name;
+}
+
+/** A Paystack "subaccount" is a bank account Paystack can send a share of each payment to. */
+export async function createSubaccount(opts: { businessName: string; bankCode: string; accountNumber: string; email?: string }) {
+  const data = await call<{ subaccount_code: string }>('POST', '/subaccount', {
+    business_name: opts.businessName.slice(0, 100),
+    settlement_bank: opts.bankCode,
+    account_number: opts.accountNumber,
+    percentage_charge: 0,
+    primary_contact_email: opts.email,
+  });
+  return data.subaccount_code;
+}
 
 /**
- * Ask Paystack for a one-time account number for a single spray
- * ("Pay with Transfer"). The guest's transfer to it is tied to `reference`.
+ * A split tells Paystack how to share every payment. Our main account keeps
+ * whatever the shares don't cover (DashPad's 5%).
  */
-export async function createOneTimeAccount(opts: {
-  reference: string;
-  totalKobo: number;
-  expiresAt: Date;
-  splitCode: string | null;
-  metadata: Record<string, unknown>;
-}): Promise<TransferAccount> {
-  const data = await call<{
-    account_number: string;
-    account_name?: string;
-    bank?: { name?: string };
-    account_expires_at?: string;
-  }>('/charge', {
-    // Paystack needs an email for every charge. Guests don't give one, so we use
-    // a placeholder tied to the reference. Paystack's receipts go nowhere.
-    email: `${opts.reference.toLowerCase()}@${process.env.PAYSTACK_GUEST_EMAIL_DOMAIN ?? 'guests.dashpad.ng'}`,
-    amount: opts.totalKobo,
-    reference: opts.reference,
-    bank_transfer: { account_expires_at: opts.expiresAt.toISOString() },
-    ...(opts.splitCode ? { split_code: opts.splitCode } : {}),
-    metadata: opts.metadata,
+export async function createSplit(opts: { name: string; shares: { subaccount: string; share: number }[] }) {
+  const data = await call<{ split_code: string }>('POST', '/split', {
+    name: opts.name.slice(0, 100),
+    type: 'percentage',
+    currency: 'NGN',
+    subaccounts: opts.shares,
+    // Paystack's own processing fee is shared by everyone in proportion to their share.
+    bearer_type: 'all-proportional',
   });
+  return data.split_code;
+}
+
+export async function createCustomer(opts: { email: string; firstName: string; lastName: string; phone?: string }) {
+  const data = await call<{ customer_code: string }>('POST', '/customer', {
+    email: opts.email,
+    first_name: opts.firstName.slice(0, 50),
+    last_name: opts.lastName.slice(0, 50),
+    phone: opts.phone || undefined,
+  });
+  return data.customer_code;
+}
+
+/** Give the event its own account number ("dedicated virtual account"). */
+export async function createDedicatedAccount(opts: { customerCode: string; splitCode: string | null }) {
+  const preferredBank = process.env.PAYSTACK_DVA_BANK || (paystackIsLive() ? 'wema-bank' : 'test-bank');
+  const data = await call<{ id: number; account_number: string; account_name: string; bank?: { name?: string } }>(
+    'POST',
+    '/dedicated_account',
+    {
+      customer: opts.customerCode,
+      preferred_bank: preferredBank,
+      ...(opts.splitCode ? { split_code: opts.splitCode } : {}),
+    },
+  );
   return {
+    id: String(data.id),
     accountNumber: data.account_number,
+    accountName: data.account_name,
     bankName: data.bank?.name ?? 'Bank',
-    accountName: data.account_name ?? 'DashPad',
-    expiresAt: data.account_expires_at ?? opts.expiresAt.toISOString(),
   };
+}
+
+/** Switch the account number off after the event, so no more money can come in. */
+export async function deactivateDedicatedAccount(id: string) {
+  await call('DELETE', `/dedicated_account/${encodeURIComponent(id)}`);
 }

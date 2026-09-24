@@ -1,14 +1,14 @@
-import LoginForm from './LoginForm';
+import AdminLoginForm from './AdminLoginForm';
 
-export const metadata = { title: 'Admin login · DashPad' };
+export const metadata = { title: 'Admin · DashPad' };
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   return (
-    <main className="landing">
-      <div className="landing-inner" style={{ width: '100%', maxWidth: 420 }}>
-        <div className="brand">DashPad</div>
-        <h1 style={{ fontSize: 36 }}>Admin portal</h1>
-        <LoginForm />
+    <main className="auth">
+      <div className="auth-top"><span className="brand">DashPad admin</span></div>
+      <div className="auth-card">
+        <h1>Admin login</h1>
+        <AdminLoginForm />
       </div>
     </main>
   );

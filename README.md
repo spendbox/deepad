@@ -1,48 +1,45 @@
 # DashPad
 
-Digital money spraying for Nigerian parties. Guests scan a QR code or transfer to the
-event's account number; every **confirmed** payment pops up on the big screen with their
-name, amount and message.
+Digital money spraying for Nigerian parties. Event planners create a spray event, put its
+link on the big screen, and guests transfer to the event's own account number. Every
+confirmed transfer pops up on screen as "₦X sent to the couple" with the sender's transfer
+description. Senders stay anonymous on screen.
 
-## The parts
+## Who uses what
 
-| Page | Web address | Who uses it |
+| Page | Address | Who |
 |---|---|---|
-| Big screen | `/screen/<event>` | The MC's laptop, on the venue TV or projector |
-| Guest spray page | `/s/<event>` | Guests' phones (from the QR code) |
-| One-time account page | `/s/<event>/pay/<ref>` | Guests' phones, after tapping Pay |
-| Admin portal | `/admin` | You (password protected) |
-| Paystack webhook | `/api/webhooks/paystack` | Paystack, to confirm payments |
-
-A sample event called `tolu-dayo` is included so you can try everything straight away.
+| Landing page | `/` | Everyone |
+| Sign up / log in | `/signup`, `/login` | Event planners and MCs |
+| Planner dashboard | `/dashboard` | Planners: create and run events |
+| Event big screen | `/e/<unique-code>` | The venue TV or projector |
+| Admin | `/admin` | DashPad staff (password protected) |
+| Paystack webhook | `/api/webhooks/paystack` | Paystack |
+| Daily clean-up | `/api/cron/close-events` | Vercel (see `vercel.json`) |
 
 ## How money works
 
-- **QR way:** the guest pays spray + fee. Default fee is **5% DashPad + the MC's share**
-  (set per event in the admin portal). The celebrant gets the full spray amount.
-- **Direct transfer to the event account:** the screen shows the full amount sent, and
-  the fee comes out of it before it reaches the celebrant.
-- Anything the sender types as the transfer description in their bank app is shown
-  on screen as their message (bank codes are stripped and rude words are masked).
-- DashPad never holds money. Paystack splits each payment between the celebrant, the
-  MC and DashPad using the event's **Paystack split code**.
-- Only payments confirmed by Paystack's signed webhook ever reach the screen.
+- Each event gets its own account number from Paystack.
+- Every transfer is split automatically by Paystack: **5% to DashPad**, the planner's cut
+  (**0–45%**, chosen per event) to the planner's bank account, and the rest to the account
+  the planner entered for the celebrant. DashPad never holds the money.
+- Transfers only count between the event's start and end time. At the end the account
+  is switched off and the planner is emailed a report of who sprayed.
+- Only transfers confirmed by Paystack's signed webhook ever reach the screen.
 
-## Setting it up (step by step)
+## Setting it up
 
-1. **Supabase:** create a project at supabase.com → SQL Editor → New query → paste all of
-   `supabase/schema.sql` → Run.
-2. **Vercel:** import this GitHub repo at vercel.com → before deploying, add the settings
-   listed in `.env.example` (at minimum `ADMIN_PASSWORD`, `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`) → Deploy.
-3. **Paystack (test mode first):** add your `sk_test_…` key as `PAYSTACK_SECRET_KEY`, and
-   in Paystack set the webhook URL to `https://<your-site>/api/webhooks/paystack`.
+1. **Supabase:** SQL Editor → New query → paste all of `supabase/schema.sql` → Run.
+2. **Vercel:** add every setting in `.env.example`, then redeploy.
+3. **Paystack:** set the webhook URL to `https://<your-site>/api/webhooks/paystack`.
+   Paystack must have *Dedicated Virtual Accounts* enabled on your business.
+4. **Resend:** create an account, verify your domain, and add `RESEND_API_KEY` and `EMAIL_FROM`.
 
 ## For developers
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000, admin password "demo"
-npm test           # money, names, messages, webhook signature
+npm run dev        # http://localhost:3000 (uses a throwaway in-memory store)
+npm test
 npm run typecheck
 ```

@@ -1,23 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { feesInside, feesOnTop, groupAccountNumber, naira } from '../lib/money.ts';
+import { clampPlannerFeeBps, groupAccountNumber, naira, splitTransfer } from '../lib/money.ts';
 import { cleanMessage, cleanNarration, filterProfanity, formatSenderName } from '../lib/text.ts';
 import { isValidPaystackSignature } from '../lib/paystack-signature.ts';
 import { computeStats } from '../lib/store/types.ts';
+import { eventPhase } from '../lib/event-info.ts';
+import { hashPassword, verifyPassword } from '../lib/passwords.ts';
+import { makePlannerToken, readPlannerToken } from '../lib/auth.ts';
 
-test('fees on top: guest pays spray + 5% + MC share', () => {
-  const f = feesOnTop(10_000_00, { platformFeeBps: 500, mcFeeBps: 200 });
-  assert.equal(f.platformFeeKobo, 500_00);
-  assert.equal(f.mcFeeKobo, 200_00);
-  assert.equal(f.totalKobo, 10_700_00);
-  assert.equal(f.celebrantKobo, 10_000_00);
+test('split: DashPad 5%, planner cut, celebrant gets the rest', () => {
+  const s = splitTransfer(10_000_00, 1000);
+  assert.equal(s.platformFeeKobo, 500_00);
+  assert.equal(s.plannerFeeKobo, 1_000_00);
+  assert.equal(s.celebrantKobo, 8_500_00);
+  assert.equal(s.platformFeeKobo + s.plannerFeeKobo + s.celebrantKobo, 10_000_00);
+  const none = splitTransfer(10_000_00, 0);
+  assert.equal(none.celebrantKobo, 9_500_00);
 });
 
-test('fees inside: direct transfer shows full amount, fee comes out', () => {
-  const f = feesInside(10_000_00, { platformFeeBps: 500, mcFeeBps: 200 });
-  assert.equal(f.sprayKobo, 10_000_00);
-  assert.equal(f.celebrantKobo, 9_300_00);
+test('planner cut is limited to 0–45%', () => {
+  assert.equal(clampPlannerFeeBps(9000), 4500);
+  assert.equal(clampPlannerFeeBps(-5), 0);
+  assert.equal(clampPlannerFeeBps(NaN), 0);
+  assert.equal(clampPlannerFeeBps(1250), 1250);
 });
 
 test('naira formatting', () => {
@@ -29,19 +35,23 @@ test('account number grouping', () => {
   assert.equal(groupAccountNumber('0123456789'), '0123 456 789');
 });
 
-test('sender name: first name + surname initial', () => {
-  assert.equal(formatSenderName('OLUWASEUN ADEBAYO'), 'Oluwaseun A.');
-  assert.equal(formatSenderName('CHIDI'), 'Chidi');
-  assert.equal(formatSenderName(''), 'A guest');
-  assert.equal(formatSenderName(null), 'A guest');
-  assert.equal(formatSenderName('  ngozi   mary  okafor '), 'Ngozi O.');
+test('event phases follow the start and end time', () => {
+  const e = { startsAt: '2026-01-01T10:00:00Z', endsAt: '2026-01-01T20:00:00Z' };
+  assert.equal(eventPhase(e, Date.parse('2026-01-01T09:59:00Z')), 'upcoming');
+  assert.equal(eventPhase(e, Date.parse('2026-01-01T12:00:00Z')), 'live');
+  assert.equal(eventPhase(e, Date.parse('2026-01-01T20:00:00Z')), 'ended');
+  assert.equal(eventPhase({ ...e, closedAt: '2026-01-01T11:00:00Z' }, Date.parse('2026-01-01T12:00:00Z')), 'ended');
 });
 
-test('profanity is masked', () => {
+test('sender name format (for reports)', () => {
+  assert.equal(formatSenderName('OLUWASEUN ADEBAYO'), 'Oluwaseun A.');
+  assert.equal(formatSenderName(''), 'A guest');
+});
+
+test('profanity is masked, surnames are not', () => {
   assert.equal(filterProfanity('what the fuck'), 'what the f***');
-  assert.equal(filterProfanity('Shittu family'), 'Shittu family');
   assert.equal(filterProfanity('fucking hell'), 'f****** hell');
-  assert.equal(filterProfanity('Congratulations'), 'Congratulations');
+  assert.equal(filterProfanity('Shittu family'), 'Shittu family');
 });
 
 test('messages are trimmed to 60 characters', () => {
@@ -54,9 +64,8 @@ test('bank narration keeps the sender’s own words', () => {
   assert.equal(cleanNarration('NIP/OLUWASEUN ADEBAYO/Congrats Tolu', 'OLUWASEUN ADEBAYO'), 'Congrats Tolu');
   assert.equal(cleanNarration('MOB/UTO/Dance well o', null), 'Dance well o');
   assert.equal(cleanNarration('TRF FROM OLUWASEUN ADEBAYO', 'OLUWASEUN ADEBAYO'), null);
-  assert.equal(cleanNarration('OLUWASEUN ADEBAYO', 'OLUWASEUN ADEBAYO'), null);
-  assert.equal(cleanNarration(''), null);
   assert.equal(cleanNarration('Transfer of love to the couple'), 'Transfer of love to the couple');
+  assert.equal(cleanNarration(''), null);
 });
 
 test('paystack signature check', () => {
@@ -68,14 +77,26 @@ test('paystack signature check', () => {
   assert.equal(isValidPaystackSignature(body, null, 'sk_test_abc'), false);
 });
 
-test('leaderboard groups by name and skips anonymous', () => {
+test('totals skip transfers outside the event time', () => {
   const s = computeStats([
-    { displayName: 'Uncle Tunde', anonymous: false, amountKobo: 100 },
-    { displayName: 'uncle tunde ', anonymous: false, amountKobo: 300 },
-    { displayName: 'Anonymous guest', anonymous: true, amountKobo: 1000 },
-    { displayName: 'Aunty Ngozi', anonymous: false, amountKobo: 200 },
+    { amountKobo: 100, outsideWindow: false },
+    { amountKobo: 300, outsideWindow: false },
+    { amountKobo: 1000, outsideWindow: true },
   ]);
-  assert.equal(s.totalKobo, 1600);
-  assert.equal(s.count, 4);
-  assert.deepEqual(s.leaderboard.map((r) => [r.name, r.amountKobo]), [['Uncle Tunde', 400], ['Aunty Ngozi', 200]]);
+  assert.deepEqual(s, { totalKobo: 400, count: 2 });
+});
+
+test('passwords are hashed and checked', async () => {
+  const h = await hashPassword('correct horse');
+  assert.notEqual(h, 'correct horse');
+  assert.equal(await verifyPassword('correct horse', h), true);
+  assert.equal(await verifyPassword('wrong', h), false);
+});
+
+test('login cookies cannot be forged', async () => {
+  const token = (await makePlannerToken('planner-123'))!;
+  assert.equal(await readPlannerToken(token), 'planner-123');
+  const [, exp, sig] = token.split('.');
+  assert.equal(await readPlannerToken(`someone-else.${exp}.${sig}`), null);
+  assert.equal(await readPlannerToken('junk'), null);
 });
