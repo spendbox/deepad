@@ -1,14 +1,18 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { ADMIN_COOKIE, isValidAdminToken, makePlannerToken, PLANNER_COOKIE, PLANNER_SESSION_DAYS, readPlannerToken } from './auth';
+import { ADMIN_COOKIE, isValidAdminToken, makePlannerToken, passwordVersion, PLANNER_COOKIE, PLANNER_SESSION_DAYS, readPlannerToken } from './auth';
 import { getStore } from './store';
 import type { Planner } from './types';
 
 export async function currentPlanner(): Promise<Planner | null> {
   const jar = await cookies();
-  const id = await readPlannerToken(jar.get(PLANNER_COOKIE)?.value);
-  return id ? getStore().getPlannerById(id) : null;
+  const session = await readPlannerToken(jar.get(PLANNER_COOKIE)?.value);
+  if (!session) return null;
+  const planner = await getStore().getPlannerById(session.id);
+  // A password change since this login makes the old login invalid.
+  if (!planner || (await passwordVersion(planner.passwordHash)) !== session.pv) return null;
+  return planner;
 }
 
 /** For planner pages and actions: send them to log in if they are not. */
@@ -18,8 +22,8 @@ export async function requirePlanner(): Promise<Planner> {
   return planner;
 }
 
-export async function startPlannerSession(plannerId: string): Promise<boolean> {
-  const token = await makePlannerToken(plannerId);
+export async function startPlannerSession(planner: Planner): Promise<boolean> {
+  const token = await makePlannerToken(planner.id, await passwordVersion(planner.passwordHash));
   if (!token) return false;
   const jar = await cookies();
   jar.set(PLANNER_COOKIE, token, {

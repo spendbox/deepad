@@ -74,8 +74,8 @@ export async function createSplit(opts: { name: string; shares: { subaccount: st
     type: 'percentage',
     currency: 'NGN',
     subaccounts: opts.shares,
-    // Paystack's own processing fee is shared by everyone in proportion to their share.
-    bearer_type: 'all-proportional',
+    // DashPad's main account pays Paystack's processing fee, out of its 5%.
+    bearer_type: 'account',
   });
   return data.split_code;
 }

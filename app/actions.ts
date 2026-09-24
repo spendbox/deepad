@@ -1,18 +1,22 @@
 'use server';
 
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
 import { EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
-import { insertEventWithUniqueSlug, sendEventReport, setupEventPayments } from '@/lib/events';
+import { escapeHtml, sendEmail } from '@/lib/email';
+import { sendEventReport, setupEventPayments } from '@/lib/events';
 import { clampPlannerFeeBps, MAX_PLANNER_FEE_BPS, PLATFORM_FEE_BPS } from '@/lib/money';
 import { hashPassword, verifyPassword } from '@/lib/passwords';
 import { endPlannerSession, requireAdmin, requirePlanner, startPlannerSession } from '@/lib/session';
+import { siteUrl } from '@/lib/site';
+import { slugProblem } from '@/lib/slug';
 import { getStore } from '@/lib/store';
 import { cleanDisplayName } from '@/lib/text';
 import { isThemeId } from '@/lib/themes';
-import type { SprayEvent } from '@/lib/types';
+import type { Planner, SprayEvent } from '@/lib/types';
 
 type FormState = { error?: string; ok?: string } | null;
 
@@ -35,9 +39,9 @@ export async function signup(_prev: FormState, form: FormData): Promise<FormStat
   const store = getStore();
   if (await store.getPlannerByEmail(email)) return { error: 'An account with that email already exists. Please log in.' };
 
-  let plannerId: string;
+  let planner: Planner;
   try {
-    const planner = await store.createPlanner({
+    planner = await store.createPlanner({
       name,
       email,
       phone,
@@ -48,12 +52,11 @@ export async function signup(_prev: FormState, form: FormData): Promise<FormStat
       accountName: null,
       paystackSubaccount: null,
     });
-    plannerId = planner.id;
   } catch (err) {
     if (err instanceof Error && err.message === 'EMAIL_TAKEN') return { error: 'An account with that email already exists. Please log in.' };
     throw err;
   }
-  if (!(await startPlannerSession(plannerId))) return { error: 'Sign-in is not set up yet (ADMIN_SESSION_SECRET missing).' };
+  if (!(await startPlannerSession(planner))) return { error: 'Sign-in is not set up yet (ADMIN_SESSION_SECRET missing).' };
   redirect('/dashboard/profile?welcome=1');
 }
 
@@ -65,13 +68,75 @@ export async function login(_prev: FormState, form: FormData): Promise<FormState
   if (!planner || !(await verifyPassword(password, planner.passwordHash))) {
     return { error: 'That email and password don’t match.' };
   }
-  if (!(await startPlannerSession(planner.id))) return { error: 'Sign-in is not set up yet (ADMIN_SESSION_SECRET missing).' };
+  if (!(await startPlannerSession(planner))) return { error: 'Sign-in is not set up yet (ADMIN_SESSION_SECRET missing).' };
   redirect('/dashboard');
 }
 
 export async function logout() {
   await endPlannerSession();
   redirect('/');
+}
+
+// ---------- Forgot password ----------
+
+const RESET_MINUTES = 60;
+const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
+
+export async function requestPasswordReset(_prev: FormState, form: FormData): Promise<FormState> {
+  const email = normEmail(str(form, 'email'));
+  const done = { ok: `If ${email} has a DashPad account, we’ve emailed a link to reset the password. It works for ${RESET_MINUTES} minutes.` };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Please enter a valid email address.' };
+
+  const store = getStore();
+  const planner = await store.getPlannerByEmail(email);
+  // Same answer whether or not the account exists, so nobody can find out who has one.
+  if (!planner) return done;
+
+  // At most one email every 2 minutes per account.
+  const last = await store.latestPasswordReset(planner.id);
+  if (last && !last.usedAt && Date.now() - new Date(last.createdAt).getTime() < 120_000) return done;
+
+  const token = randomBytes(32).toString('base64url');
+  await store.createPasswordReset({
+    plannerId: planner.id,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + RESET_MINUTES * 60_000).toISOString(),
+  });
+  const link = `${await siteUrl()}/reset-password?token=${token}`;
+  const sent = await sendEmail({
+    to: planner.email,
+    subject: 'Reset your DashPad password',
+    text: `Hi ${planner.name},\n\nReset your DashPad password here (works for ${RESET_MINUTES} minutes):\n${link}\n\nIf you didn’t ask for this, you can ignore this email.`,
+    html: `<div style="font-family:Arial,sans-serif;color:#1F0A26;max-width:520px">
+<p>Hi ${escapeHtml(planner.name)},</p>
+<p>Tap the button to choose a new DashPad password. The link works for ${RESET_MINUTES} minutes.</p>
+<p><a href="${link}" style="display:inline-block;background:#1F0A26;color:#F2B437;padding:14px 22px;border-radius:10px;text-decoration:none;font-weight:bold">Reset my password</a></p>
+<p style="color:#5E4A66;font-size:13px">If you didn’t ask for this, you can ignore this email. Your password won’t change.</p></div>`,
+  });
+  if (!sent) {
+    // Cancel the unsent link so the planner can try again straight away.
+    const latest = await store.latestPasswordReset(planner.id);
+    if (latest) await store.markPasswordResetUsed(latest.id);
+    return { error: 'We couldn’t send the email right now. Please try again in a few minutes.' };
+  }
+  return done;
+}
+
+export async function resetPassword(_prev: FormState, form: FormData): Promise<FormState> {
+  const token = str(form, 'token');
+  const password = String(form.get('password') ?? '');
+  if (password.length < 8) return { error: 'Your new password needs at least 8 characters.' };
+
+  const store = getStore();
+  const reset = token ? await store.findPasswordReset(hashToken(token)) : null;
+  if (!reset || reset.usedAt || new Date(reset.expiresAt).getTime() < Date.now()) {
+    return { error: 'This reset link has expired or was already used. Please ask for a new one.' };
+  }
+  if (!(await store.markPasswordResetUsed(reset.id))) return { error: 'This reset link was already used.' };
+  // Changing the password also logs out every other device.
+  const planner = await store.updatePlanner(reset.plannerId, { passwordHash: await hashPassword(password) });
+  await startPlannerSession(planner);
+  redirect('/dashboard');
 }
 
 /** The planner's own bank account, where their cut is paid. */
@@ -103,6 +168,8 @@ export async function savePayoutAccount(_prev: FormState, form: FormData): Promi
 // ---------- Events ----------
 
 export type NewEventInput = {
+  slug: string;
+  photos: string[];
   eventType: string;
   celebrantName: string;
   title: string;
@@ -147,7 +214,16 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     return { error: 'Add your own bank account in your profile first, so we know where to pay your cut.' };
   }
 
-  const event = await insertEventWithUniqueSlug({
+  const slug = String(input.slug ?? '').trim().toLowerCase();
+  const slugIssue = slugProblem(slug);
+  if (slugIssue) return { error: slugIssue };
+  if (await getStore().getEventBySlug(slug)) return { error: 'That event link is already taken. Please choose another.' };
+
+  let event: SprayEvent;
+  try {
+    event = await getStore().createEvent({
+    slug,
+    photos: ownPhotos(input.photos, planner.id),
     plannerId: planner.id,
     eventType,
     title,
@@ -175,7 +251,11 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     setupError: null,
     closedAt: null,
     reportSentAt: null,
-  });
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'SLUG_TAKEN') return { error: 'That event link is already taken. Please choose another.' };
+    throw err;
+  }
 
   await setupEventPayments(event.id);
   revalidatePath('/dashboard');
@@ -187,6 +267,48 @@ async function ownEvent(eventId: string): Promise<SprayEvent> {
   const event = await getStore().getEventById(eventId);
   if (!event || event.plannerId !== planner.id) redirect('/dashboard');
   return event;
+}
+
+// ---------- Celebrant photos ----------
+
+const MAX_PHOTOS = 6;
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const PHOTO_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+/** Only keep photos this planner uploaded through us (never outside links). */
+function ownPhotos(urls: unknown, plannerId: string): string[] {
+  if (!Array.isArray(urls)) return [];
+  return urls
+    .filter((u): u is string => typeof u === 'string')
+    .filter((u) => u.startsWith('data:image/') || u.includes(`/celebrant-photos/${plannerId}/`))
+    .slice(0, MAX_PHOTOS);
+}
+
+/** Upload one photo (already shrunk on the phone). Returns its public link. */
+export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: string } | { error: string }> {
+  const planner = await requirePlanner();
+  const file = form.get('photo');
+  if (!(file instanceof File)) return { error: 'Please choose a photo.' };
+  const ext = PHOTO_TYPES[file.type];
+  if (!ext) return { error: 'Please use a JPG, PNG or WebP photo.' };
+  if (file.size > MAX_PHOTO_BYTES) return { error: 'That photo is too large (max 5 MB).' };
+  try {
+    const url = await getStore().uploadImage(`${planner.id}/${randomUUID()}.${ext}`, new Uint8Array(await file.arrayBuffer()), file.type);
+    return { url };
+  } catch (err) {
+    console.error('Photo upload failed', err);
+    return { error: 'The photo could not be uploaded. Please try again.' };
+  }
+}
+
+export async function saveEventPhotos(eventId: string, photos: string[]): Promise<{ error?: string }> {
+  const event = await ownEvent(eventId);
+  const keep = ownPhotos(photos, event.plannerId);
+  const removed = event.photos.filter((u) => !keep.includes(u));
+  await getStore().updateEvent(eventId, { photos: keep });
+  await Promise.all(removed.map((u) => getStore().deleteImage(u).catch(() => {})));
+  revalidatePath(`/dashboard/events/${eventId}`);
+  return {};
 }
 
 export async function retrySetup(eventId: string) {
@@ -219,6 +341,14 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   if (title) patch.title = title;
   const label = cleanDisplayName(str(form, 'recipientLabel'));
   if (label) patch.recipientLabel = label;
+
+  const newSlug = str(form, 'slug').toLowerCase();
+  if (newSlug && newSlug !== event.slug) {
+    const issue = slugProblem(newSlug);
+    if (issue) return { error: issue };
+    if (await getStore().getEventBySlug(newSlug)) return { error: 'That event link is already taken.' };
+    patch.slug = newSlug;
+  }
 
   if (endsAtRaw && !event.closedAt) {
     const end = new Date(endsAtRaw);

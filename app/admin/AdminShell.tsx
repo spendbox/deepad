@@ -15,7 +15,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <header className="dash-top">
         <Link href="/admin" className="brand">DashPad admin</Link>
         <nav>
-          <form action={adminLogout}><button type="submit">Log out</button></form>
+          <form action={adminLogout}>
+            <button type="submit" className="btn btn-sm" style={{ background: "transparent", color: "var(--ivory)", borderColor: "var(--ivory)" }}>Log out</button>
+          </form>
         </nav>
       </header>
       <main className="dash-main" style={{ maxWidth: 1100 }}>

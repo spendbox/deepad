@@ -16,13 +16,18 @@ export default async function AdminHome() {
   const [planners, events] = await Promise.all([store.listPlanners(), store.listEvents()]);
   const sums = await Promise.all(events.map(async (e) => summarise(await store.listTransfers(e.id, 100000))));
   const plannerName = new Map(planners.map((p) => [p.id, p.name]));
-  const total = sums.reduce((a, s) => ({ sprayed: a.sprayed + s.totalKobo, platform: a.platform + s.platformKobo, outside: a.outside + s.outside.length }), { sprayed: 0, platform: 0, outside: 0 });
+  const total = sums.reduce(
+    (a, s) => ({ sprayed: a.sprayed + s.totalKobo, platform: a.platform + s.platformKobo, processing: a.processing + s.processingKobo, outside: a.outside + s.outside.length }),
+    { sprayed: 0, platform: 0, processing: 0, outside: 0 },
+  );
 
   return (
     <AdminShell>
       <h1>Overview</h1>
       <div className="tiles">
-        <div className="tile gold"><div className="v">{naira(total.platform)}</div><div className="k">DashPad earnings (5%)</div></div>
+        <div className="tile gold"><div className="v">{naira(total.platform - total.processing)}</div><div className="k">DashPad earnings after Paystack fees</div></div>
+        <div className="tile"><div className="v">{naira(total.platform)}</div><div className="k">DashPad 5% (before fees)</div></div>
+        <div className="tile"><div className="v">{naira(total.processing)}</div><div className="k">Paystack fees paid by DashPad</div></div>
         <div className="tile"><div className="v">{naira(total.sprayed)}</div><div className="k">Total sprayed</div></div>
         <div className="tile"><div className="v">{events.length}</div><div className="k">Events</div></div>
         <div className="tile"><div className="v">{planners.length}</div><div className="k">Planners</div></div>

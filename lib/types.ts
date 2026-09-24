@@ -24,7 +24,7 @@ export type SetupStatus = 'pending' | 'ready' | 'failed';
 
 export type SprayEvent = {
   id: string;
-  /** The unique code in the event's link: /e/<slug>. */
+  /** The event's short link: dashpad.ng/<slug>, chosen by the planner. */
   slug: string;
   plannerId: string;
   eventType: EventType;
@@ -32,6 +32,8 @@ export type SprayEvent = {
   celebrantName: string; // "Tolu & Dayo"
   recipientLabel: string; // "the couple" -> "₦20,000 sent to the couple"
   theme: ThemeId;
+  /** Photos of the celebrants (public image links), shown on the big screen. */
+  photos: string[];
   startsAt: string;
   endsAt: string;
   plannerFeeBps: number; // 0–4500 (0–45%)
@@ -74,6 +76,8 @@ export type Transfer = {
   platformFeeKobo: number;
   plannerFeeKobo: number;
   celebrantKobo: number;
+  /** Paystack's processing fee on this transfer. DashPad pays it out of its 5%. */
+  processingFeeKobo: number;
   /** Money that arrived before the start or after the end: kept off the screen. */
   outsideWindow: boolean;
   hidden: boolean;
@@ -83,3 +87,12 @@ export type Transfer = {
 export type NewTransfer = Omit<Transfer, 'id' | 'createdAt' | 'hidden'>;
 
 export type EventStats = { totalKobo: number; count: number };
+
+export type PasswordReset = {
+  id: string;
+  plannerId: string;
+  tokenHash: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+};

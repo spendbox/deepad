@@ -2,10 +2,11 @@
 
 import { useActionState, useState } from 'react';
 import { RECIPIENT_CHOICES } from '@/lib/event-info';
+import SlugField from '@/components/SlugField';
 import { THEMES } from '@/lib/themes';
 import { saveEventSettings } from '../../../actions';
 
-type Values = { title: string; recipientLabel: string; theme: string; bigSprayNaira: number; endsAt: string };
+type Values = { slug: string; title: string; recipientLabel: string; theme: string; bigSprayNaira: number; endsAt: string };
 
 function toLocalInput(iso: string): string {
   const d = new Date(iso);
@@ -23,6 +24,7 @@ export default function SettingsForm({ eventId, ended, values }: { eventId: stri
   const [theme, setTheme] = useState(values.theme);
   const [label, setLabel] = useState(values.recipientLabel);
   const [endLocal, setEndLocal] = useState(() => toLocalInput(values.endsAt));
+  const [slug, setSlug] = useState(values.slug);
 
   return (
     <form action={action} className="form" style={{ marginTop: 8 }}>
@@ -30,6 +32,13 @@ export default function SettingsForm({ eventId, ended, values }: { eventId: stri
       <input type="hidden" name="recipientLabel" value={label} />
       {/* Sent as a full date with time zone, so the server reads it correctly. */}
       <input type="hidden" name="endsAt" value={ended ? '' : localToIso(endLocal)} />
+      <input type="hidden" name="slug" value={slug} />
+      <SlugField value={slug} onChange={setSlug} exceptEventId={eventId} />
+      {slug !== values.slug && (
+        <p className="banner warn" style={{ margin: 0 }}>
+          The old link will stop working. If you’ve already shared it, share the new one.
+        </p>
+      )}
       <div className="field">
         <label htmlFor="s-title">Event title</label>
         <input id="s-title" name="title" className="input" defaultValue={values.title} maxLength={40} />

@@ -77,8 +77,29 @@ create table if not exists transfers (
 
 create index if not exists transfers_event_idx on transfers (event_id, id desc);
 
+-- Added later: celebrant photos, Paystack's fee per transfer.
+alter table spray_events add column if not exists photos jsonb not null default '[]'::jsonb;
+alter table transfers add column if not exists processing_fee_kobo bigint not null default 0;
+
+-- "Forgot password" links. Only a hash of each link's secret is stored.
+create table if not exists password_resets (
+  id uuid primary key default gen_random_uuid(),
+  planner_id uuid not null references planners (id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists password_resets_planner_idx on password_resets (planner_id, created_at desc);
+
+-- Public storage folder for celebrant photos (shown on the big screen).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('celebrant-photos', 'celebrant-photos', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+
 -- Lock everything down: only our server (with the secret service-role key)
 -- can read or write. Browsers never talk to the database directly.
 alter table planners enable row level security;
 alter table spray_events enable row level security;
 alter table transfers enable row level security;
+alter table password_resets enable row level security;

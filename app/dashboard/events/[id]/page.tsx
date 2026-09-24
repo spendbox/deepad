@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { after } from 'next/server';
 import CopyButton from '@/components/CopyButton';
+import PayoutNote from '@/components/PayoutNote';
 import { eventPhase, formatWhen } from '@/lib/event-info';
 import { closeEvent, summarise } from '@/lib/events';
 import { groupAccountNumber, naira, percent } from '@/lib/money';
@@ -10,6 +11,7 @@ import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import { retrySetup, setPaused, setTransferHidden } from '../../../actions';
 import AutoRefresh from '../../AutoRefresh';
+import EventPhotos from './EventPhotos';
 import DashShell from '../../DashShell';
 import PhasePill from '../../PhasePill';
 import ReportButton from './ReportButton';
@@ -37,7 +39,7 @@ export default async function EventPage({
 
   const transfers = await store.listTransfers(event.id, 1000);
   const s = summarise(transfers);
-  const link = `${await siteUrl()}/e/${event.slug}`;
+  const link = `${await siteUrl()}/${event.slug}`;
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });
@@ -67,7 +69,7 @@ export default async function EventPage({
         <div className="actions">
           <CopyButton text={link} label="Copy link" dark />
           <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-gold btn-sm">Share on WhatsApp</a>
-          <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{ background: 'transparent', color: 'var(--ivory)', borderColor: 'var(--ivory)' }}>
+          <a href={`/${event.slug}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{ background: 'transparent', color: 'var(--ivory)', borderColor: 'var(--ivory)' }}>
             Open big screen ↗
           </a>
         </div>
@@ -81,7 +83,8 @@ export default async function EventPage({
               <span className="acct-big">{groupAccountNumber(event.accountNumber)}</span>
               <CopyButton text={event.accountNumber} />
             </div>
-            <span style={{ fontWeight: 700 }}>{event.accountBank} · {event.accountName}</span>
+            <span className="bank-strong">{event.accountBank}</span>
+            <span style={{ fontWeight: 600 }}>{event.accountName}</span>
             {phase === 'ended' && <span className="hint">This account is closed. New transfers are not accepted.</span>}
           </>
         ) : event.setupStatus === 'failed' ? (
@@ -99,6 +102,7 @@ export default async function EventPage({
         <span className="hint">
           Money goes to {event.payoutAccountName} ({event.payoutBankName} · {event.payoutAccountNumber}).
         </span>
+        <PayoutNote />
       </section>
 
       <div className="tiles">
@@ -175,11 +179,17 @@ export default async function EventPage({
       )}
 
       <details className="card">
+        <summary>Celebrant photos ({event.photos.length})</summary>
+        <EventPhotos eventId={event.id} initial={event.photos} />
+      </details>
+
+      <details className="card">
         <summary>Event settings</summary>
         <SettingsForm
           eventId={event.id}
           ended={phase === 'ended'}
           values={{
+            slug: event.slug,
             title: event.title,
             recipientLabel: event.recipientLabel,
             theme: event.theme,

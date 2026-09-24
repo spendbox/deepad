@@ -3,6 +3,7 @@ import type {
   NewPlanner,
   NewSprayEvent,
   NewTransfer,
+  PasswordReset,
   Planner,
   SprayEvent,
   Transfer,
@@ -16,6 +17,15 @@ export interface Store {
   getPlannerByEmail(email: string): Promise<Planner | null>;
   updatePlanner(id: string, patch: Partial<NewPlanner>): Promise<Planner>;
   listPlanners(): Promise<Planner[]>;
+
+  createPasswordReset(r: { plannerId: string; tokenHash: string; expiresAt: string }): Promise<void>;
+  findPasswordReset(tokenHash: string): Promise<PasswordReset | null>;
+  latestPasswordReset(plannerId: string): Promise<PasswordReset | null>;
+  markPasswordResetUsed(id: string): Promise<boolean>;
+
+  /** Save an image and return its public link. */
+  uploadImage(path: string, bytes: Uint8Array, contentType: string): Promise<string>;
+  deleteImage(url: string): Promise<void>;
 
   createEvent(e: NewSprayEvent): Promise<SprayEvent>;
   getEventById(id: string): Promise<SprayEvent | null>;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import { groupAccountNumber, naira } from '@/lib/money';
 import { getTheme } from '@/lib/themes';
@@ -9,6 +10,7 @@ import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 const POLL_MS = 2000;
 const SPRAY_HOLD_MS = 12000; // a spray stays up this long, then the screen invites more
 const TAKEOVER_MS = 7000;
+const PHOTO_MS = 7000; // each celebrant photo shows this long
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
@@ -32,6 +34,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const [popKey, setPopKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
+  const [compact, setCompact] = useState(false);
+  const [ready, setReady] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
   // --- Ask the server for new transfers. Keeps retrying if the internet drops. ---
@@ -94,7 +98,12 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
   // --- Fit the 1920x1080 design to any TV or projector. ---
   useEffect(() => {
-    const fit = () => setScale(Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H));
+    const fit = () => {
+      setScale(Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H));
+      // Phones and narrow windows get a layout made for them instead of a tiny TV picture.
+      setCompact(window.innerWidth < 900 || window.innerHeight > window.innerWidth);
+      setReady(true);
+    };
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
@@ -153,7 +162,108 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
   const recent = feed.recent.filter((t) => !queue.some((q) => q.id === t.id)).slice(-6).reverse();
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
+  // Celebrant photos take turns, a new one every few seconds.
+  const photo = e.photos.length ? e.photos[ready ? Math.floor(now / PHOTO_MS) % e.photos.length : 0] : null;
 
+  const statusBadge = !online ? (
+    <div className="badge offline" role="status">Reconnecting… transfers still work</div>
+  ) : e.phase === 'live' ? (
+    <div className="badge"><span className="live-dot" />{paused ? 'Paused' : 'Live'}</div>
+  ) : null;
+
+  const fullScreenButton = (
+    <button
+      type="button"
+      className={`fs-btn${showControls ? '' : ' hidden'}`}
+      onClick={() => {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else document.documentElement.requestFullscreen().catch(() => {});
+      }}
+    >
+      Full screen
+    </button>
+  );
+
+  // ---------- Phone layout (someone opened the link on their phone) ----------
+  if (compact) {
+    return (
+      <div className="m-screen" style={themeVars}>
+        <header className="m-top">
+          <div style={{ minWidth: 0 }}>
+            <div className="top-brand" style={{ fontSize: 16 }}>DashPad</div>
+            <h1 className="m-title">{e.title}</h1>
+          </div>
+          {statusBadge}
+        </header>
+
+        {photo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className="m-photo fade-in" />
+        )}
+
+        {e.phase === 'upcoming' ? (
+          <section className="m-card m-center">
+            <div className="m-big">Spraying opens soon</div>
+            <div>{dayAndClock(e.startsAt)}</div>
+            <div className="m-muted">The account number will appear here when spraying starts.</div>
+          </section>
+        ) : e.phase === 'ended' ? (
+          <section className="m-card m-center">
+            <div className="m-big">Thank you for spraying!</div>
+            <div className="m-amount">{naira(feed.stats.totalKobo)}</div>
+            <div>sent to {e.recipientLabel} from {feed.stats.count.toLocaleString('en-NG')} sprays</div>
+            <div className="m-muted">Spraying has closed. Please don’t send more transfers.</div>
+          </section>
+        ) : (
+          <>
+            {acct ? (
+              <section className="m-pay">
+                <div className="m-pay-label">Transfer to spray</div>
+                <div className="m-acct">{acct}</div>
+                <div className="m-bank">{e.accountBank}</div>
+                <div className="m-acct-name">{e.accountName}</div>
+                <CopyButton text={e.accountNumber!} label="Copy account number" />
+              </section>
+            ) : (
+              <section className="m-pay"><div className="m-bank">Account number coming soon</div></section>
+            )}
+
+            {takeover || (showingSpray && current) ? (
+              <section key={popKey} className={`m-card pop${takeover ? ' m-bigspray' : ''}`}>
+                {takeover && <div className="m-badge">Big spray!</div>}
+                <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
+                <div className="m-to">sent to {e.recipientLabel}</div>
+                {(takeover?.t ?? current!).message && <div className="m-msg">“{(takeover?.t ?? current!).message}”</div>}
+              </section>
+            ) : (
+              <section className="m-card">
+                <div className="m-big">Spray {e.celebrantName}!</div>
+                <div className="m-muted">Type a message in your transfer description and it will show on the big screen.</div>
+              </section>
+            )}
+
+            <section className="m-card">
+              <div className="m-total">{naira(totalKobo)}</div>
+              <div className="m-muted">sprayed · {count.toLocaleString('en-NG')} sprays</div>
+              {recent.length > 0 && (
+                <ol className="m-recent">
+                  {recent.map((t) => (
+                    <li key={t.id}>
+                      <strong>{naira(t.amountKobo)}</strong>
+                      {t.message && <span>{t.message}</span>}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </>
+        )}
+        <p className="m-foot">Only confirmed transfers appear. Senders stay anonymous.</p>
+      </div>
+    );
+  }
+
+  // ---------- Big screen layout (TV or projector) ----------
   return (
     <div className="screen-root" style={themeVars}>
       <div className="stage" style={{ transform: `translate(-50%, -50%) scale(${scale})` }}>
@@ -169,7 +279,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
               <div className="takeover-acct">
                 <span>Transfer to spray</span>
                 <strong>{acct}</strong>
-                <span>{e.accountBank}</span>
+                <span className="takeover-bank">{e.accountBank}</span>
               </div>
             )}
           </div>
@@ -181,27 +291,33 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                 <h1 className="top-title">{e.title}</h1>
               </div>
               <div className="top-right">
-                {!online ? (
-                  <div className="badge offline" role="status">Reconnecting… transfers still work</div>
-                ) : e.phase === 'live' ? (
-                  <div className="badge"><span className="live-dot" />{paused ? 'Paused' : 'Live'}</div>
-                ) : null}
+                {statusBadge}
                 {e.phase === 'live' && <div className="top-note">Spraying closes {clock(e.endsAt)}</div>}
               </div>
             </header>
 
-            {e.phase === 'upcoming' ? (
+            {e.phase === 'upcoming' || e.phase === 'ended' ? (
               <section className="notice">
-                <div className="notice-big">Spraying opens soon</div>
-                <div className="notice-sub">{dayAndClock(e.startsAt)}</div>
-                <div className="notice-sub muted">The account number will appear here when spraying starts.</div>
-              </section>
-            ) : e.phase === 'ended' ? (
-              <section className="notice">
-                <div className="notice-big">Thank you for spraying!</div>
-                <div className="notice-amount">{naira(feed.stats.totalKobo)}</div>
-                <div className="notice-sub">sent to {e.recipientLabel} from {feed.stats.count.toLocaleString('en-NG')} sprays</div>
-                <div className="notice-sub muted">Spraying has closed. Please don’t send more transfers.</div>
+                {photo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={photo} src={photo} alt="" className="notice-photo fade-in" />
+                )}
+                <div className="notice-text">
+                  {e.phase === 'upcoming' ? (
+                    <>
+                      <div className="notice-big">Spraying opens soon</div>
+                      <div className="notice-sub">{dayAndClock(e.startsAt)}</div>
+                      <div className="notice-sub muted">The account number will appear here when spraying starts.</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="notice-big">Thank you for spraying!</div>
+                      <div className="notice-amount">{naira(feed.stats.totalKobo)}</div>
+                      <div className="notice-sub">sent to {e.recipientLabel} from {feed.stats.count.toLocaleString('en-NG')} sprays</div>
+                      <div className="notice-sub muted">Spraying has closed. Please don’t send more transfers.</div>
+                    </>
+                  )}
+                </div>
               </section>
             ) : (
               <>
@@ -213,12 +329,18 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                       {current.message && <div className="pop-msg">“{current.message}”</div>}
                     </div>
                   ) : (
-                    <div className="invite panel-main">
-                      <div className="invite-big">Spray {e.celebrantName}!</div>
-                      <div className="invite-sub">
-                        Transfer any amount from your bank app to the account below. Type a message in the transfer
-                        description and it will show here.
+                    <div className={`invite panel-main${photo ? ' with-photo' : ''}`}>
+                      <div className="invite-text">
+                        <div className="invite-big">Spray {e.celebrantName}!</div>
+                        <div className="invite-sub">
+                          Transfer any amount from your bank app to the account below. Type a message in the transfer
+                          description and it will show here.
+                        </div>
                       </div>
+                      {photo && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={photo} src={photo} alt="" className="invite-photo fade-in" />
+                      )}
                     </div>
                   )}
                   <aside className="side">
@@ -250,7 +372,10 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                       <>
                         <div className="paybar-label">Transfer to spray</div>
                         <FitText className="paybar-acct" text={acct} max={150} />
-                        <div className="paybar-meta">{[e.accountBank, e.accountName].filter(Boolean).join(' · ')}</div>
+                        <div className="paybar-meta">
+                          <span className="paybar-bank">{e.accountBank}</span>
+                          {e.accountName && <span className="paybar-name">{e.accountName}</span>}
+                        </div>
                       </>
                     ) : (
                       <div className="paybar-acct" style={{ fontSize: 72 }}>Account number coming soon</div>
@@ -272,17 +397,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           </div>
         )}
       </div>
-
-      <button
-        type="button"
-        className={`fs-btn${showControls ? '' : ' hidden'}`}
-        onClick={() => {
-          if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-          else document.documentElement.requestFullscreen().catch(() => {});
-        }}
-      >
-        Full screen
-      </button>
+      {fullScreenButton}
     </div>
   );
 }

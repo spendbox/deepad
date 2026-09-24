@@ -7,7 +7,8 @@ import { isValidPaystackSignature } from '../lib/paystack-signature.ts';
 import { computeStats } from '../lib/store/types.ts';
 import { eventPhase } from '../lib/event-info.ts';
 import { hashPassword, verifyPassword } from '../lib/passwords.ts';
-import { makePlannerToken, readPlannerToken } from '../lib/auth.ts';
+import { makePlannerToken, passwordVersion, readPlannerToken } from '../lib/auth.ts';
+import { slugify, slugProblem } from '../lib/slug.ts';
 
 test('split: DashPad 5%, planner cut, celebrant gets the rest', () => {
   const s = splitTransfer(10_000_00, 1000);
@@ -94,9 +95,25 @@ test('passwords are hashed and checked', async () => {
 });
 
 test('login cookies cannot be forged', async () => {
-  const token = (await makePlannerToken('planner-123'))!;
-  assert.equal(await readPlannerToken(token), 'planner-123');
-  const [, exp, sig] = token.split('.');
-  assert.equal(await readPlannerToken(`someone-else.${exp}.${sig}`), null);
+  const pv = await passwordVersion('scrypt$abc$def');
+  const token = (await makePlannerToken('planner-123', pv))!;
+  assert.deepEqual(await readPlannerToken(token), { id: 'planner-123', pv });
+  const [, exp, , sig] = token.split('.');
+  assert.equal(await readPlannerToken(`someone-else.${exp}.${pv}.${sig}`), null);
+  assert.equal(await readPlannerToken(`planner-123.${exp}.000000000000.${sig}`), null);
   assert.equal(await readPlannerToken('junk'), null);
+});
+
+test('a new password changes the login fingerprint', async () => {
+  assert.notEqual(await passwordVersion('scrypt$a$1'), await passwordVersion('scrypt$a$2'));
+});
+
+test('event links are short and safe', () => {
+  assert.equal(slugify('Tolu & Dayo’s Wedding!'), 'tolu-and-dayos-wedding');
+  assert.equal(slugify('  Mama  Kemi @ 60 '), 'mama-kemi-60');
+  assert.equal(slugProblem('tolu-and-dayo'), null);
+  assert.notEqual(slugProblem('dashboard'), null);
+  assert.notEqual(slugProblem('ab'), null);
+  assert.notEqual(slugProblem('Tolu_Dayo'), null);
+  assert.notEqual(slugProblem('-tolu'), null);
 });

@@ -28,23 +28,32 @@ function sameText(a: string, b: string): boolean {
 
 // ----- Planners -----
 
-export async function makePlannerToken(plannerId: string): Promise<string | null> {
+/**
+ * A short fingerprint of the planner's password. It is part of the login
+ * cookie, so changing the password logs out every other phone and laptop.
+ */
+export async function passwordVersion(passwordHash: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(passwordHash));
+  return Array.from(new Uint8Array(digest).slice(0, 6), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function makePlannerToken(plannerId: string, pv: string): Promise<string | null> {
   const secret = signingSecret();
   if (!secret) return null;
   const exp = Date.now() + PLANNER_SESSION_DAYS * 86_400_000;
-  const sig = await hmacHex(secret, `planner|${plannerId}|${exp}`);
-  return `${plannerId}.${exp}.${sig}`;
+  const sig = await hmacHex(secret, `planner|${plannerId}|${exp}|${pv}`);
+  return `${plannerId}.${exp}.${pv}.${sig}`;
 }
 
-/** Returns the planner id if the cookie is genuine and not expired. */
-export async function readPlannerToken(token: string | undefined | null): Promise<string | null> {
+/** Returns who is logged in if the cookie is genuine and not expired. */
+export async function readPlannerToken(token: string | undefined | null): Promise<{ id: string; pv: string } | null> {
   const secret = signingSecret();
   if (!token || !secret) return null;
-  const [id, expText, sig] = token.split('.');
+  const [id, expText, pv, sig] = token.split('.');
   const exp = Number(expText);
-  if (!id || !sig || !Number.isFinite(exp) || exp < Date.now()) return null;
-  const expected = await hmacHex(secret, `planner|${id}|${exp}`);
-  return sameText(sig, expected) ? id : null;
+  if (!id || !pv || !sig || !Number.isFinite(exp) || exp < Date.now()) return null;
+  const expected = await hmacHex(secret, `planner|${id}|${exp}|${pv}`);
+  return sameText(sig, expected) ? { id, pv } : null;
 }
 
 // ----- DashPad admin (Wilson) -----
