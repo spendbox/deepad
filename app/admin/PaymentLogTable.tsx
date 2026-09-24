@@ -28,7 +28,15 @@ export default function PaymentLogTable({ logs, title = 'Payment notifications' 
                   </span>
                 </td>
                 <td className="num">{l.reference ?? '—'}</td>
-                <td style={{ minWidth: 260 }}>{l.detail ?? ''}</td>
+                <td style={{ minWidth: 260 }}>
+                  {l.detail ?? ''}
+                  {l.raw ? (
+                    <details style={{ marginTop: 6 }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Full notification from Paystack</summary>
+                      <pre className="raw-json">{JSON.stringify(l.raw, null, 2)}</pre>
+                    </details>
+                  ) : null}
+                </td>
               </tr>
             ))}
             {logs.length === 0 && <tr><td colSpan={5}>Nothing received yet.</td></tr>}

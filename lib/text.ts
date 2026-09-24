@@ -69,14 +69,59 @@ export function formatSenderName(raw: string | null | undefined): string {
  * or "MOB/UTO/Dance well o". We keep the guest's own words, and always remove
  * the sender's name so the big screen stays anonymous.
  */
-const JARGON = /^(nip|nibss|trf|trfr|tfr|transfer|trsf|ft|mob|mobile|mb|mbanking|web|ussd|pos|inw|inward|outward|ref|app|fip|nxg|frm|from|by|via|payment|pymt|pmt)$/i;
+const JARGON = /^(nip|nibss|trf|trfr|tfr|transfer|trsf|ft|mob|mobile|mb|mbanking|web|ussd|pos|inw|inward|outward|ref|app|fip|nxg|frm|from|to|by|via|payment|pymt|pmt)$/i;
+
+const lettersOnly = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * Some banks fill the description with the RECEIVING account's name (e.g.
+ * "SPENDBOX/DASHPA…", cut short) instead of what the guest typed. Remove it.
+ * `receiverNames` are names of the event's own account, e.g. "SPENDBOX/DASHPAD TOLU".
+ */
+export function stripReceiverName(text: string, receiverNames: (string | null | undefined)[]): string {
+  let s = text;
+  for (const name of receiverNames) {
+    if (!name) continue;
+    const full = lettersOnly(name);
+    if (full.length >= 4) {
+      // A leading chunk whose letters match the start of the account name (banks cut it short).
+      let matched = 0;
+      let end = 0;
+      let lastGood = 0;
+      for (let i = 0; i < s.length && matched < full.length; i++) {
+        const ch = s[i].toLowerCase();
+        if (!/[\p{L}\p{N}]/u.test(ch)) {
+          end = i + 1;
+          continue;
+        }
+        if (ch !== full[matched]) break;
+        matched += 1;
+        end = i + 1;
+        lastGood = end;
+      }
+      const atWordEnd = lastGood >= s.length || !/[\p{L}\p{N}]/u.test(s[lastGood]);
+      if (lastGood && atWordEnd && (matched >= Math.min(8, full.length) || lastGood >= s.trim().length)) {
+        s = s.slice(Math.max(lastGood, end > lastGood && !/\p{L}/u.test(s.slice(lastGood, end)) ? end : lastGood));
+      }
+    }
+    // The business part (before the "/") anywhere in the text, with the cut-off bit after it.
+    const business = name.split('/')[0].trim();
+    if (lettersOnly(business).length >= 4) {
+      const esc = business.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+      s = s.replace(new RegExp(`(?<![\\p{L}])${esc}(?![\\p{L}])(\\s*/\\s*[\\p{L}\\p{N}&' ]*)?`, 'giu'), ' ');
+    }
+  }
+  return s;
+}
 
 export function cleanNarration(
   raw: string | null | undefined,
   senderName?: string | null,
+  receiverNames: (string | null | undefined)[] = [],
 ): string | null {
   if (!raw) return null;
-  let s = collapseSpaces(raw);
+  let s = collapseSpaces(stripReceiverName(collapseSpaces(raw), receiverNames));
+  if (!s) return null;
 
   // 1) Slash-separated pieces: drop bank codes and bare jargon pieces.
   const pieces = s.split(/\s*[\/|]\s*/).map((p) => p.trim()).filter(Boolean);

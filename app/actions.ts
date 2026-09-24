@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
 import { EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
 import { escapeHtml, sendEmail } from '@/lib/email';
-import { checkPaystackForTransfers, sendEventReport, setupEventPayments } from '@/lib/events';
+import { checkPaystackForTransfers, recleanMessages, sendEventReport, setupEventPayments } from '@/lib/events';
 import { deactivateDedicatedAccount, paystackConfigured } from '@/lib/paystack';
 import { clampPlannerFeeBps, MAX_PLANNER_FEE_BPS, PLATFORM_FEE_BPS } from '@/lib/money';
 import { hashPassword, verifyPassword } from '@/lib/passwords';
@@ -436,6 +436,15 @@ export async function adminCheckPaystack(eventId: string, _prev: FormState): Pro
   const found = await checkPaystackForTransfers(event, { force: true });
   revalidatePath(`/admin/events/${eventId}`);
   return { ok: found ? `Found ${found} new payment(s) and added them.` : 'Checked Paystack: no new payments found. See the payment log below for any errors.' };
+}
+
+export async function adminRecleanMessages(eventId: string, _prev: FormState): Promise<FormState> {
+  await requireAdmin();
+  const event = await getStore().getEventById(eventId);
+  if (!event) return { error: 'Event not found.' };
+  const changed = await recleanMessages(event);
+  revalidatePath(`/admin/events/${eventId}`);
+  return { ok: changed ? `Updated ${changed} message(s).` : 'All messages were already correct.' };
 }
 
 export async function adminRetrySetup(eventId: string) {

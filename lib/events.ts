@@ -13,6 +13,8 @@ import {
   paystackConfigured,
 } from './paystack';
 import { getStore } from './store';
+export { collectNarrations } from './narration';
+import { collectNarrations, pickNarration } from './narration';
 import { cleanNarration } from './text';
 import type { Planner, SprayEvent, Transfer } from './types';
 
@@ -122,7 +124,8 @@ export async function recordTransfer(
     amountKobo: number;
     senderName: string | null;
     senderBank: string | null;
-    narration: string | null;
+    /** Possible descriptions, most likely first (see collectNarrations). */
+    narrations: string[];
     paidAt?: string | null;
     processingFeeKobo?: number;
   },
@@ -131,8 +134,7 @@ export async function recordTransfer(
   const outsideWindow = eventPhase({ startsAt: event.startsAt, endsAt: event.endsAt }, Number.isFinite(when) ? when : Date.now()) !== 'live';
   const split = splitTransfer(t.amountKobo, event.plannerFeeBps, event.platformFeeBps);
   const store = getStore();
-  const rawNarration = t.narration?.trim() || null;
-  const message = cleanNarration(rawNarration, t.senderName);
+  const { raw: rawNarration, message } = pickNarration(t.narrations, t.senderName, receiverNames(event));
   const result = await store.insertTransfer({
     eventId: event.id,
     reference: t.reference,
@@ -148,49 +150,36 @@ export async function recordTransfer(
     outsideWindow,
   });
   // Seen before without a description (e.g. found by the backup check), and now we have one.
-  if (!result.created && !result.transfer.rawNarration && rawNarration) {
+  if (!result.created && !result.transfer.message && message) {
     await store.setTransferMessage(result.transfer.id, message, rawNarration);
     result.transfer = { ...result.transfer, message, rawNarration };
   }
   return result;
 }
 
+/** Names of the event's own receiving account, which must never be shown as a guest's message. */
+export function receiverNames(event: SprayEvent): string[] {
+  return [event.accountName, process.env.PAYSTACK_BUSINESS_NAME, 'DashPad'].filter((n): n is string => !!n);
+}
+
 /**
- * Find the description the sender typed. Paystack normally puts it in
- * authorization.narration, but we also look in other places banks use.
+ * Re-read every stored description with the latest cleaning rules, e.g. after
+ * learning that a bank puts the receiving account's name in the description.
+ * Returns how many messages changed.
  */
-export function findNarration(data: unknown): string | null {
-  const d = (data ?? {}) as Record<string, any>;
-  const direct = [
-    d.authorization?.narration,
-    d.narration,
-    d.metadata?.narration,
-    d.authorization?.description,
-    d.metadata?.description,
-    d.description,
-  ].find((v) => typeof v === 'string' && v.trim());
-  if (direct) return direct.trim();
-  // Last resort: any field whose name sounds like a description.
-  const seen = new Set<unknown>();
-  const walk = (o: unknown, depth: number): string | null => {
-    if (!o || typeof o !== 'object' || depth > 4 || seen.has(o)) return null;
-    seen.add(o);
-    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
-      if (typeof v === 'string' && v.trim() && /narrat|remark|memo|description/i.test(k)) return v.trim();
-      if (Array.isArray(v)) {
-        for (const item of v) {
-          const it = item as Record<string, unknown>;
-          if (it && typeof it.value === 'string' && /narrat|remark|description/i.test(String(it.variable_name ?? it.display_name ?? ''))) {
-            return it.value.trim();
-          }
-        }
-      }
-      const found = walk(v, depth + 1);
-      if (found) return found;
+export async function recleanMessages(event: SprayEvent): Promise<number> {
+  const store = getStore();
+  const receivers = receiverNames(event);
+  let changed = 0;
+  for (const t of await store.listTransfers(event.id, 100000)) {
+    if (!t.rawNarration) continue;
+    const message = cleanNarration(t.rawNarration, t.senderName, receivers);
+    if (message !== t.message) {
+      await store.setTransferMessage(t.id, message, t.rawNarration);
+      changed += 1;
     }
-    return null;
-  };
-  return walk(d, 0);
+  }
+  return changed;
 }
 
 // ---------- Backup: ask Paystack directly ----------
@@ -239,7 +228,7 @@ export async function checkPaystackForTransfers(event: SprayEvent, opts: { force
         amountKobo,
         senderName: auth.sender_name ?? null,
         senderBank: auth.sender_bank ?? null,
-        narration: findNarration(tx),
+        narrations: collectNarrations(tx),
         paidAt: tx.paid_at ?? tx.paidAt ?? null,
         processingFeeKobo: Number(tx.fees ?? 0) || 0,
       });
@@ -252,6 +241,7 @@ export async function checkPaystackForTransfers(event: SprayEvent, opts: { force
           outcome: 'recorded',
           detail: 'Found by asking Paystack directly (no webhook had arrived for it).',
           eventId: event.id,
+          raw: tx,
         });
       }
     }
