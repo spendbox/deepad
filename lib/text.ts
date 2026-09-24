@@ -65,9 +65,12 @@ export function formatSenderName(raw: string | null | undefined): string {
 
 /**
  * The description a sender types in their bank app ("narration") often comes
- * wrapped in bank jargon such as "NIP/TRF FROM JOHN DOE/Congrats". We strip
- * the obvious bank bits so the guest's own words show on screen.
+ * wrapped in bank jargon, e.g. "NIP FRM OLUWASEUN ADEBAYO-Happy married life"
+ * or "MOB/UTO/Dance well o". We keep the guest's own words, and always remove
+ * the sender's name so the big screen stays anonymous.
  */
+const JARGON = /^(nip|nibss|trf|trfr|tfr|transfer|trsf|ft|mob|mobile|mb|mbanking|web|ussd|pos|inw|inward|outward|ref|app|fip|nxg|frm|from|by|via|payment|pymt|pmt)$/i;
+
 export function cleanNarration(
   raw: string | null | undefined,
   senderName?: string | null,
@@ -75,25 +78,45 @@ export function cleanNarration(
   if (!raw) return null;
   let s = collapseSpaces(raw);
 
-  // Many banks separate their own prefix from the sender's words with slashes.
-  const pieces = s.split('/').map((p) => p.trim()).filter(Boolean);
-  const bankish = /^(nip|nibss|trf|trfr|transfer|ft|mob|mobile|mb|mbanking|web|ussd|pos|inw|inward|outward|ref|app|fip|nxg|nip transfer|mobile transfer|mobile banking|internet banking)\b/i;
-  const useful = pieces.filter((p, i) => {
-    // Short capital codes before the real words, e.g. "MOB/UTO/Dance well o".
-    if (i < pieces.length - 1 && /^[A-Z0-9]{2,6}$/.test(p)) return false;
-    if (pieces.length > 1 && bankish.test(p) && p.split(' ').length <= 3) return false;
-    if (/^(trf|transfer|tfr)\s+(from|frm|to)\b/i.test(p)) return false;
-    if (/^[A-Z0-9-]{8,}$/.test(p) && /\d/.test(p)) return false; // reference codes
-    if (senderName && p.toLowerCase() === senderName.toLowerCase()) return false;
+  // 1) Slash-separated pieces: drop bank codes and bare jargon pieces.
+  const pieces = s.split(/\s*[\/|]\s*/).map((p) => p.trim()).filter(Boolean);
+  const kept = pieces.filter((p, i) => {
+    if (pieces.length > 1 && i < pieces.length - 1 && /^[A-Z0-9]{2,6}$/.test(p)) return false; // "MOB/UTO/…"
+    if (/^[A-Z0-9-]{6,}$/.test(p) && /\d/.test(p)) return false; // reference codes
+    if (p.split(' ').every((w) => JARGON.test(w))) return false; // "NIP", "TRF FROM"
     return true;
   });
-  s = useful.join(' ');
+  s = kept.join(' - ');
 
-  s = s
-    .replace(/\b(nip|trf|tfr)\s*(from|frm)\b.*$/i, '')
-    .replace(/\b\d{8,}\b/g, '')
-    .replace(/^(transfer|trf|tfr)\s+(from|frm|to)\b.*$/i, '');
+  // 2) The sender's name, wherever it appears (screen must stay anonymous).
+  const nameWords = (senderName ?? '')
+    .toLowerCase()
+    .split(/[^\p{L}']+/u)
+    .filter((w) => w.length >= 2);
+  if (nameWords.length) {
+    const re = new RegExp(`(?<![\\p{L}])(${nameWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\p{L}])`, 'giu');
+    s = s.replace(re, ' ');
+  }
+  // Without a sender name, "FRM SOME NAME - message" still hides the capitalised name.
+  s = s.replace(/^(?:[A-Z]{2,6}\s+)*(?:FRM|FROM)\s+[A-Z][A-Z .'-]*?\s*(?:[-:]|\s-\s)\s*(?=\S)/, '');
+
+  // 3) Leading bank words ("NIP FRM", "TRANSFER FROM", "WEB TRF") and trailing "TO DASHPAD…".
+  s = s.replace(/\b(?:to\s+)?dashpad\b.*$/i, ' ');
+  s = s.replace(/\b\d{8,}\b/g, ' ');
   s = collapseSpaces(s);
-  if (senderName && s.toLowerCase() === senderName.toLowerCase()) return null;
+  for (;;) {
+    const m = s.match(/^([\p{L}]+)[\s:.,-]*/u);
+    if (!m) break;
+    const word = m[1];
+    const isJargon = JARGON.test(word) && (word === word.toUpperCase() || /^(trf|tfr|nip|frm|nibss|ussd)$/i.test(word) || /^(transfer)\s+(from|frm|to)\b/i.test(s));
+    if (!isJargon) break;
+    s = s.slice(m[0].length);
+  }
+
+  // 4) Tidy up leftover separators and shouting.
+  s = collapseSpaces(s.replace(/\s*-\s*(-\s*)+/g, ' - ')).replace(/^[\s\-:,.;/|]+|[\s\-:,;/|]+$/g, '');
+  s = s.replace(/\s+(?:from|frm|by)$/i, '');
+  if (!/\p{L}/u.test(s)) return null;
+  if (s.length > 3 && s === s.toUpperCase()) s = s.charAt(0) + s.slice(1).toLowerCase();
   return cleanMessage(s);
 }

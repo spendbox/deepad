@@ -75,6 +75,8 @@ export type Transfer = {
   senderBank: string | null;
   /** The description the sender typed, cleaned. Shown on screen unless hidden. */
   message: string | null;
+  /** Exactly what the bank sent as the description, before cleaning. Private. */
+  rawNarration: string | null;
   platformFeeKobo: number;
   plannerFeeKobo: number;
   celebrantKobo: number;

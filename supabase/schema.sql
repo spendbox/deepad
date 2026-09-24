@@ -96,6 +96,9 @@ create index if not exists password_resets_planner_idx on password_resets (plann
 -- are kept (marked deleted) so DashPad's records stay complete.
 alter table spray_events add column if not exists deleted_at timestamptz;
 
+-- Added later: the exact description the bank sent, for checking what guests typed.
+alter table transfers add column if not exists raw_narration text;
+
 -- Every payment notification from Paystack, so problems can be seen and fixed.
 create table if not exists payment_logs (
   id bigserial primary key,
