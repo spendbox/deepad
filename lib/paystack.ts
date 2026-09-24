@@ -114,3 +114,34 @@ export async function createDedicatedAccount(opts: { customerCode: string; split
 export async function deactivateDedicatedAccount(id: string) {
   await call('DELETE', `/dedicated_account/${encodeURIComponent(id)}`);
 }
+
+/** Paystack's number for a customer (each event has its own customer). */
+export async function getCustomerId(customerCode: string): Promise<number> {
+  const data = await call<{ id: number }>('GET', `/customer/${encodeURIComponent(customerCode)}`);
+  return data.id;
+}
+
+export type PaystackTransaction = {
+  status?: string;
+  reference?: string;
+  amount?: number;
+  fees?: number | null;
+  currency?: string;
+  paid_at?: string | null;
+  paidAt?: string | null;
+  authorization?: {
+    sender_name?: string | null;
+    sender_bank?: string | null;
+    narration?: string | null;
+    receiver_bank_account_number?: string | null;
+  } | null;
+};
+
+/**
+ * Successful payments to one customer (= one event) since a given time.
+ * Used as a backup in case a payment notification (webhook) never arrives.
+ */
+export async function listCustomerTransactions(customerId: number, fromIso: string): Promise<PaystackTransaction[]> {
+  const q = new URLSearchParams({ customer: String(customerId), status: 'success', perPage: '100', from: fromIso });
+  return call<PaystackTransaction[]>('GET', `/transaction?${q}`);
+}

@@ -4,13 +4,14 @@ import { after } from 'next/server';
 import CopyButton from '@/components/CopyButton';
 import PayoutNote from '@/components/PayoutNote';
 import { eventPhase, formatWhen } from '@/lib/event-info';
-import { closeEvent, summarise } from '@/lib/events';
+import { checkPaystackForTransfers, closeEvent, summarise } from '@/lib/events';
 import { groupAccountNumber, naira, percent } from '@/lib/money';
 import { requirePlanner } from '@/lib/session';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import { retrySetup, setPaused, setTransferHidden } from '../../../actions';
 import AutoRefresh from '../../AutoRefresh';
+import DeleteEvent from './DeleteEvent';
 import EventPhotos from './EventPhotos';
 import DashShell from '../../DashShell';
 import PhasePill from '../../PhasePill';
@@ -30,7 +31,10 @@ export default async function EventPage({
   const planner = await requirePlanner();
   const store = getStore();
   const event = await store.getEventById(id);
-  if (!event || event.plannerId !== planner.id) notFound();
+  if (!event || event.plannerId !== planner.id || event.deletedAt) notFound();
+
+  // Backup for missed payment notifications while the planner is watching.
+  after(() => checkPaystackForTransfers(event).catch((err) => console.error('checkPaystack failed', err)));
 
   const phase = eventPhase(event);
   if (phase === 'ended' && (!event.closedAt || !event.reportSentAt)) {
@@ -197,6 +201,11 @@ export default async function EventPage({
             endsAt: event.endsAt,
           }}
         />
+      </details>
+
+      <details className="card">
+        <summary>Delete event</summary>
+        <DeleteEvent eventId={event.id} hasMoney={transfers.length > 0} live={phase === 'live'} />
       </details>
 
       <p><Link href="/dashboard">← All events</Link></p>

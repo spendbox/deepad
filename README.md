@@ -28,7 +28,10 @@ description. Senders stay anonymous on screen.
 - Payouts reach the bank accounts within 2 business days.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
-- Only transfers confirmed by Paystack's signed webhook ever reach the screen.
+- Only transfers confirmed by Paystack ever reach the screen: either its signed webhook, or (as a
+  backup while the screen is open) by asking Paystack's API directly for the event's payments.
+- The admin page has a **Setup check** and a **Payment notifications** log for fixing problems.
+- Planners can delete events. Events that received money are hidden, not erased, so records stay complete.
 
 ## Setting it up
 

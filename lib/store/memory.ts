@@ -1,15 +1,22 @@
 import { randomUUID } from 'node:crypto';
-import type { NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, Planner, SprayEvent, Transfer } from '../types';
+import type { NewPaymentLog, NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, PaymentLog, Planner, SprayEvent, Transfer } from '../types';
 import { computeStats, type Store } from './types';
 
 // A throwaway store that lives in the server's memory, for developers running
 // the app on their own computer. It is never used on the live site.
 
-type Data = { planners: Planner[]; events: SprayEvent[]; transfers: Transfer[]; resets: PasswordReset[]; nextTransferId: number };
+type Data = {
+  planners: Planner[];
+  events: SprayEvent[];
+  transfers: Transfer[];
+  resets: PasswordReset[];
+  logs: PaymentLog[];
+  nextTransferId: number;
+};
 
 const g = globalThis as unknown as { __dashpadMemory?: Data };
 function data(): Data {
-  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], nextTransferId: 1 };
+  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], nextTransferId: 1 };
   return g.__dashpadMemory;
 }
 
@@ -84,7 +91,7 @@ export class MemoryStore implements Store {
     return data().events.find((e) => e.paystackCustomerCode === code) ?? null;
   }
   async listEventsByPlanner(plannerId: string) {
-    return data().events.filter((e) => e.plannerId === plannerId).sort(byNewest);
+    return data().events.filter((e) => e.plannerId === plannerId && !e.deletedAt).sort(byNewest);
   }
   async listEvents() {
     return [...data().events].sort(byNewest);
@@ -97,6 +104,11 @@ export class MemoryStore implements Store {
     if (!e) throw new Error('Event not found');
     Object.assign(e, patch);
     return e;
+  }
+  async deleteEvent(id: string) {
+    const d = data();
+    d.events = d.events.filter((e) => e.id !== id);
+    d.transfers = d.transfers.filter((t) => t.eventId !== id);
   }
   async claimReport(eventId: string) {
     const e = data().events.find((x) => x.id === eventId);
@@ -129,5 +141,17 @@ export class MemoryStore implements Store {
   }
   async eventStats(eventId: string) {
     return computeStats(data().transfers.filter((t) => t.eventId === eventId));
+  }
+
+  async logPayment(l: NewPaymentLog) {
+    const d = data();
+    d.logs.unshift({ ...l, id: d.logs.length + 1, createdAt: now() });
+    d.logs.length = Math.min(d.logs.length, 500);
+  }
+  async listPaymentLogs(limit = 50) {
+    return data().logs.slice(0, limit);
+  }
+  async schemaProblems() {
+    return [];
   }
 }

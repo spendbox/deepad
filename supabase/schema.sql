@@ -92,6 +92,23 @@ create table if not exists password_resets (
 );
 create index if not exists password_resets_planner_idx on password_resets (planner_id, created_at desc);
 
+-- Added later: planners can delete events. Events that already received money
+-- are kept (marked deleted) so DashPad's records stay complete.
+alter table spray_events add column if not exists deleted_at timestamptz;
+
+-- Every payment notification from Paystack, so problems can be seen and fixed.
+create table if not exists payment_logs (
+  id bigserial primary key,
+  source text not null default 'webhook',
+  paystack_event text,
+  reference text,
+  outcome text not null,
+  detail text,
+  event_id uuid,
+  created_at timestamptz not null default now()
+);
+create index if not exists payment_logs_created_idx on payment_logs (id desc);
+
 -- Public storage folder for celebrant photos (shown on the big screen).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('celebrant-photos', 'celebrant-photos', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
@@ -103,3 +120,4 @@ alter table planners enable row level security;
 alter table spray_events enable row level security;
 alter table transfers enable row level security;
 alter table password_resets enable row level security;
+alter table payment_logs enable row level security;

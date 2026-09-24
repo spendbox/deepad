@@ -9,7 +9,8 @@ import PhasePill from './PhasePill';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Your events · DashPad' };
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   const planner = await requirePlanner();
   const store = getStore();
   const events = await store.listEventsByPlanner(planner.id);
@@ -25,6 +26,8 @@ export default async function Dashboard() {
         </div>
         <Link href="/dashboard/events/new" className="btn btn-dark">+ New event</Link>
       </div>
+
+      {deleted === '1' && <div className="banner info" role="status">The event was deleted.</div>}
 
       {needsBank && (
         <div className="banner warn">

@@ -6,6 +6,8 @@ import { requireAdmin } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import PhasePill from '../dashboard/PhasePill';
 import AdminShell from './AdminShell';
+import PaymentLogTable from './PaymentLogTable';
+import SetupCheck from './SetupCheck';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin · DashPad' };
@@ -13,7 +15,7 @@ export const metadata = { title: 'Admin · DashPad' };
 export default async function AdminHome() {
   await requireAdmin();
   const store = getStore();
-  const [planners, events] = await Promise.all([store.listPlanners(), store.listEvents()]);
+  const [planners, events, logs] = await Promise.all([store.listPlanners(), store.listEvents(), store.listPaymentLogs(40)]);
   const sums = await Promise.all(events.map(async (e) => summarise(await store.listTransfers(e.id, 100000))));
   const plannerName = new Map(planners.map((p) => [p.id, p.name]));
   const total = sums.reduce(
@@ -24,6 +26,7 @@ export default async function AdminHome() {
   return (
     <AdminShell>
       <h1>Overview</h1>
+      <SetupCheck logs={logs} />
       <div className="tiles">
         <div className="tile gold"><div className="v">{naira(total.platform - total.processing)}</div><div className="k">DashPad earnings after Paystack fees</div></div>
         <div className="tile"><div className="v">{naira(total.platform)}</div><div className="k">DashPad 5% (before fees)</div></div>
@@ -49,7 +52,7 @@ export default async function AdminHome() {
                   <td><Link href={`/admin/events/${e.id}`}>{e.title}</Link></td>
                   <td>{plannerName.get(e.plannerId) ?? '—'}</td>
                   <td className="num">{formatWhen(e.startsAt)}</td>
-                  <td><PhasePill phase={eventPhase(e)} /></td>
+                  <td>{e.deletedAt ? <span className="pill ended">Deleted by planner</span> : <PhasePill phase={eventPhase(e)} />}</td>
                   <td className="num"><strong>{naira(sums[i].totalKobo)}</strong></td>
                   <td className="num">{percent(e.plannerFeeBps)}</td>
                   <td>{e.setupStatus === 'ready' ? e.accountNumber : <span className={`pill ${e.setupStatus === 'failed' ? 'failed' : ''}`}>{e.setupStatus}</span>}</td>
@@ -60,6 +63,8 @@ export default async function AdminHome() {
           </table>
         </div>
       </section>
+
+      <PaymentLogTable logs={logs} />
 
       <section className="card">
         <h2>Planners</h2>

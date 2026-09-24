@@ -57,6 +57,8 @@ export type SprayEvent = {
   setupError: string | null;
   closedAt: string | null;
   reportSentAt: string | null;
+  /** Set when the planner deletes an event that already received money (kept for records). */
+  deletedAt: string | null;
   createdAt: string;
 };
 
@@ -96,3 +98,19 @@ export type PasswordReset = {
   usedAt: string | null;
   createdAt: string;
 };
+
+export type PaymentLogOutcome = 'recorded' | 'duplicate' | 'ignored' | 'unmatched' | 'bad_signature' | 'error';
+
+/** One payment notification from Paystack (or one check we made), for fixing problems. */
+export type PaymentLog = {
+  id: number;
+  source: 'webhook' | 'check';
+  paystackEvent: string | null;
+  reference: string | null;
+  outcome: PaymentLogOutcome;
+  detail: string | null;
+  eventId: string | null;
+  createdAt: string;
+};
+
+export type NewPaymentLog = Omit<PaymentLog, 'id' | 'createdAt'>;
