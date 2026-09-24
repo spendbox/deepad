@@ -236,7 +236,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
             {takeover || (showingSpray && current) ? (
               <section key={popKey} className={`m-card spray-pop m-spray${takeover ? ' m-bigspray' : ''}`}>
                 <Burst count={10} />
-                <Vuvuzela className="m-vuvu" />
                 <div className="m-badge">{takeover ? 'Big spray!' : 'New spray!'}</div>
                 <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
                 <div className="m-to">sent to {e.recipientLabel}</div>
@@ -277,8 +276,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
         {takeover ? (
           <div className="takeover">
-            <Vuvuzela className="takeover-vuvu left" />
-            <Vuvuzela className="takeover-vuvu right" />
             <div className="takeover-badge">Big spray!</div>
             <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
             <div className="takeover-to">sent to {e.recipientLabel}</div>
@@ -332,7 +329,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                   {showingSpray && current ? (
                     <div key={popKey} className="panel-main spray-pop">
                       <Burst count={16} />
-                      <Vuvuzela className="pop-vuvu" />
                       <div className="pop-kicker">New spray!</div>
                       <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
                       <div className="pop-to">sent to {e.recipientLabel}</div>
@@ -402,60 +398,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       </div>
       {fullScreenButton}
     </div>
-  );
-}
-
-/** A vuvuzela blowing: sound waves and confetti out of the horn. Green-white-green. */
-const CONFETTI = Array.from({ length: 12 }, (_, i) => {
-  const a = (-25 + (i - 5.5) * 7) * (Math.PI / 180); // spread around the horn's direction
-  const d = 90 + (i % 4) * 30;
-  return {
-    dx: `${Math.round(Math.cos(a) * d)}px`,
-    dy: `${Math.round(Math.sin(a) * d)}px`,
-    color: ['#F2B437', '#FFFFFF', '#1F7A4D', '#E8457A', '#4FC3F7'][i % 5],
-    delay: `${(i % 6) * 0.12}s`,
-  };
-});
-
-function Vuvuzela({ className = '' }: { className?: string }) {
-  return (
-    <svg className={`vuvu ${className}`} viewBox="0 -40 360 240" aria-hidden="true">
-      <defs>
-        <linearGradient id="vuvu-stripes" gradientUnits="userSpaceOnUse" x1="30" y1="170" x2="240" y2="70">
-          <stop offset="0" stopColor="#1F7A4D" />
-          <stop offset=".33" stopColor="#1F7A4D" />
-          <stop offset=".33" stopColor="#FFFFFF" />
-          <stop offset=".66" stopColor="#FFFFFF" />
-          <stop offset=".66" stopColor="#1F7A4D" />
-          <stop offset="1" stopColor="#1F7A4D" />
-        </linearGradient>
-      </defs>
-      <g className="vuvu-waves" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round">
-        <path className="vuvu-wave w1" d="M264.6 26.5 A50 50 0 0 1 289.3 78.3" />
-        <path className="vuvu-wave w2" d="M277 4.7 A75 75 0 0 1 314 82.4" />
-        <path className="vuvu-wave w3" d="M289.3 -17 A100 100 0 0 1 338.6 86.6" />
-      </g>
-      <g className="vuvu-horn">
-        <polygon points="27.8,165.5 223.6,35.6 256.4,104.4 32.2,174.5" fill="url(#vuvu-stripes)" stroke="#0B3D26" strokeWidth="3" strokeLinejoin="round" />
-        <ellipse cx="240" cy="70" rx="11" ry="38" transform="rotate(-25.5 240 70)" fill="#0B3D26" stroke="#F2B437" strokeWidth="4" />
-        <circle cx="27" cy="171" r="9" fill="#F2B437" stroke="#0B3D26" strokeWidth="3" />
-      </g>
-      <g>
-        {CONFETTI.map((c, i) => (
-          <rect
-            key={i}
-            className="vuvu-confetti"
-            x="244"
-            y="64"
-            width="12"
-            height="7"
-            rx="2"
-            fill={c.color}
-            style={{ '--dx': c.dx, '--dy': c.dy, animationDelay: c.delay } as React.CSSProperties}
-          />
-        ))}
-      </g>
-    </svg>
   );
 }
 
