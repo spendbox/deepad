@@ -56,8 +56,6 @@ function drawLogo(page: PDFPage, x: number, yTop: number, size: number) {
   page.drawSvgPath('M17 15 H29.5 A17 17 0 0 1 29.5 49 H17 Z', {
     x, y: yTop, scale: s, borderColor: C.gold, borderWidth: 7.5 * s,
   });
-  // Green note
-  page.drawSvgPath('M40 13 L57 5 L62 16 L45 24 Z', { x, y: yTop, scale: s, color: C.green });
 }
 
 export async function buildReportPdf(event: SprayEvent, planner: Planner, transfers: Transfer[]): Promise<Uint8Array> {
