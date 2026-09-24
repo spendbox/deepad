@@ -139,6 +139,8 @@ create index if not exists spray_intents_event_idx on spray_intents (event_id);
 
 -- Added later: fun lines for sprays that arrive without a message.
 alter table spray_events add column if not exists hype_lines jsonb not null default '[]'::jsonb;
+-- Added later: the planner's own theme colours ({"primary": "#..", "secondary": "#.."}).
+alter table spray_events add column if not exists theme_colors jsonb;
 
 -- Public storage folder for celebrant photos (shown on the big screen).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

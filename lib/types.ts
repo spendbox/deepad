@@ -1,4 +1,4 @@
-import type { ThemeId } from './themes';
+import type { EventThemeId, ThemeColors } from './themes';
 
 /** An event planner (or MC) who creates spray events. */
 export type Planner = {
@@ -31,7 +31,10 @@ export type SprayEvent = {
   title: string; // "Tolu & Dayo’s wedding"
   celebrantName: string; // "Tolu & Dayo"
   recipientLabel: string; // "the couple" -> "₦20,000 sent to the couple"
-  theme: ThemeId;
+  /** A preset theme, or 'custom' to use `themeColors`. */
+  theme: EventThemeId;
+  /** The planner's own colours (used when theme is 'custom'). */
+  themeColors: ThemeColors | null;
   /** Photos of the celebrants (public image links), shown on the big screen. */
   photos: string[];
   /** Fun lines shown for sprays that arrive without a message. Empty = use the defaults. */
@@ -93,6 +96,12 @@ export type Transfer = {
 export type NewTransfer = Omit<Transfer, 'id' | 'createdAt' | 'hidden'>;
 
 export type EventStats = { totalKobo: number; count: number };
+
+/** Just the money columns of a transfer: enough for totals and charts, and fast to load. */
+export type MoneyRow = Pick<
+  Transfer,
+  'eventId' | 'createdAt' | 'amountKobo' | 'platformFeeKobo' | 'plannerFeeKobo' | 'celebrantKobo' | 'processingFeeKobo' | 'outsideWindow'
+>;
 
 export type PasswordReset = {
   id: string;

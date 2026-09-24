@@ -1,10 +1,10 @@
 import Logo from '@/components/Logo';
 import Link from 'next/link';
-import { currentPlanner } from '@/lib/session';
 import SprayScene from './SprayScene';
 import './landing.css';
 
-export const dynamic = 'force-dynamic';
+// Static: built once and served instantly from the edge. Logged-in planners who
+// tap Log in or Sign up are sent straight to their dashboard.
 
 const STEPS = [
   {
@@ -57,23 +57,15 @@ const FAQ = [
   },
 ];
 
-export default async function Home() {
-  const planner = await currentPlanner();
-  const primary = planner ? { href: '/dashboard', label: 'Go to your dashboard' } : { href: '/signup', label: 'Create your spray event' };
+export default function Home() {
 
   return (
     <div className="lp">
       <header className="lp-nav">
         <Link href="/" className="brand" aria-label="DashPad home"><Logo size={34} /></Link>
         <nav>
-          {planner ? (
-            <Link href="/dashboard" className="btn btn-gold btn-sm">Dashboard</Link>
-          ) : (
-            <>
-              <Link href="/login" className="lp-navlink">Log in</Link>
-              <Link href="/signup" className="btn btn-gold btn-sm">Sign up</Link>
-            </>
-          )}
+          <Link href="/login" className="lp-navlink">Log in</Link>
+          <Link href="/signup" className="btn btn-gold btn-sm">Sign up</Link>
         </nav>
       </header>
 
@@ -86,8 +78,8 @@ export default async function Home() {
             message they typed. You earn a cut of every naira.
           </p>
           <div className="actions">
-            <Link href={primary.href} className="btn btn-gold btn-lg">{primary.label}</Link>
-            {!planner && <Link href="/login" className="btn btn-ghost lp-ghost btn-lg">Log in</Link>}
+            <Link href="/signup" className="btn btn-gold btn-lg">Create your spray event</Link>
+            <Link href="/login" className="btn btn-ghost lp-ghost btn-lg">Log in</Link>
           </div>
           <p className="lp-small">Free to set up. DashPad takes 5% per transfer.</p>
         </div>
@@ -168,7 +160,7 @@ export default async function Home() {
 
       <section className="lp-cta">
         <h2>Your next party, sprayed right.</h2>
-        <Link href={primary.href} className="btn btn-gold btn-lg">{primary.label}</Link>
+        <Link href="/signup" className="btn btn-gold btn-lg">Create your spray event</Link>
       </section>
 
       <footer className="lp-foot">

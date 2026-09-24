@@ -1,4 +1,5 @@
 import type {
+  MoneyRow,
   EventStats,
   NewPlanner,
   NewSprayEvent,
@@ -55,6 +56,8 @@ export interface Store {
   insertTransfer(t: NewTransfer): Promise<{ transfer: Transfer; created: boolean }>;
   /** Newest first. */
   listTransfers(eventId: string, limit?: number): Promise<Transfer[]>;
+  /** Money columns of every transfer for these events, in one go (for totals and charts). */
+  listMoneyRows(eventIds: string[]): Promise<MoneyRow[]>;
   /** Transfers with an id greater than `afterId`, oldest first (so the screen never skips one). */
   listTransfersAfter(eventId: string, afterId: number, limit?: number): Promise<Transfer[]>;
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;

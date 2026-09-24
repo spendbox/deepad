@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { naira } from '@/lib/money';
 
-type Bar = { label: string; kobo: number; sprays: number };
+type Bar = { label: string; tip: string; kobo: number; sprays: number };
 
 const BAR = '#8A3FA3'; // plum: passes the lightness and 3:1 contrast checks on white
 const GRID = '#EDE3F0';
@@ -27,12 +27,16 @@ function compactNaira(kobo: number): string {
   return `₦${Math.round(n)}`;
 }
 
-/** One series (your earnings), so no legend: the heading says what is plotted. */
-export default function EarningsChart({ bars, title }: { bars: Bar[]; title: string }) {
+/**
+ * One series (your earnings), so no legend: the heading says what is plotted.
+ * "Running total" shows how the money grew over time; "Per hour/day…" shows each slot.
+ */
+export default function EarningsChart({ bars, title, per }: { bars: Bar[]; title: string; per: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const [mode, setMode] = useState<'total' | 'per'>('total');
 
   useEffect(() => {
     const el = wrap.current;
@@ -42,7 +46,10 @@ export default function EarningsChart({ bars, title }: { bars: Bar[]; title: str
     return () => ro.disconnect();
   }, []);
 
-  const max = niceMax(Math.max(0, ...bars.map((b) => b.kobo)));
+  let running = 0;
+  const cumulative = bars.map((b) => (running += b.kobo));
+  const values = mode === 'total' ? cumulative : bars.map((b) => b.kobo);
+  const max = niceMax(Math.max(0, ...values));
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(max * f));
   const plotW = width - PAD.left - PAD.right;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
@@ -56,18 +63,24 @@ export default function EarningsChart({ bars, title }: { bars: Bar[]; title: str
     <div className="chart-card">
       <div className="row-between">
         <h2>{title}</h2>
-        <button type="button" className="btn btn-sm" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
-          {asTable ? 'Show chart' : 'Show as table'}
-        </button>
+        <div className="actions">
+          <div className="seg" role="group" aria-label="Chart type">
+            <button type="button" aria-pressed={mode === 'total'} onClick={() => setMode('total')}>Running total</button>
+            <button type="button" aria-pressed={mode === 'per'} onClick={() => setMode('per')}>Per {per}</button>
+          </div>
+          <button type="button" className="btn btn-sm" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
+            {asTable ? 'Show chart' : 'Table'}
+          </button>
+        </div>
       </div>
 
       {asTable ? (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Period</th><th>Sprays</th><th>You earned</th></tr></thead>
+            <thead><tr><th>Time</th><th>Sprays</th><th>You earned</th><th>Running total</th></tr></thead>
             <tbody>
-              {bars.map((b) => (
-                <tr key={b.label}><td>{b.label}</td><td className="num">{b.sprays}</td><td className="num">{naira(b.kobo)}</td></tr>
+              {bars.map((b, i) => (
+                <tr key={i}><td>{b.tip}</td><td className="num">{b.sprays}</td><td className="num">{naira(b.kobo)}</td><td className="num">{naira(cumulative[i])}</td></tr>
               ))}
             </tbody>
           </table>
@@ -84,6 +97,18 @@ export default function EarningsChart({ bars, title }: { bars: Bar[]; title: str
                 </text>
               </g>
             ))}
+            {mode === 'total' && bars.length > 0 && (() => {
+              const pts = cumulative.map((v, i) => `${PAD.left + band * i + band / 2},${y(v)}`);
+              const x0 = PAD.left + band / 2;
+              const x1 = PAD.left + band * (bars.length - 1) + band / 2;
+              return (
+                <>
+                  <path d={`M${x0},${PAD.top + plotH} L${pts.join(' L')} L${x1},${PAD.top + plotH} Z`} fill={BAR} opacity="0.12" />
+                  <polyline points={pts.join(' ')} fill="none" stroke={BAR} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                  {hover !== null && <circle cx={PAD.left + band * hover + band / 2} cy={y(cumulative[hover])} r="5" fill={BAR} stroke="#fff" strokeWidth="2" />}
+                </>
+              );
+            })()}
             {bars.map((b, i) => {
               const cx = PAD.left + band * i + band / 2;
               const h = Math.max(0, (b.kobo / max) * plotH);
@@ -91,11 +116,11 @@ export default function EarningsChart({ bars, title }: { bars: Bar[]; title: str
               const top = PAD.top + plotH - h;
               const r = Math.min(4, barW / 2, h);
               // Rounded data end at the top, square at the baseline.
-              const d = h > 0
+              const d = mode === 'per' && h > 0
                 ? `M${x},${PAD.top + plotH} V${top + r} Q${x},${top} ${x + r},${top} H${x + barW - r} Q${x + barW},${top} ${x + barW},${top + r} V${PAD.top + plotH} Z`
                 : '';
               return (
-                <g key={b.label}>
+                <g key={i}>
                   {d && <path d={d} fill={BAR} opacity={hover === null || hover === i ? 1 : 0.55} />}
                   {i % everyNth === 0 && (
                     <text x={cx} y={HEIGHT - 10} textAnchor="middle" fontSize="12" fill={MUTED}>{b.label}</text>
@@ -121,13 +146,15 @@ export default function EarningsChart({ bars, title }: { bars: Bar[]; title: str
               className="chart-tip"
               style={{
                 left: Math.min(Math.max(PAD.left + band * hover + band / 2, 80), width - 80),
-                top: Math.max(y(bars[hover].kobo) - 12, 0),
+                top: Math.max(y(values[hover]) - 12, 0),
               }}
               role="status"
             >
-              <div style={{ color: MUTED, fontSize: 12 }}>{bars[hover].label}</div>
-              <div style={{ color: INK, fontWeight: 700 }}>{naira(bars[hover].kobo)}</div>
-              <div style={{ color: MUTED, fontSize: 12 }}>{bars[hover].sprays} spray{bars[hover].sprays === 1 ? '' : 's'}</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{bars[hover].tip}</div>
+              <div style={{ color: INK, fontWeight: 700 }}>+{naira(bars[hover].kobo)}</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>
+                {bars[hover].sprays} spray{bars[hover].sprays === 1 ? '' : 's'} · {naira(cumulative[hover])} so far
+              </div>
             </div>
           )}
         </div>

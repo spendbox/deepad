@@ -14,7 +14,6 @@ description. Senders stay anonymous on screen.
 | Planner dashboard | `/dashboard` | Planners: create and run events |
 | Earnings | `/dashboard/earnings` | Planners: earnings over time, with time filters |
 | Event big screen | `/<event-link>` e.g. `/tolu-and-dayo` | The venue TV or projector (works on phones too) |
-| Spray with a message | `/<event-link>/spray` (QR code on the big screen) | Guests who want their message on screen |
 | Forgot password | `/forgot-password` | Planners |
 | Admin | `/admin` | DashPad staff (password protected) |
 | Paystack webhook | `/api/webhooks/paystack` | Paystack |
@@ -30,13 +29,16 @@ description. Senders stay anonymous on screen.
 - Payouts reach the bank accounts within 2 business days.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
-- Banks often drop or replace the transfer description, so guests who want a message scan the QR
-  code, type it, and get a one-time account number for that spray: the message always matches.
+- The guest's transfer description is shown as their message when the bank passes it on.
   Sprays without a message show a fun “hype line” (planners can write their own).
 - Only transfers confirmed by Paystack ever reach the screen: either its signed webhook, or (as a
   backup while the screen is open) by asking Paystack's API directly for the event's payments.
 - After the event, the planner is emailed a short summary with a branded **PDF report** attached
   (also downloadable from the event page).
+- Planners pick a ready-made screen theme or their **own two colours**; DashPad automatically adjusts
+  them so all text on the big screen stays readable (WCAG contrast).
+- Celebrant photos can have their **background removed** on the planner's own device (free, using
+  Google's MediaPipe; the model downloads once, about 16 MB).
 - The admin page has a **Setup check** and a **Payment notifications** log for fixing problems.
 - Planners can delete events. Events that received money are hidden, not erased, so records stay complete.
 

@@ -179,3 +179,26 @@ test('earnings are grouped into Nigerian days, weeks and months', async () => {
   const m = rangeWindow('12m', now, null);
   assert.equal(bucketize([], m.from, m.unit, now).length, 12);
 });
+
+test('custom theme colours: every random pair stays readable', async () => {
+  const { paletteFromColors, contrast, CONTRAST } = await import('../lib/colors.ts');
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const hex = () => '#' + Math.floor(rand() * 0xffffff).toString(16).padStart(6, '0');
+  const fixed = [['#FFFFFF', '#FFFFFF'], ['#000000', '#000000'], ['#808080', '#808080'], ['#FF0000', '#00FF00'], ['#FFFF00', '#FFFFFF']];
+  const pairs = [...fixed, ...Array.from({ length: 800 }, () => [hex(), hex()])];
+  for (const [p, s] of pairs) {
+    const t = paletteFromColors(p, s);
+    const why = `${p} / ${s} → ${JSON.stringify(t)}`;
+    assert.ok(contrast(t.text, t.bg) >= CONTRAST.text, 'text on bg ' + why);
+    assert.ok(contrast(t.text, t.panel) >= CONTRAST.text, 'text on panel ' + why);
+    assert.ok(contrast(t.muted, t.bg) >= CONTRAST.muted && contrast(t.muted, t.panel) >= CONTRAST.muted, 'muted ' + why);
+    assert.ok(contrast(t.accent, t.bg) >= CONTRAST.accent && contrast(t.accent, t.panel) >= CONTRAST.accent, 'accent ' + why);
+    assert.ok(contrast(t.onAccent, t.accent) >= CONTRAST.onAccent, 'on accent ' + why);
+  }
+  // A good pair is left exactly as chosen.
+  const owambe = paletteFromColors('#1F0A26', '#F2B437');
+  assert.equal(owambe.bg, '#1F0A26');
+  assert.equal(owambe.accent, '#F2B437');
+  assert.deepEqual(owambe.notes, []);
+});

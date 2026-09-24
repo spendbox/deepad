@@ -6,7 +6,8 @@ import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import { groupAccountNumber, naira } from '@/lib/money';
 import { pickHypeLine } from '@/lib/hype';
-import { getTheme } from '@/lib/themes';
+import { isCutout } from '@/components/cutout';
+import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 
 const POLL_MS = 2000;
@@ -16,7 +17,7 @@ const PHOTO_MS = 7000; // each celebrant photo shows this long
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
-type Props = { code: string; initialFeed: ScreenFeed; qrSvg: string; sprayPath: string };
+type Props = { code: string; initialFeed: ScreenFeed };
 
 function clock(iso: string) {
   return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
@@ -25,7 +26,7 @@ function dayAndClock(iso: string) {
   return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Props) {
+export default function LiveScreen({ code, initialFeed }: Props) {
   const [feed, setFeed] = useState(initialFeed);
   const [online, setOnline] = useState(true);
   const seen = useRef(new Set(initialFeed.recent.map((t) => t.id)));
@@ -154,15 +155,8 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
   }, []);
 
   const e = feed.event;
-  const theme = getTheme(e.theme);
-  const themeVars = {
-    '--s-bg': theme.bg,
-    '--s-panel': theme.panel,
-    '--s-accent': theme.accent,
-    '--s-on-accent': theme.onAccent,
-    '--s-text': theme.text,
-    '--s-muted': theme.muted,
-  } as React.CSSProperties;
+  const theme = resolveTheme(e.theme, e.themeColors);
+  const themeVars = toThemeVars(theme) as React.CSSProperties;
 
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
   // The guest's message, or a fun line when they didn't leave one.
@@ -203,7 +197,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
       <div className="m-screen" style={themeVars}>
         <header className="m-top">
           <div style={{ minWidth: 0 }}>
-            <div className="top-brand"><Logo size={22} tone={theme.id === 'daylight' ? 'light' : 'dark'} /></div>
+            <div className="top-brand"><Logo size={22} tone={theme.light ? 'light' : 'dark'} /></div>
             <h1 className="m-title">{e.title}</h1>
           </div>
           {statusBadge}
@@ -211,7 +205,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
 
         {photo && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className="m-photo fade-in" />
+          <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`m-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
         )}
 
         {e.phase === 'upcoming' ? (
@@ -254,8 +248,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
             ) : (
               <section className="m-card">
                 <div className="m-big">Spray {e.celebrantName}!</div>
-                <div className="m-muted">Want your message on the big screen? Spray with a message:</div>
-                <a href={sprayPath} className="m-spray-btn">Spray with a message</a>
+                <div className="m-muted">Transfer any amount to the account above. Add a message in the transfer description.</div>
               </section>
             )}
 
@@ -302,7 +295,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
           <div className="layout">
             <header className="top">
               <div style={{ minWidth: 0 }}>
-                <div className="top-brand"><Logo size={34} tone={theme.id === 'daylight' ? 'light' : 'dark'} /></div>
+                <div className="top-brand"><Logo size={34} tone={theme.light ? 'light' : 'dark'} /></div>
                 <h1 className="top-title">{e.title}</h1>
               </div>
               <div className="top-right">
@@ -315,7 +308,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
               <section className="notice">
                 {photo && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={photo} src={photo} alt="" className="notice-photo fade-in" />
+                  <img key={photo} src={photo} alt="" className={`notice-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
                 )}
                 <div className="notice-text">
                   {e.phase === 'upcoming' ? (
@@ -353,13 +346,13 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
                       <div className="invite-text">
                         <div className="invite-big">Spray {e.celebrantName}!</div>
                         <div className="invite-sub">
-                          Transfer any amount to the account below, or scan the QR code to spray with a message that
-                          shows up here.
+                          Transfer any amount to the account below. Add a message in the transfer description and it
+                          may show up here.
                         </div>
                       </div>
                       {photo && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo} src={photo} alt="" className="invite-photo fade-in" />
+                        <img key={photo} src={photo} alt="" className={`invite-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
                       )}
                     </div>
                   )}
@@ -367,7 +360,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
                     <div className="side-list">
                       <h2>Latest messages</h2>
                       {messages.length === 0 ? (
-                        <p className="side-empty">Scan the QR code below to spray with a message. It will appear here.</p>
+                        <p className="side-empty">Messages typed in transfer descriptions will appear here.</p>
                       ) : (
                         <ul className="side-messages">
                           {messages.map((t) => (
@@ -394,13 +387,9 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
                       <div className="paybar-acct" style={{ fontSize: 72 }}>Account number coming soon</div>
                     )}
                   </div>
-                  <div className="paybar-qr">
-                    <div className="qr" role="img" aria-label="QR code to spray with a message" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-                    <div className="paybar-qr-text">
-                      <strong>Want your message on screen?</strong>
-                      <span>Scan to spray with a message</span>
-                      <span className="paybar-small">Transfers can take up to a minute to show.</span>
-                    </div>
+                  <div className="paybar-side">
+                    <strong>Any amount is welcome</strong>
+                    <span className="paybar-small">Transfers can take up to a minute to show.</span>
                   </div>
                 </footer>
               </>

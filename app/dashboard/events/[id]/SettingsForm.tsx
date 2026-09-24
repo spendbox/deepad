@@ -3,11 +3,12 @@
 import { useActionState, useState } from 'react';
 import { RECIPIENT_CHOICES } from '@/lib/event-info';
 import SlugField from '@/components/SlugField';
-import { THEMES } from '@/lib/themes';
+import ThemePicker from '@/components/ThemePicker';
+import type { ThemeColors } from '@/lib/themes';
 import { DEFAULT_HYPE_LINES } from '@/lib/hype';
 import { saveEventSettings } from '../../../actions';
 
-type Values = { slug: string; hypeLines: string[]; title: string; recipientLabel: string; theme: string; bigSprayNaira: number; endsAt: string };
+type Values = { slug: string; hypeLines: string[]; title: string; recipientLabel: string; theme: string; themeColors: ThemeColors | null; bigSprayNaira: number; endsAt: string };
 
 function toLocalInput(iso: string): string {
   const d = new Date(iso);
@@ -22,14 +23,15 @@ function localToIso(local: string): string {
 
 export default function SettingsForm({ eventId, ended, values }: { eventId: string; ended: boolean; values: Values }) {
   const [state, action, pending] = useActionState(saveEventSettings.bind(null, eventId), null);
-  const [theme, setTheme] = useState(values.theme);
+  const [theme, setTheme] = useState({ theme: values.theme, colors: values.themeColors });
   const [label, setLabel] = useState(values.recipientLabel);
   const [endLocal, setEndLocal] = useState(() => toLocalInput(values.endsAt));
   const [slug, setSlug] = useState(values.slug);
 
   return (
     <form action={action} className="form" style={{ marginTop: 8 }}>
-      <input type="hidden" name="theme" value={theme} />
+      <input type="hidden" name="theme" value={theme.theme} />
+      <input type="hidden" name="themeColors" value={theme.theme === 'custom' && theme.colors ? JSON.stringify(theme.colors) : ''} />
       <input type="hidden" name="recipientLabel" value={label} />
       {/* Sent as a full date with time zone, so the server reads it correctly. */}
       <input type="hidden" name="endsAt" value={ended ? '' : localToIso(endLocal)} />
@@ -53,10 +55,8 @@ export default function SettingsForm({ eventId, ended, values }: { eventId: stri
         </div>
       </div>
       <div className="field">
-        <label htmlFor="s-theme">Theme</label>
-        <select id="s-theme" className="select" value={theme} onChange={(e) => setTheme(e.target.value)}>
-          {THEMES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <span className="field-label">Screen colours</span>
+        <ThemePicker value={theme} onChange={setTheme} recipientLabel={label} />
       </div>
       <div className="field">
         <label htmlFor="s-hype">Lines for sprays without a message</label>

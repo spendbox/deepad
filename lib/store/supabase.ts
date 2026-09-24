@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type {
+  MoneyRow,
   NewPaymentLog,
   NewPlanner,
   NewSprayEvent,
@@ -211,10 +212,40 @@ export class SupabaseStore implements Store {
     return (rows ?? []).map(toTransfer);
   }
   async listTransfers(eventId: string, limit = 1000) {
-    const rows = check(
-      await this.db.from('transfers').select('*').eq('event_id', eventId).order('id', { ascending: false }).limit(limit),
+    // Supabase returns at most 1000 rows per request, so read big events in pages.
+    const all: Row[] = [];
+    for (let from = 0; from < limit; from += 1000) {
+      const rows = check(
+        await this.db
+          .from('transfers')
+          .select('*')
+          .eq('event_id', eventId)
+          .order('id', { ascending: false })
+          .range(from, Math.min(from + 999, limit - 1)),
+      );
+      all.push(...(rows ?? []));
+      if (!rows || rows.length < 1000) break;
+    }
+    return all.map(toTransfer);
+  }
+  async listMoneyRows(eventIds: string[]) {
+    if (eventIds.length === 0) return [];
+    const all: Row[] = [];
+    for (let from = 0; ; from += 1000) {
+      const rows = check(
+        await this.db
+          .from('transfers')
+          .select('event_id, created_at, amount_kobo, platform_fee_kobo, planner_fee_kobo, celebrant_kobo, processing_fee_kobo, outside_window')
+          .in('event_id', eventIds)
+          .order('id')
+          .range(from, from + 999),
+      );
+      all.push(...(rows ?? []));
+      if (!rows || rows.length < 1000) break;
+    }
+    return all.map((r) =>
+      fromRow<MoneyRow>(r, ['amountKobo', 'platformFeeKobo', 'plannerFeeKobo', 'celebrantKobo', 'processingFeeKobo']),
     );
-    return (rows ?? []).map(toTransfer);
   }
   async setTransferMessage(transferId: number, message: string | null, rawNarration: string | null) {
     check(await this.db.from('transfers').update({ message, raw_narration: rawNarration }).eq('id', transferId));
@@ -268,7 +299,7 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors'],
       ['spray_intents', 'reference, message'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],

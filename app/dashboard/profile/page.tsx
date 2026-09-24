@@ -1,6 +1,6 @@
 import { requirePlanner } from '@/lib/session';
 import DashShell from '../DashShell';
-import ProfileForm from './ProfileForm';
+import ProfileForm, { DetailsForm } from './ProfileForm';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Profile · DashPad' };
@@ -18,6 +18,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         </p>
       </div>
       <ProfileForm
+        key={`${planner.bankCode}-${planner.accountNumber}`}
         welcome={welcome}
         planner={{
           name: planner.name,
@@ -29,6 +30,15 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           accountName: planner.accountName ?? '',
         }}
       />
+      {!welcome && (
+        <DetailsForm
+          planner={{
+            name: planner.name,
+            email: planner.email,
+            phone: planner.phone,
+          }}
+        />
+      )}
     </DashShell>
   );
 }

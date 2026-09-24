@@ -79,8 +79,8 @@ export class MemoryStore implements Store {
   }
 
   // Images are kept inline as data links. Fine for a developer's computer only.
-  async uploadImage(_path: string, bytes: Uint8Array, contentType: string) {
-    return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+  async uploadImage(path: string, bytes: Uint8Array, contentType: string) {
+    return `data:${contentType};name=${path.split('/').pop()};base64,${Buffer.from(bytes).toString('base64')}`;
   }
   async deleteImage() {}
 
@@ -149,6 +149,10 @@ export class MemoryStore implements Store {
       .transfers.filter((t) => t.eventId === eventId && t.id > afterId)
       .sort((a, b) => a.id - b.id)
       .slice(0, limit);
+  }
+  async listMoneyRows(eventIds: string[]) {
+    const ids = new Set(eventIds);
+    return data().transfers.filter((t) => ids.has(t.eventId));
   }
   async listTransfers(eventId: string, limit = 1000) {
     return data()
