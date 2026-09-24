@@ -21,6 +21,7 @@ import { cleanMessage, cleanNarration } from './text';
 import type { Planner, SprayEvent, SprayIntent, Transfer } from './types';
 import { randomBytes } from 'node:crypto';
 import { hypeLinesFor } from './hype';
+import { buildReportPdf, reportFileName } from './report-pdf';
 
 /** Paystack customer email for an event; its one-time accounts use the same one. */
 function eventCustomerEmail(event: SprayEvent): string {
@@ -391,7 +392,8 @@ export async function sendEventReport(event: SprayEvent, opts: { force?: boolean
     if (!planner) throw new Error('Planner missing');
     const transfers = (await store.listTransfers(event.id, 100000)).reverse();
     const { subject, html, text } = buildReport(event, planner, transfers);
-    const sent = await sendEmail({ to: planner.email, subject, html, text });
+    const pdf = await buildReportPdf(event, planner, transfers);
+    const sent = await sendEmail({ to: planner.email, subject, html, text, attachments: [{ filename: reportFileName(event), content: pdf }] });
     if (!sent) throw new Error('Email not sent');
     return true;
   } catch (err) {
@@ -420,52 +422,33 @@ export function summarise(transfers: Transfer[]) {
 function buildReport(event: SprayEvent, planner: Planner, transfers: Transfer[]) {
   const s = summarise(transfers);
   const subject = `Your DashPad report: ${event.title} (${naira(s.totalKobo)} sprayed)`;
-  const time = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });
+  const row = (k: string, v: string) =>
+    `<tr><td style="padding:6px 16px 6px 0;color:#5E4A66">${k}</td><td style="padding:6px 0"><b>${v}</b></td></tr>`;
 
-  const rows = transfers
-    .filter((t) => !t.outsideWindow)
-    .map(
-      (t) =>
-        `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${time(t.createdAt)}</td>` +
-        `<td style="padding:6px 8px;border-bottom:1px solid #eee">${escapeHtml(t.senderName ?? 'Unknown')}</td>` +
-        `<td style="padding:6px 8px;border-bottom:1px solid #eee">${escapeHtml(t.senderBank ?? '')}</td>` +
-        `<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap"><b>${naira(t.amountKobo)}</b></td>` +
-        `<td style="padding:6px 8px;border-bottom:1px solid #eee">${escapeHtml(t.message ?? '')}</td></tr>`,
-    )
-    .join('');
-
-  const outsideNote = s.outside.length
-    ? `<p style="color:#8a4b00">${s.outside.length} transfer(s) arrived outside the event time and were not shown on screen. DashPad will contact you about them.</p>`
-    : '';
-
-  const html = `<div style="font-family:Arial,sans-serif;color:#1F0A26;max-width:680px">
+  const html = `<div style="font-family:Arial,sans-serif;color:#1F0A26;max-width:560px">
+<div style="background:#1F0A26;padding:18px 22px;border-radius:14px 14px 0 0">
+  <span style="font-size:22px;font-weight:bold;color:#FFF6E6">Dash</span><span style="font-size:22px;font-weight:bold;color:#F2B437">Pad</span>
+</div>
+<div style="border:1px solid #E3D3E8;border-top:none;border-radius:0 0 14px 14px;padding:22px">
 <h2 style="margin:0 0 4px">${escapeHtml(event.title)}</h2>
 <p style="margin:0 0 16px;color:#5E4A66">${escapeHtml(formatWhen(event.startsAt))} – ${escapeHtml(formatWhen(event.endsAt))}</p>
-<p>Hi ${escapeHtml(planner.name)}, here is who sprayed at your event.</p>
+<p>Hi ${escapeHtml(planner.name)}, your event has ended. Here’s the summary. The full list of who sprayed is in the <b>attached PDF</b>.</p>
 <table style="border-collapse:collapse;margin:12px 0">
-<tr><td style="padding:4px 12px 4px 0">Total sprayed</td><td><b>${naira(s.totalKobo)}</b></td></tr>
-<tr><td style="padding:4px 12px 4px 0">Number of sprays</td><td><b>${s.count}</b></td></tr>
-<tr><td style="padding:4px 12px 4px 0">Different senders</td><td><b>${s.senderCount}</b></td></tr>
-<tr><td style="padding:4px 12px 4px 0">Your earnings (${percent(event.plannerFeeBps)})</td><td><b>${naira(s.plannerKobo)}</b></td></tr>
-<tr><td style="padding:4px 12px 4px 0">Paid to ${escapeHtml(event.celebrantName)}</td><td><b>${naira(s.celebrantKobo)}</b></td></tr>
+${row('Total sprayed', naira(s.totalKobo))}
+${row('Sprays', String(s.count))}
+${row('Different senders', String(s.senderCount))}
+${row(`Your earnings (${percent(event.plannerFeeBps)})`, naira(s.plannerKobo))}
+${row(`Paid to ${escapeHtml(event.celebrantName)}`, naira(s.celebrantKobo))}
 </table>
-<p style="color:#5E4A66">Payouts reach your account and ${escapeHtml(event.celebrantName)}’s account within 2 business days of each spray.</p>
-${outsideNote}
-<table style="border-collapse:collapse;width:100%;font-size:14px">
-<tr style="background:#F7F0F9;text-align:left"><th style="padding:6px 8px">Time</th><th style="padding:6px 8px">Sender</th><th style="padding:6px 8px">Bank</th><th style="padding:6px 8px;text-align:right">Amount</th><th style="padding:6px 8px">Message</th></tr>
-${rows || '<tr><td colspan="5" style="padding:8px">No sprays were received.</td></tr>'}
-</table>
-<p style="color:#5E4A66;font-size:13px;margin-top:16px">Sender names come from their bank accounts. On the big screen every spray was anonymous.</p>
-</div>`;
+<p style="color:#5E4A66;font-size:13px">Payouts reach bank accounts within 2 business days of each spray.</p>
+</div></div>`;
 
   const text = [
     `${event.title}`,
     `Total sprayed: ${naira(s.totalKobo)} from ${s.count} sprays (${s.senderCount} different senders)`,
     `Your earnings: ${naira(s.plannerKobo)}`,
-    'Payouts arrive within 2 business days of each spray.',
-    '',
-    ...transfers.filter((t) => !t.outsideWindow).map((t) => `${time(t.createdAt)}  ${t.senderName ?? 'Unknown'}  ${naira(t.amountKobo)}  ${t.message ?? ''}`),
+    `Paid to ${event.celebrantName}: ${naira(s.celebrantKobo)}`,
+    'The full list of who sprayed is in the attached PDF.',
   ].join('\n');
 
   return { subject, html, text };

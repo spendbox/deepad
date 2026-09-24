@@ -1,5 +1,6 @@
 'use client';
 
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -188,7 +189,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
     <div className="wizard">
       <header className="wizard-head">
         <div className="row-between">
-          <Link href="/dashboard" className="brand" style={{ fontSize: 18 }}>DashPad</Link>
+          <Link href="/dashboard" className="brand" aria-label="Back to dashboard"><Logo size={26} /></Link>
           <span style={{ fontSize: 14, color: 'var(--lilac)' }}>
             Step {step + 1} of {STEP_NAMES.length}: {STEP_NAMES[step]}
           </span>

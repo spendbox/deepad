@@ -36,7 +36,8 @@ export interface Store {
   getEventBySlug(slug: string): Promise<SprayEvent | null>;
   getEventByAccountNumber(accountNumber: string): Promise<SprayEvent | null>;
   getEventByCustomerCode(code: string): Promise<SprayEvent | null>;
-  listEventsByPlanner(plannerId: string): Promise<SprayEvent[]>;
+  /** A planner's events, newest first. Deleted ones only with includeDeleted (e.g. for earnings). */
+  listEventsByPlanner(plannerId: string, opts?: { includeDeleted?: boolean }): Promise<SprayEvent[]>;
   listEvents(): Promise<SprayEvent[]>;
   /** Events whose end time has passed but which have not been closed yet. */
   listEventsToClose(now: Date): Promise<SprayEvent[]>;

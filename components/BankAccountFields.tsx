@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
+import BankCombobox from './BankCombobox';
 
 export type BankAccount = { bankCode: string; bankName: string; accountNumber: string; accountName: string };
 
@@ -75,9 +76,9 @@ export default function BankAccountFields({
           <input type="hidden" name={`${namePrefix}accountName`} value={value.accountName} />
         </>
       )}
-      <div className="field">
-        <label htmlFor={`${id}-bank`}>{label}</label>
-        {manual ? (
+      {manual ? (
+        <div className="field">
+          <label htmlFor={`${id}-bank`}>{label}</label>
           <input
             id={`${id}-bank`}
             className="input"
@@ -85,26 +86,16 @@ export default function BankAccountFields({
             value={value.bankName}
             onChange={(e) => onChange({ ...value, bankName: e.target.value, bankCode: '' })}
           />
-        ) : (
-          <select
-            id={`${id}-bank`}
-            className="select"
-            value={value.bankCode}
-            disabled={banks === null}
-            onChange={(e) => {
-              const b = banks?.find((x) => x.code === e.target.value);
-              onChange({ ...value, bankCode: b?.code ?? '', bankName: b?.name ?? '', accountName: '' });
-            }}
-          >
-            <option value="">{banks === null ? 'Loading banks…' : 'Choose a bank'}</option>
-            {banks?.map((b) => (
-              <option key={b.code} value={b.code}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+        </div>
+      ) : (
+        <BankCombobox
+          banks={banks ?? []}
+          disabled={banks === null}
+          label={label}
+          value={{ code: value.bankCode, name: value.bankName }}
+          onChange={(b) => onChange({ ...value, bankCode: b?.code ?? '', bankName: b?.name ?? '', accountName: '' })}
+        />
+      )}
       <div className="field">
         <label htmlFor={`${id}-acct`}>Account number</label>
         <input

@@ -7,7 +7,15 @@ export function emailConfigured(): boolean {
   return !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 }
 
-export async function sendEmail(opts: { to: string; subject: string; html: string; text: string }): Promise<boolean> {
+export type Attachment = { filename: string; content: Uint8Array };
+
+export async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  attachments?: Attachment[];
+}): Promise<boolean> {
   if (!emailConfigured()) {
     console.warn(`Email not sent (RESEND_API_KEY / EMAIL_FROM missing): "${opts.subject}" to ${opts.to}`);
     return false;
@@ -16,7 +24,14 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   const res = await fetch(`${process.env.RESEND_API_BASE || 'https://api.resend.com'}/emails`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [opts.to], subject: opts.subject, html: opts.html, text: opts.text }),
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+      attachments: opts.attachments?.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })),
+    }),
   });
   if (!res.ok) {
     console.error('Resend failed', res.status, await res.text().catch(() => ''));

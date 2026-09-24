@@ -1,3 +1,4 @@
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import ResetForm from './ResetForm';
 
@@ -7,7 +8,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
   const { token } = await searchParams;
   return (
     <main className="auth">
-      <div className="auth-top"><Link href="/" className="brand">DashPad</Link></div>
+      <div className="auth-top"><Link href="/" className="brand" aria-label="DashPad home"><Logo size={30} /></Link></div>
       <div className="auth-card">
         <h1>Choose a new password</h1>
         {token ? (

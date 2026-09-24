@@ -160,3 +160,22 @@ test('hype lines fill in when there is no message', async () => {
   assert.equal(pickHypeLine(['a', 'b', 'c'], 5), pickHypeLine(['a', 'b', 'c'], 5));
   assert.equal(pickHypeLine([], 1), null);
 });
+
+test('earnings are grouped into Nigerian days, weeks and months', async () => {
+  const { bucketize, rangeWindow } = await import('../lib/earnings.ts');
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  const w = rangeWindow('7d', now, null);
+  const items = [
+    { at: Date.parse('2026-09-24T09:00:00Z'), kobo: 100 },
+    { at: Date.parse('2026-09-23T23:30:00Z'), kobo: 50 }, // 00:30 on the 24th in Lagos
+    { at: Date.parse('2026-09-20T10:00:00Z'), kobo: 7 },
+    { at: Date.parse('2026-09-01T10:00:00Z'), kobo: 999 }, // outside 7 days
+  ];
+  const b = bucketize(items, w.from, w.unit, now);
+  assert.equal(b.length, 7);
+  assert.equal(b[6].label, '24 Sep');
+  assert.equal(b[6].kobo, 150);
+  assert.equal(b.reduce((s, x) => s + x.kobo, 0), 157);
+  const m = rangeWindow('12m', now, null);
+  assert.equal(bucketize([], m.from, m.unit, now).length, 12);
+});

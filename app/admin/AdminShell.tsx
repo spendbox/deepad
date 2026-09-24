@@ -1,3 +1,4 @@
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
 import { emailConfigured } from '@/lib/email';
@@ -13,7 +14,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <div className="dash">
       <header className="dash-top">
-        <Link href="/admin" className="brand">DashPad admin</Link>
+        <Link href="/admin" className="brand" aria-label="DashPad admin"><Logo size={28} /> <span style={{ color: 'var(--lilac)', fontSize: 15, marginLeft: 6 }}>admin</span></Link>
         <nav>
           <form action={adminLogout}>
             <button type="submit" className="btn btn-sm" style={{ background: "transparent", color: "var(--ivory)", borderColor: "var(--ivory)" }}>Log out</button>

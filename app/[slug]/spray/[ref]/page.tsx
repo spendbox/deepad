@@ -1,3 +1,4 @@
+import { LogoMark } from '@/components/Logo';
 import { notFound } from 'next/navigation';
 import { getStore } from '@/lib/store';
 import { themeVars } from '../themeVars';
@@ -15,7 +16,7 @@ export default async function PayPage({ params }: { params: Promise<{ slug: stri
   return (
     <main className="g-page" style={themeVars(event.theme)}>
       <header>
-        <div className="g-brand">DashPad</div>
+        <div className="g-brand"><LogoMark size={28} /></div>
         <h1 className="g-title">Transfer to spray</h1>
       </header>
       <PayScreen

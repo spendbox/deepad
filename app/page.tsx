@@ -1,3 +1,4 @@
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import { currentPlanner } from '@/lib/session';
 import SprayScene from './SprayScene';
@@ -63,7 +64,7 @@ export default async function Home() {
   return (
     <div className="lp">
       <header className="lp-nav">
-        <Link href="/" className="brand">DashPad</Link>
+        <Link href="/" className="brand" aria-label="DashPad home"><Logo size={34} /></Link>
         <nav>
           {planner ? (
             <Link href="/dashboard" className="btn btn-gold btn-sm">Dashboard</Link>
@@ -171,7 +172,7 @@ export default async function Home() {
       </section>
 
       <footer className="lp-foot">
-        <span className="brand">DashPad</span>
+        <Logo size={26} />
         <span>© {new Date().getFullYear()} DashPad. Made for Nigerian celebrations.</span>
       </footer>
     </div>

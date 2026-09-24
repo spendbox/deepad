@@ -24,7 +24,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <p className="hint" style={{ margin: 0 }}>Hi {planner.name.split(' ')[0]}</p>
           <h1>Your events</h1>
         </div>
-        <Link href="/dashboard/events/new" className="btn btn-dark">+ New event</Link>
+        <Link href="/dashboard/events/new" className="btn btn-dark hide-desktop">+ New event</Link>
       </div>
 
       {deleted === '1' && <div className="banner info" role="status">The event was deleted.</div>}
