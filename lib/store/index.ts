@@ -5,11 +5,20 @@ import type { Store } from './types';
 
 let store: Store | null = null;
 
-/** Supabase when its keys are set, otherwise the practice (memory) store. */
+/**
+ * The live site always uses Supabase. A developer's own computer can run
+ * without it, using a throwaway in-memory store.
+ */
 export function getStore(): Store {
   if (store) return store;
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  store = url && key ? new SupabaseStore(url, key) : new MemoryStore();
+  if (url && key) {
+    store = new SupabaseStore(url, key);
+  } else if (process.env.NODE_ENV !== 'production' || process.env.DASHPAD_ALLOW_MEMORY_STORE === '1') {
+    store = new MemoryStore();
+  } else {
+    throw new Error('Supabase is not connected: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel.');
+  }
   return store;
 }

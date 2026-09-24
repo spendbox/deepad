@@ -1,0 +1,135 @@
+/* The event's big screen. Designed at 1920x1080 and scaled to fit any TV or
+   projector. Colours come from the theme the planner picked (--s-*). */
+
+.screen-root {
+  position: fixed; inset: 0; overflow: hidden; background: #000;
+  color: var(--s-text); font-family: var(--body);
+}
+.stage {
+  position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px;
+  transform-origin: center center; overflow: hidden; background: var(--s-bg);
+}
+
+.rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.note {
+  position: absolute; top: 0; width: 88px; height: 42px; border-radius: 6px; background: #1f7a4d;
+  border: 2px solid #3fa56e; display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-weight: 800; font-size: 22px; color: #cff2dc; opacity: 0;
+  animation-name: fall; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+@keyframes fall {
+  0% { transform: translateY(-120px) rotate(0deg); opacity: 0; }
+  8% { opacity: .35; }
+  100% { transform: translateY(1200px) rotate(420deg); opacity: .35; }
+}
+
+.layout { position: relative; z-index: 1; height: 100%; padding: 40px 56px; display: flex; flex-direction: column; gap: 28px; }
+
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+.top-brand { font-family: var(--display); font-weight: 800; font-size: 26px; color: var(--s-accent); }
+.top-title {
+  margin: 4px 0 0; font-family: var(--display); font-weight: 800; font-size: 58px; line-height: 1.05;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1250px;
+}
+.top-right { display: flex; align-items: center; gap: 24px; flex-shrink: 0; }
+.top-note { font-size: 26px; color: var(--s-muted); }
+.badge {
+  display: flex; align-items: center; gap: 12px; padding: 10px 22px; border: 2px solid var(--s-accent);
+  border-radius: 999px; font-size: 26px; font-weight: 700; color: var(--s-accent);
+}
+.badge.offline { border-color: #ff9d7a; color: #ff9d7a; font-size: 22px; }
+.live-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--s-accent); animation: livePulse 1.4s ease-in-out infinite; }
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+.middle { display: flex; gap: 32px; flex: 1; min-height: 0; }
+.panel-main {
+  flex: 1; min-width: 0; border-radius: 36px; background: var(--s-panel); border: 3px solid var(--s-accent);
+  padding: 36px 56px; display: flex; flex-direction: column; justify-content: center; gap: 10px; overflow: hidden;
+}
+.pop { animation: pop .7s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pop {
+  0% { transform: scale(.94); opacity: .2; }
+  55% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop-amount {
+  font-family: var(--display); font-weight: 800; line-height: .92; letter-spacing: -5px;
+  color: var(--s-accent); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.pop-to { font-family: var(--display); font-weight: 800; font-size: 58px; line-height: 1.1; }
+.pop-msg {
+  font-size: 44px; line-height: 1.3; color: var(--s-muted); margin-top: 8px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.invite-big { font-family: var(--display); font-weight: 800; font-size: 104px; line-height: 1.02; color: var(--s-accent); }
+.invite-sub { font-size: 38px; line-height: 1.35; color: var(--s-muted); max-width: 1000px; }
+
+.side { width: 520px; flex-shrink: 0; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+.side-total { background: var(--s-panel); border-radius: 28px; padding: 22px 28px; }
+.side-total-v { font-family: var(--display); font-weight: 800; font-size: 62px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-total-k { font-size: 24px; color: var(--s-muted); margin-top: 6px; }
+.side-list { flex: 1; min-height: 0; background: var(--s-panel); border-radius: 28px; padding: 22px 28px; overflow: hidden; }
+.side-list h2 { margin: 0 0 12px; font-family: var(--display); font-weight: 800; font-size: 32px; }
+.side-list ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.side-list li { display: flex; flex-direction: column; border-top: 1px solid color-mix(in srgb, var(--s-muted) 30%, transparent); padding-top: 8px; }
+.side-list li:first-child { border-top: none; padding-top: 0; }
+.side-amt { font-family: var(--display); font-weight: 800; font-size: 32px; color: var(--s-accent); }
+.side-msg { font-size: 22px; color: var(--s-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-empty { font-size: 28px; color: var(--s-muted); margin: 0; }
+
+/* Account number bar: always on screen, as big as it will go */
+.paybar {
+  flex-shrink: 0; height: 270px; display: flex; align-items: center; gap: 48px;
+  padding: 20px 48px; border-radius: 36px; background: var(--s-accent); color: var(--s-on-accent);
+}
+.paybar-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.paybar-label { font-size: 32px; font-weight: 700; }
+.paybar-acct { font-family: var(--display); font-weight: 800; line-height: 1; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+.paybar-meta { font-size: 34px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.paybar-side { width: 460px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; font-size: 26px; line-height: 1.3; font-weight: 600; }
+.paybar-trust { display: flex; align-items: center; gap: 12px; font-size: 22px; }
+.paybar-trust svg { flex-shrink: 0; }
+
+/* Before and after the event */
+.notice {
+  flex: 1; border-radius: 40px; background: var(--s-panel); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 48px;
+}
+.notice-big { font-family: var(--display); font-weight: 800; font-size: 110px; line-height: 1.02; color: var(--s-accent); }
+.notice-amount { font-family: var(--display); font-weight: 800; font-size: 200px; line-height: .95; font-variant-numeric: tabular-nums; }
+.notice-sub { font-size: 44px; font-weight: 600; }
+.notice-sub.muted { color: var(--s-muted); font-size: 34px; font-weight: 500; }
+
+/* Big spray takeover */
+.takeover {
+  position: absolute; inset: 0; z-index: 2; color: var(--s-on-accent); background: var(--s-accent);
+  background-image: repeating-conic-gradient(from 0deg at 50% 40%, rgba(255,255,255,.14) 0deg 9deg, transparent 9deg 18deg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  padding-bottom: 170px; animation: pop .7s cubic-bezier(.2, .8, .2, 1);
+}
+.takeover-badge {
+  padding: 12px 36px; border-radius: 999px; background: var(--s-on-accent); color: var(--s-accent);
+  font-family: var(--display); font-weight: 800; font-size: 44px;
+}
+.takeover-amount { width: 1760px; text-align: center; font-family: var(--display); font-weight: 800; line-height: .88; letter-spacing: -8px; font-variant-numeric: tabular-nums; }
+.takeover-to { font-family: var(--display); font-weight: 800; font-size: 76px; }
+.takeover-msg {
+  padding: 20px 44px; border-radius: 24px; background: var(--s-on-accent); color: var(--s-accent);
+  font-size: 44px; line-height: 1.3; max-width: 1600px; text-align: center;
+}
+.takeover-acct {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 150px; background: var(--s-on-accent); color: var(--s-accent);
+  display: flex; align-items: center; justify-content: center; gap: 36px; font-size: 38px; font-weight: 700;
+}
+.takeover-acct strong { font-family: var(--display); font-weight: 800; font-size: 104px; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+
+.fs-btn {
+  position: fixed; right: 16px; bottom: 16px; z-index: 5; min-height: 44px; padding: 0 18px; border-radius: 12px;
+  border: 2px solid var(--s-accent); background: var(--s-bg); color: var(--s-accent); font-weight: 700; transition: opacity .3s;
+}
+.fs-btn.hidden { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .note { display: none; }
+  .pop, .takeover, .live-dot { animation: none; }
+}

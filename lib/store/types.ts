@@ -1,52 +1,55 @@
 import type {
-  DashEvent,
   EventStats,
-  NewEvent,
-  NewSpray,
-  Spray,
-  SprayIntent,
+  NewPlanner,
+  NewSprayEvent,
+  NewTransfer,
+  Planner,
+  SprayEvent,
+  Transfer,
 } from '../types';
 
 export interface Store {
   readonly kind: 'memory' | 'supabase';
 
-  listEvents(): Promise<DashEvent[]>;
-  getEventById(id: string): Promise<DashEvent | null>;
-  getEventBySlug(slug: string): Promise<DashEvent | null>;
-  getEventByAccountNumber(accountNumber: string): Promise<DashEvent | null>;
-  createEvent(e: NewEvent): Promise<DashEvent>;
-  updateEvent(id: string, patch: Partial<NewEvent>): Promise<DashEvent>;
+  createPlanner(p: NewPlanner): Promise<Planner>;
+  getPlannerById(id: string): Promise<Planner | null>;
+  getPlannerByEmail(email: string): Promise<Planner | null>;
+  updatePlanner(id: string, patch: Partial<NewPlanner>): Promise<Planner>;
+  listPlanners(): Promise<Planner[]>;
 
-  createIntent(i: Omit<SprayIntent, 'createdAt' | 'status' | 'sprayId'>): Promise<SprayIntent>;
-  getIntent(reference: string): Promise<SprayIntent | null>;
-  markIntentPaid(reference: string, sprayId: number): Promise<void>;
+  createEvent(e: NewSprayEvent): Promise<SprayEvent>;
+  getEventById(id: string): Promise<SprayEvent | null>;
+  getEventBySlug(slug: string): Promise<SprayEvent | null>;
+  getEventByAccountNumber(accountNumber: string): Promise<SprayEvent | null>;
+  getEventByCustomerCode(code: string): Promise<SprayEvent | null>;
+  listEventsByPlanner(plannerId: string): Promise<SprayEvent[]>;
+  listEvents(): Promise<SprayEvent[]>;
+  /** Events whose end time has passed but which have not been closed yet. */
+  listEventsToClose(now: Date): Promise<SprayEvent[]>;
+  updateEvent(id: string, patch: Partial<NewSprayEvent>): Promise<SprayEvent>;
+  /**
+   * Atomically mark the event's report as sent. Returns false if someone else
+   * already claimed it, so the email only ever goes out once.
+   */
+  claimReport(eventId: string): Promise<boolean>;
+  releaseReport(eventId: string): Promise<void>;
 
-  /** Idempotent on `reference`: a repeated webhook returns the existing spray. */
-  insertSpray(s: NewSpray): Promise<{ spray: Spray; created: boolean }>;
+  /** Idempotent on `reference`: a repeated webhook returns the existing transfer. */
+  insertTransfer(t: NewTransfer): Promise<{ transfer: Transfer; created: boolean }>;
   /** Newest first. */
-  listSprays(eventId: string, limit?: number): Promise<Spray[]>;
-  setSprayHidden(eventId: string, sprayId: number, hidden: boolean): Promise<void>;
+  listTransfers(eventId: string, limit?: number): Promise<Transfer[]>;
+  setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
+  /** Totals of transfers that counted (inside the event window). */
   eventStats(eventId: string): Promise<EventStats>;
 }
 
-/** Leaderboard: named guests grouped by display name, anonymous sprays excluded. */
-export function computeStats(
-  rows: Pick<Spray, 'displayName' | 'anonymous' | 'amountKobo'>[],
-): EventStats {
+export function computeStats(rows: Pick<Transfer, 'amountKobo' | 'outsideWindow'>[]): EventStats {
   let totalKobo = 0;
-  // "Uncle Tunde" and "uncle tunde " count as the same person.
-  const byName = new Map<string, { name: string; amountKobo: number }>();
+  let count = 0;
   for (const r of rows) {
+    if (r.outsideWindow) continue;
     totalKobo += r.amountKobo;
-    if (r.anonymous) continue;
-    const name = r.displayName.trim();
-    const key = name.toLowerCase();
-    const row = byName.get(key) ?? { name, amountKobo: 0 };
-    row.amountKobo += r.amountKobo;
-    byName.set(key, row);
+    count += 1;
   }
-  const leaderboard = [...byName.values()]
-    .sort((a, b) => b.amountKobo - a.amountKobo)
-    .slice(0, 5);
-  return { totalKobo, count: rows.length, leaderboard };
+  return { totalKobo, count };
 }

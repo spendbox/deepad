@@ -1,83 +1,85 @@
-export type EventStatus = 'draft' | 'live' | 'ended';
+import type { ThemeId } from './themes';
 
-export type DashEvent = {
+/** An event planner (or MC) who creates spray events. */
+export type Planner = {
   id: string;
+  name: string;
+  email: string;
+  phone: string;
+  passwordHash: string;
+  // Where the planner's cut is paid.
+  bankCode: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  accountName: string | null;
+  paystackSubaccount: string | null;
+  createdAt: string;
+};
+
+export type NewPlanner = Omit<Planner, 'id' | 'createdAt'>;
+
+export type EventType = 'wedding' | 'birthday' | 'burial' | 'graduation' | 'other';
+
+export type SetupStatus = 'pending' | 'ready' | 'failed';
+
+export type SprayEvent = {
+  id: string;
+  /** The unique code in the event's link: /e/<slug>. */
   slug: string;
-  title: string; // "Tolu & Dayo's wedding"
-  celebrants: string; // "Tolu & Dayo"
-  mcName: string;
-  status: EventStatus;
-  paused: boolean;
-  nextUp: string | null; // "Couple trivia starts after this song"
+  plannerId: string;
+  eventType: EventType;
+  title: string; // "Tolu & Dayo’s wedding"
+  celebrantName: string; // "Tolu & Dayo"
+  recipientLabel: string; // "the couple" -> "₦20,000 sent to the couple"
+  theme: ThemeId;
+  startsAt: string;
+  endsAt: string;
+  plannerFeeBps: number; // 0–4500 (0–45%)
+  platformFeeBps: number; // 500 (5%)
   bigSprayKobo: number;
-  platformFeeBps: number;
-  mcFeeBps: number;
-  // The event's fixed account number (backup way, shown on the big screen).
+  paused: boolean;
+  // Where the celebrant's money goes.
+  payoutBankCode: string;
+  payoutBankName: string;
+  payoutAccountNumber: string;
+  payoutAccountName: string;
+  // The event's own account number that guests transfer to (from Paystack).
   accountNumber: string | null;
   accountBank: string | null;
   accountName: string | null;
-  // Where the money settles. Kept for records and for the Paystack split.
-  celebrantBank: string | null;
-  celebrantAccountNumber: string | null;
-  celebrantAccountName: string | null;
-  mcBank: string | null;
-  mcAccountNumber: string | null;
-  mcAccountName: string | null;
+  paystackCustomerCode: string | null;
+  paystackDvaId: string | null;
   paystackSplitCode: string | null;
+  paystackPayoutSubaccount: string | null;
+  setupStatus: SetupStatus;
+  setupError: string | null;
+  closedAt: string | null;
+  reportSentAt: string | null;
   createdAt: string;
 };
 
-export type NewEvent = Omit<DashEvent, 'id' | 'createdAt'>;
+export type NewSprayEvent = Omit<SprayEvent, 'id' | 'createdAt'>;
 
-export type IntentStatus = 'pending' | 'paid' | 'expired';
-
-/** A guest filled the form and got a one-time account; waiting for the transfer. */
-export type SprayIntent = {
-  reference: string;
-  eventId: string;
-  guestName: string;
-  message: string | null;
-  anonymous: boolean;
-  sprayKobo: number;
-  feeKobo: number;
-  totalKobo: number;
-  accountNumber: string;
-  bankName: string;
-  accountName: string;
-  expiresAt: string;
-  status: IntentStatus;
-  sprayId: number | null;
-  createdAt: string;
-};
-
-export type SpraySource = 'qr' | 'direct';
-
-/** A confirmed payment. Only these ever reach the screen. */
-export type Spray = {
+/** A confirmed bank transfer to an event's account. */
+export type Transfer = {
   id: number;
   eventId: string;
   reference: string;
-  source: SpraySource;
-  /** Real name (typed by guest or from the bank). Private: never sent to the screen for anonymous sprays. */
-  guestName: string;
-  /** Name as shown on screen. */
-  displayName: string;
-  message: string | null;
-  anonymous: boolean;
   amountKobo: number;
+  /** Bank account name of the sender. Private: never shown on screen. */
+  senderName: string | null;
+  senderBank: string | null;
+  /** The description the sender typed, cleaned. Shown on screen unless hidden. */
+  message: string | null;
   platformFeeKobo: number;
-  mcFeeKobo: number;
+  plannerFeeKobo: number;
   celebrantKobo: number;
+  /** Money that arrived before the start or after the end: kept off the screen. */
+  outsideWindow: boolean;
   hidden: boolean;
   createdAt: string;
 };
 
-export type NewSpray = Omit<Spray, 'id' | 'createdAt' | 'hidden'>;
+export type NewTransfer = Omit<Transfer, 'id' | 'createdAt' | 'hidden'>;
 
-export type LeaderRow = { name: string; amountKobo: number };
-
-export type EventStats = {
-  totalKobo: number;
-  count: number;
-  leaderboard: LeaderRow[];
-};
+export type EventStats = { totalKobo: number; count: number };

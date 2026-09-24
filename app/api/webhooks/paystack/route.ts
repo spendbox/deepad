@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { recordTransfer } from '@/lib/events';
 import { isValidPaystackSignature } from '@/lib/paystack-signature';
 import { getStore } from '@/lib/store';
-import { confirmDirectSpray, confirmQrSpray } from '@/lib/sprays';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,21 +10,21 @@ type ChargeData = {
   reference?: string;
   amount?: number; // kobo
   currency?: string;
-  channel?: string;
+  paid_at?: string | null;
+  customer?: { customer_code?: string } | null;
   authorization?: {
     sender_name?: string | null;
     sender_bank?: string | null;
     narration?: string | null;
     receiver_bank_account_number?: string | null;
-    account_name?: string | null;
   } | null;
-  metadata?: { dashpad_reference?: string } | string | null;
 };
 
 /**
- * Paystack tells us here the moment money lands. This is the ONLY way a real
- * spray reaches the screen, and only after the signature checks out.
- * Set this URL in Paystack: Settings -> API Keys & Webhooks -> Webhook URL:
+ * Paystack tells us here the moment money lands in an event's account. This
+ * is the ONLY way a spray reaches the screen, and only after the signature
+ * checks out ("no fake alerts").
+ * In Paystack: Settings -> API Keys & Webhooks -> Webhook URL:
  *   https://<your-site>/api/webhooks/paystack
  */
 export async function POST(req: Request) {
@@ -45,38 +45,30 @@ export async function POST(req: Request) {
   if (payload.event !== 'charge.success' || !data || data.status !== 'success' || !data.reference) {
     return NextResponse.json({ ok: true, ignored: true });
   }
-  if (data.currency && data.currency !== 'NGN') {
-    console.warn('Ignoring non-naira payment', data.reference, data.currency);
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-
+  if (data.currency && data.currency !== 'NGN') return NextResponse.json({ ok: true, ignored: true });
   const amountKobo = Math.round(Number(data.amount ?? 0));
   if (!(amountKobo > 0)) return NextResponse.json({ ok: true, ignored: true });
 
   const auth = data.authorization ?? {};
-  const senderName = auth.sender_name ?? null;
-  const narration = auth.narration ?? null;
   const store = getStore();
-
   try {
-    // 1) A spray started from the guest page (one-time account number).
-    const metaRef = typeof data.metadata === 'object' ? data.metadata?.dashpad_reference : undefined;
-    const intent = (await store.getIntent(data.reference)) ?? (metaRef ? await store.getIntent(metaRef) : null);
-    if (intent) {
-      await confirmQrSpray(intent, { paidKobo: amountKobo, narration, senderName });
-      return NextResponse.json({ ok: true });
-    }
-
-    // 2) A direct transfer to the event's own account number.
     const receiver = auth.receiver_bank_account_number?.replace(/\D/g, '');
-    const event = receiver ? await store.getEventByAccountNumber(receiver) : null;
-    if (event) {
-      await confirmDirectSpray(event, { reference: data.reference, amountKobo, senderName, narration });
-      return NextResponse.json({ ok: true });
+    const event =
+      (receiver ? await store.getEventByAccountNumber(receiver) : null) ??
+      (data.customer?.customer_code ? await store.getEventByCustomerCode(data.customer.customer_code) : null);
+    if (!event) {
+      console.warn('Paystack payment did not match any event', data.reference);
+      return NextResponse.json({ ok: true, unmatched: true });
     }
-
-    console.warn('Paystack payment did not match any spray or event', data.reference);
-    return NextResponse.json({ ok: true, unmatched: true });
+    await recordTransfer(event, {
+      reference: data.reference,
+      amountKobo,
+      senderName: auth.sender_name ?? null,
+      senderBank: auth.sender_bank ?? null,
+      narration: auth.narration ?? null,
+      paidAt: data.paid_at ?? null,
+    });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     // A 500 makes Paystack retry later, so a hiccup never loses a spray.
     console.error('Webhook processing failed', data.reference, err);

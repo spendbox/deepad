@@ -1,35 +1,25 @@
 import Link from 'next/link';
-import { paymentMode, storeIsPractice } from '@/lib/config';
-import { logout } from './actions';
-
-const MODE_TEXT = {
-  demo: 'Demo mode: no real payments. Use the "pretend" buttons to test.',
-  'paystack-test': 'Paystack TEST mode: real Paystack system, fake money.',
-  'paystack-live': 'LIVE: real money is moving.',
-};
+import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
+import { emailConfigured } from '@/lib/email';
+import { adminLogout } from '../actions';
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
-  const mode = paymentMode();
+  const warnings: string[] = [];
+  if (!paystackConfigured()) warnings.push('Paystack is not connected (PAYSTACK_SECRET_KEY). Events cannot get account numbers.');
+  else if (!paystackIsLive()) warnings.push('Paystack is in TEST mode: no real money moves.');
+  if (!emailConfigured()) warnings.push('Email is not connected (RESEND_API_KEY, EMAIL_FROM). Planners won’t get their reports.');
+  if (!process.env.CRON_SECRET) warnings.push('CRON_SECRET is not set, so the daily clean-up job cannot run.');
+
   return (
-    <div className="admin">
-      <header className="admin-top">
-        <Link href="/admin" className="brand" style={{ textDecoration: 'none' }}>DashPad admin</Link>
+    <div className="dash">
+      <header className="dash-top">
+        <Link href="/admin" className="brand">DashPad admin</Link>
         <nav>
-          <Link href="/admin">Events</Link>
-          <Link href="/admin/events/new">New event</Link>
-          <form action={logout}>
-            <button type="submit">Log out</button>
-          </form>
+          <form action={adminLogout}><button type="submit">Log out</button></form>
         </nav>
       </header>
-      <main className="admin-main">
-        {storeIsPractice() && (
-          <div className="banner warn">
-            <strong>Practice database.</strong> Supabase is not connected yet, so events and sprays are kept in
-            memory and disappear when the server restarts. Fine for trying things out; never use it for a real event.
-          </div>
-        )}
-        <div className={`banner ${mode === 'paystack-live' ? 'warn' : 'info'}`}>{MODE_TEXT[mode]}</div>
+      <main className="dash-main" style={{ maxWidth: 1100 }}>
+        {warnings.map((w) => <div key={w} className="banner warn">{w}</div>)}
         {children}
       </main>
     </div>

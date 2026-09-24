@@ -25,14 +25,14 @@ export default function CopyButton({ text, label = 'Copy', dark = false }: { tex
     setTimeout(() => setCopied(false), 2500);
   }
 
+  const style = dark
+    ? { borderColor: 'var(--gold)', background: copied ? 'var(--gold)' : 'transparent', color: copied ? 'var(--aubergine)' : 'var(--gold)' }
+    : copied
+      ? { background: 'var(--aubergine)', color: 'var(--gold)' }
+      : undefined;
+
   return (
-    <button
-      type="button"
-      className="copy-btn"
-      data-copied={copied}
-      onClick={copy}
-      style={dark ? { borderColor: 'var(--gold)', background: copied ? 'var(--gold)' : 'transparent', color: copied ? 'var(--aubergine)' : 'var(--gold)' } : undefined}
-    >
+    <button type="button" className="btn btn-sm" onClick={copy} style={style}>
       <span aria-live="polite">{copied ? 'Copied' : label}</span>
     </button>
   );

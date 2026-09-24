@@ -1,74 +1,48 @@
 // All money is stored and passed around in kobo (1 naira = 100 kobo) so we
 // never lose precision. Only format to naira at the moment we display it.
 
-export const PRESET_AMOUNTS_NAIRA = [1000, 5000, 10000, 20000, 50000, 100000];
-export const MIN_SPRAY_NAIRA = 100;
-export const MAX_SPRAY_NAIRA = 5_000_000;
+/** DashPad's cut of every transfer: 5%. */
+export const PLATFORM_FEE_BPS = 500;
+/** The most a planner can take from each transfer: 45%. */
+export const MAX_PLANNER_FEE_BPS = 4500;
 
 /** "₦20,000" (or "₦20,000.50" when there are kobo). */
 export function naira(kobo: number): string {
   const whole = Math.round(kobo) % 100 === 0;
-  const value = kobo / 100;
   return (
     '₦' +
-    value.toLocaleString('en-NG', {
+    (kobo / 100).toLocaleString('en-NG', {
       minimumFractionDigits: whole ? 0 : 2,
       maximumFractionDigits: whole ? 0 : 2,
     })
   );
 }
 
-export type FeeSettings = {
-  /** Our platform fee in basis points (500 = 5%). */
-  platformFeeBps: number;
-  /** The MC's share in basis points (200 = 2%). */
-  mcFeeBps: number;
-};
-
-export type FeeBreakdown = {
-  sprayKobo: number;
+export type Split = {
+  amountKobo: number;
   platformFeeKobo: number;
-  mcFeeKobo: number;
-  feeKobo: number;
-  totalKobo: number;
+  plannerFeeKobo: number;
   celebrantKobo: number;
 };
 
 /**
- * QR sprays: the guest pays the fee on top of the spray, so the celebrant
- * receives the full spray amount.
+ * Split one transfer. The screen shows the full amount sent; DashPad's 5% and
+ * the planner's cut come out of it and the celebrant gets the rest.
  */
-export function feesOnTop(sprayKobo: number, s: FeeSettings): FeeBreakdown {
-  const platformFeeKobo = Math.round((sprayKobo * s.platformFeeBps) / 10000);
-  const mcFeeKobo = Math.round((sprayKobo * s.mcFeeBps) / 10000);
-  const feeKobo = platformFeeKobo + mcFeeKobo;
+export function splitTransfer(amountKobo: number, plannerFeeBps: number, platformFeeBps = PLATFORM_FEE_BPS): Split {
+  const platformFeeKobo = Math.round((amountKobo * platformFeeBps) / 10000);
+  const plannerFeeKobo = Math.round((amountKobo * plannerFeeBps) / 10000);
   return {
-    sprayKobo,
+    amountKobo,
     platformFeeKobo,
-    mcFeeKobo,
-    feeKobo,
-    totalKobo: sprayKobo + feeKobo,
-    celebrantKobo: sprayKobo,
+    plannerFeeKobo,
+    celebrantKobo: amountKobo - platformFeeKobo - plannerFeeKobo,
   };
 }
 
-/**
- * Direct transfers to the event account: there is no form to add a fee, so
- * the screen shows the full amount the guest sent and the fee comes out of
- * it before it reaches the celebrant.
- */
-export function feesInside(receivedKobo: number, s: FeeSettings): FeeBreakdown {
-  const platformFeeKobo = Math.round((receivedKobo * s.platformFeeBps) / 10000);
-  const mcFeeKobo = Math.round((receivedKobo * s.mcFeeBps) / 10000);
-  const feeKobo = platformFeeKobo + mcFeeKobo;
-  return {
-    sprayKobo: receivedKobo,
-    platformFeeKobo,
-    mcFeeKobo,
-    feeKobo,
-    totalKobo: receivedKobo,
-    celebrantKobo: receivedKobo - feeKobo,
-  };
+export function clampPlannerFeeBps(bps: number): number {
+  if (!Number.isFinite(bps)) return 0;
+  return Math.min(MAX_PLANNER_FEE_BPS, Math.max(0, Math.round(bps)));
 }
 
 /** Group digits of an account number so it reads well from far away: "0123 456 789". */
