@@ -34,6 +34,8 @@ export type SprayEvent = {
   theme: ThemeId;
   /** Photos of the celebrants (public image links), shown on the big screen. */
   photos: string[];
+  /** Fun lines shown for sprays that arrive without a message. Empty = use the defaults. */
+  hypeLines: string[];
   startsAt: string;
   endsAt: string;
   plannerFeeBps: number; // 0–4500 (0–45%)
@@ -118,3 +120,25 @@ export type PaymentLog = {
 };
 
 export type NewPaymentLog = Omit<PaymentLog, 'id' | 'createdAt'>;
+
+export type IntentStatus = 'pending' | 'paid';
+
+/**
+ * A guest typed a message on their phone and got a one-time account number
+ * for this one spray. The transfer to it is matched to the message for certain.
+ */
+export type SprayIntent = {
+  reference: string;
+  eventId: string;
+  message: string | null;
+  amountKobo: number;
+  accountNumber: string;
+  bankName: string;
+  accountName: string;
+  expiresAt: string;
+  status: IntentStatus;
+  transferId: number | null;
+  createdAt: string;
+};
+
+export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transferId'>;

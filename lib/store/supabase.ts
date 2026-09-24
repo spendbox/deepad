@@ -1,5 +1,17 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { NewPaymentLog, NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, PaymentLog, Planner, SprayEvent, Transfer } from '../types';
+import type {
+  NewPaymentLog,
+  NewPlanner,
+  NewSprayEvent,
+  NewSprayIntent,
+  NewTransfer,
+  PasswordReset,
+  PaymentLog,
+  Planner,
+  SprayEvent,
+  SprayIntent,
+  Transfer,
+} from '../types';
 import { computeStats, type Store } from './types';
 
 // Talks to Supabase with the secret service-role key. Server only: the key
@@ -29,6 +41,7 @@ const TRANSFER_NUMS = ['id', 'amountKobo', 'platformFeeKobo', 'plannerFeeKobo', 
 const toEvent = (r: Row | null) => {
   const e = fromRow<SprayEvent>(r ?? {}, EVENT_NUMS);
   e.photos = Array.isArray(e.photos) ? e.photos : [];
+  e.hypeLines = Array.isArray(e.hypeLines) ? e.hypeLines : [];
   return e;
 };
 const toReset = (r: Row | null) => fromRow<PasswordReset>(r ?? {});
@@ -190,6 +203,18 @@ export class SupabaseStore implements Store {
     }
     return { transfer: toTransfer(check(res)), created: true };
   }
+  async listTransfersAfter(eventId: string, afterId: number, limit = 200) {
+    const rows = check(
+      await this.db
+        .from('transfers')
+        .select('*')
+        .eq('event_id', eventId)
+        .gt('id', afterId)
+        .order('id', { ascending: true })
+        .limit(limit),
+    );
+    return (rows ?? []).map(toTransfer);
+  }
   async listTransfers(eventId: string, limit = 1000) {
     const rows = check(
       await this.db.from('transfers').select('*').eq('event_id', eventId).order('id', { ascending: false }).limit(limit),
@@ -220,6 +245,18 @@ export class SupabaseStore implements Store {
     return computeStats(all.map((r) => ({ amountKobo: Number(r.amount_kobo), outsideWindow: r.outside_window })));
   }
 
+  // ----- One-time accounts (spray with a message) -----
+  async createIntent(i: NewSprayIntent) {
+    return fromRow<SprayIntent>(check(await this.db.from('spray_intents').insert(toRow(i)).select('*').single()) ?? {}, ['amountKobo', 'transferId']);
+  }
+  async getIntent(reference: string) {
+    const row = check(await this.db.from('spray_intents').select('*').eq('reference', reference).maybeSingle());
+    return row ? fromRow<SprayIntent>(row, ['amountKobo', 'transferId']) : null;
+  }
+  async markIntentPaid(reference: string, transferId: number) {
+    check(await this.db.from('spray_intents').update({ status: 'paid', transfer_id: transferId }).eq('reference', reference));
+  }
+
   // ----- Payment notification log -----
   async logPayment(l: NewPaymentLog) {
     const res = await this.db.from('payment_logs').insert(toRow(l));
@@ -236,7 +273,8 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines'],
+      ['spray_intents', 'reference, message'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome, raw'],

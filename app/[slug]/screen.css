@@ -247,3 +247,47 @@
   .spray-pop, .m-spray, .pop-kicker, .spray-pop .pop-amount, .spray-pop .pop-to, .spray-pop .pop-msg { animation: none; }
   .burst { display: none; }
 }
+
+/* A compact spray: notes stay around the amount instead of flooding the screen. */
+@keyframes flash { 0% { width: 20px; height: 20px; opacity: .9; } 100% { width: 700px; height: 700px; opacity: 0; } }
+.burst-note { width: 72px; height: 34px; margin: -17px 0 0 -36px; font-size: 18px; }
+@keyframes burstOut {
+  0% { transform: translate(0, 0) scale(.3) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  80% { opacity: .85; }
+  100% { transform: translate(calc(var(--dx) * 5), calc(var(--dy) * 4)) scale(1) rotate(var(--rot)); opacity: 0; }
+}
+
+/* Latest messages (no amounts) */
+.side-messages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.side-messages li {
+  font-size: 30px; line-height: 1.3; font-weight: 600; padding: 14px 18px; border-radius: 18px 18px 18px 4px;
+  background: color-mix(in srgb, var(--s-accent) 14%, transparent); border-left: 6px solid var(--s-accent);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  animation: riseIn .6s ease-out both;
+}
+.side-messages li:first-child { background: color-mix(in srgb, var(--s-accent) 26%, transparent); }
+.m-messages { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.m-messages li {
+  font-size: 16px; font-weight: 600; padding: 8px 12px; border-radius: 12px 12px 12px 4px; overflow-wrap: anywhere;
+  background: color-mix(in srgb, var(--s-accent) 14%, transparent); border-left: 4px solid var(--s-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-messages li { animation: none; }
+}
+
+/* QR code: spray with a message */
+.paybar-qr { width: 520px; flex-shrink: 0; display: flex; align-items: center; gap: 22px; }
+.paybar-qr .qr { width: 200px; height: 200px; flex-shrink: 0; background: #fff; border-radius: 16px; padding: 8px; line-height: 0; }
+.paybar-qr .qr svg { width: 100%; height: 100%; display: block; }
+.paybar-qr-text { display: flex; flex-direction: column; gap: 6px; font-size: 26px; line-height: 1.25; font-weight: 600; }
+.paybar-qr-text strong { font-family: var(--display); font-weight: 800; font-size: 32px; line-height: 1.1; }
+.paybar-small { font-size: 20px; opacity: .85; }
+.m-spray-btn {
+  margin-top: 6px; min-height: 50px; border-radius: 14px; background: var(--s-accent); color: var(--s-on-accent);
+  display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 800; font-size: 18px; text-decoration: none;
+}
+
+/* Fun line for a spray without a message */
+.pop-msg.hype, .m-msg.hype { font-style: italic; color: var(--s-accent); border-left-style: dashed; }

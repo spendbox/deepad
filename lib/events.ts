@@ -6,17 +6,27 @@ import {
   createCustomer,
   createDedicatedAccount,
   createSplit,
+  createOneTimeAccount,
   createSubaccount,
   deactivateDedicatedAccount,
   getCustomerId,
   listCustomerTransactions,
   paystackConfigured,
+  verifyTransaction,
 } from './paystack';
 import { getStore } from './store';
 export { collectNarrations } from './narration';
 import { collectNarrations, pickNarration } from './narration';
-import { cleanNarration } from './text';
-import type { Planner, SprayEvent, Transfer } from './types';
+import { cleanMessage, cleanNarration } from './text';
+import type { Planner, SprayEvent, SprayIntent, Transfer } from './types';
+import { randomBytes } from 'node:crypto';
+import { hypeLinesFor } from './hype';
+
+/** Paystack customer email for an event; its one-time accounts use the same one. */
+function eventCustomerEmail(event: SprayEvent): string {
+  const domain = process.env.PAYSTACK_CUSTOMER_EMAIL_DOMAIN || 'events.dashpad.ng';
+  return `event-${event.id}@${domain}`;
+}
 
 // ---------- Payment setup (Paystack) ----------
 
@@ -66,9 +76,8 @@ export async function setupEventPayments(eventId: string): Promise<SprayEvent> {
     }
 
     if (!event.paystackCustomerCode) {
-      const domain = process.env.PAYSTACK_CUSTOMER_EMAIL_DOMAIN || 'events.dashpad.ng';
       const code = await createCustomer({
-        email: `event-${event.id}@${domain}`,
+        email: eventCustomerEmail(event),
         firstName: event.celebrantName,
         lastName: 'DashPad',
         phone: planner.phone,
@@ -134,7 +143,11 @@ export async function recordTransfer(
   const outsideWindow = eventPhase({ startsAt: event.startsAt, endsAt: event.endsAt }, Number.isFinite(when) ? when : Date.now()) !== 'live';
   const split = splitTransfer(t.amountKobo, event.plannerFeeBps, event.platformFeeBps);
   const store = getStore();
-  const { raw: rawNarration, message } = pickNarration(t.narrations, t.senderName, receiverNames(event));
+  const picked = pickNarration(t.narrations, t.senderName, receiverNames(event));
+  // A spray started on the guest's phone: the message they typed there always wins.
+  const intent = await store.getIntent(t.reference);
+  const rawNarration = picked.raw;
+  const message = intent && intent.eventId === event.id && intent.message ? intent.message : picked.message;
   const result = await store.insertTransfer({
     eventId: event.id,
     reference: t.reference,
@@ -149,6 +162,7 @@ export async function recordTransfer(
     processingFeeKobo: Math.max(0, Math.round(t.processingFeeKobo ?? 0)),
     outsideWindow,
   });
+  if (intent && intent.status !== 'paid') await store.markIntentPaid(intent.reference, result.transfer.id);
   // Seen before without a description (e.g. found by the backup check), and now we have one.
   if (!result.created && !result.transfer.message && message) {
     await store.setTransferMessage(result.transfer.id, message, rawNarration);
@@ -160,6 +174,88 @@ export async function recordTransfer(
 /** Names of the event's own receiving account, which must never be shown as a guest's message. */
 export function receiverNames(event: SprayEvent): string[] {
   return [event.accountName, process.env.PAYSTACK_BUSINESS_NAME, 'DashPad'].filter((n): n is string => !!n);
+}
+
+// ---------- Spray with a message (one-time account per spray) ----------
+
+export const ONE_TIME_MINUTES = 30;
+export const MIN_SPRAY_NAIRA = 100;
+export const MAX_SPRAY_NAIRA = 5_000_000;
+export class SprayInputError extends Error {}
+
+const recentStarts = new Map<string, number[]>();
+
+/** Guest typed a message and amount: give them a one-time account number for this spray. */
+export async function startMessageSpray(
+  event: SprayEvent,
+  input: { message: unknown; amountNaira: unknown },
+  clientKey: string,
+): Promise<SprayIntent> {
+  if (eventPhase(event) !== 'live') throw new SprayInputError('Spraying is not open right now.');
+  if (event.setupStatus !== 'ready' || !paystackConfigured()) throw new SprayInputError('Spraying is not ready yet. Please transfer to the account on the big screen.');
+  const message = cleanMessage(String(input.message ?? ''));
+  if (!message) throw new SprayInputError('Please type your message.');
+  const amountNaira = Math.floor(Number(input.amountNaira));
+  if (!Number.isFinite(amountNaira) || amountNaira < MIN_SPRAY_NAIRA) {
+    throw new SprayInputError(`The smallest spray is ₦${MIN_SPRAY_NAIRA.toLocaleString('en-NG')}.`);
+  }
+  if (amountNaira > MAX_SPRAY_NAIRA) throw new SprayInputError(`The largest single spray is ₦${MAX_SPRAY_NAIRA.toLocaleString('en-NG')}.`);
+
+  // A little protection against someone hammering the button.
+  const now = Date.now();
+  const recent = (recentStarts.get(clientKey) ?? []).filter((t) => now - t < 60_000);
+  if (recent.length >= 5) throw new SprayInputError('Too many tries. Please wait a minute and try again.');
+  recentStarts.set(clientKey, [...recent, now]);
+
+  const reference = `DPM${now.toString(36)}${randomBytes(4).toString('hex')}`.toUpperCase();
+  const expiresAt = new Date(Math.min(now + ONE_TIME_MINUTES * 60_000, new Date(event.endsAt).getTime()));
+  const account = await createOneTimeAccount({
+    reference,
+    email: eventCustomerEmail(event),
+    amountKobo: amountNaira * 100,
+    expiresAt,
+    splitCode: event.paystackSplitCode,
+    metadata: { dashpad_event_id: event.id, dashpad_reference: reference },
+  });
+  return getStore().createIntent({
+    reference,
+    eventId: event.id,
+    message,
+    amountKobo: amountNaira * 100,
+    ...account,
+  });
+}
+
+const lastVerifyAt = new Map<string, number>();
+
+/**
+ * The guest's phone asks "has my money landed?". Normally the webhook has
+ * already recorded it; if not, ask Paystack directly (at most every few seconds).
+ */
+export async function checkIntentPaid(intent: SprayIntent): Promise<boolean> {
+  if (intent.status === 'paid') return true;
+  const now = Date.now();
+  if (now - (lastVerifyAt.get(intent.reference) ?? 0) < 6_000) return false;
+  lastVerifyAt.set(intent.reference, now);
+  try {
+    const tx = await verifyTransaction(intent.reference);
+    if (tx.status !== 'success' || !(Number(tx.amount) > 0)) return false;
+    const event = await getStore().getEventById(intent.eventId);
+    if (!event) return false;
+    const auth = tx.authorization ?? {};
+    await recordTransfer(event, {
+      reference: intent.reference,
+      amountKobo: Math.round(Number(tx.amount)),
+      senderName: auth.sender_name ?? null,
+      senderBank: auth.sender_bank ?? null,
+      narrations: collectNarrations(tx),
+      paidAt: tx.paid_at ?? tx.paidAt ?? null,
+      processingFeeKobo: Number(tx.fees ?? 0) || 0,
+    });
+    return true;
+  } catch {
+    return false; // not paid yet, or Paystack busy: the phone will ask again
+  }
 }
 
 /**
@@ -386,6 +482,8 @@ export type ScreenFeed = {
     recipientLabel: string;
     theme: string;
     photos: string[];
+    /** Shown when a spray has no message. */
+    hypeLines: string[];
     phase: 'upcoming' | 'live' | 'ended';
     startsAt: string;
     endsAt: string;
@@ -399,9 +497,17 @@ export type ScreenFeed = {
   recent: ScreenTransfer[];
 };
 
-export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
+/**
+ * What the big screen needs. `afterId` is the newest spray the screen has
+ * already seen: every spray after it is included, so a burst of payments
+ * arriving together is never cut short.
+ */
+export async function screenFeed(event: SprayEvent, afterId?: number): Promise<ScreenFeed> {
   const store = getStore();
-  const transfers = await store.listTransfers(event.id, 40);
+  const latest = await store.listTransfers(event.id, 40);
+  const newer = afterId != null && Number.isFinite(afterId) ? await store.listTransfersAfter(event.id, afterId, 300) : [];
+  const byId = new Map([...latest, ...newer].map((t) => [t.id, t]));
+  const transfers = [...byId.values()].sort((a, b) => b.id - a.id);
   return {
     event: {
       title: event.title,
@@ -409,6 +515,7 @@ export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
       recipientLabel: event.recipientLabel,
       theme: event.theme,
       photos: event.photos ?? [],
+      hypeLines: hypeLinesFor(event.hypeLines, event.celebrantName),
       phase: eventPhase(event),
       startsAt: event.startsAt,
       endsAt: event.endsAt,
@@ -420,7 +527,6 @@ export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
     },
     recent: transfers
       .filter((t) => !t.outsideWindow)
-      .slice(0, 30)
       .map((t) => ({ id: t.id, amountKobo: t.amountKobo, message: t.hidden ? null : t.message, createdAt: t.createdAt }))
       .reverse(),
   };

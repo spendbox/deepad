@@ -4,17 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import { groupAccountNumber, naira } from '@/lib/money';
+import { pickHypeLine } from '@/lib/hype';
 import { getTheme } from '@/lib/themes';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 
 const POLL_MS = 2000;
-const SPRAY_HOLD_MS = 12000; // a spray stays up this long, then the screen invites more
+const SPRAY_HOLD_MS = 8000; // a spray's celebration stays up this long, then the screen invites more
 const TAKEOVER_MS = 7000;
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
-type Props = { code: string; initialFeed: ScreenFeed };
+type Props = { code: string; initialFeed: ScreenFeed; qrSvg: string; sprayPath: string };
 
 function clock(iso: string) {
   return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
@@ -23,10 +24,12 @@ function dayAndClock(iso: string) {
   return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function LiveScreen({ code, initialFeed }: Props) {
+export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Props) {
   const [feed, setFeed] = useState(initialFeed);
   const [online, setOnline] = useState(true);
   const seen = useRef(new Set(initialFeed.recent.map((t) => t.id)));
+  // The newest spray already known. Each poll asks for everything after it, so none are ever skipped.
+  const lastId = useRef(initialFeed.recent.reduce((m, t) => Math.max(m, t.id), 0));
   const [queue, setQueue] = useState<ScreenTransfer[]>([]);
   const [current, setCurrent] = useState<ScreenTransfer | null>(null);
   const [shownAt, setShownAt] = useState(0);
@@ -45,15 +48,19 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/screen/${encodeURIComponent(code)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/screen/${encodeURIComponent(code)}?after=${lastId.current}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as ScreenFeed;
         if (!alive) return;
         fails = 0;
         setOnline(true);
         setFeed(data);
-        const fresh = data.recent.filter((t) => !seen.current.has(t.id));
-        fresh.forEach((t) => seen.current.add(t.id));
+        // Every new spray joins the queue in the order it arrived, even if many came at once.
+        const fresh = data.recent.filter((t) => !seen.current.has(t.id)).sort((a, b) => a.id - b.id);
+        fresh.forEach((t) => {
+          seen.current.add(t.id);
+          lastId.current = Math.max(lastId.current, t.id);
+        });
         if (fresh.length) setQueue((q) => [...q, ...fresh]);
         // Pick up changes to what's showing (e.g. the planner hid a message).
         setCurrent((c) => (c ? data.recent.find((t) => t.id === c.id) ?? c : c));
@@ -86,7 +93,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       return;
     }
     if (!queue.length || paused) return;
-    const gap = queue.length > 3 ? 2500 : 4500;
+    // Each spray gets its moment; when many arrive together they play a little faster.
+    const gap = queue.length > 10 ? 1800 : queue.length > 3 ? 2600 : 4500;
     if (shownAt && now - shownAt < gap) return;
     const [next, ...rest] = queue;
     setQueue(rest);
@@ -156,7 +164,15 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   } as React.CSSProperties;
 
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
-  const recent = feed.recent.filter((t) => !queue.some((q) => q.id === t.id)).slice(-6).reverse();
+  // The guest's message, or a fun line when they didn't leave one.
+  const lineFor = (t: ScreenTransfer) => t.message ?? pickHypeLine(e.hypeLines ?? [], t.id);
+  const isHype = (t: ScreenTransfer) => !t.message;
+
+  // Guests' messages only (no amounts), newest first, once their spray has popped up.
+  const messages = feed.recent
+    .filter((t) => t.message && !queue.some((q) => q.id === t.id))
+    .slice(-5)
+    .reverse();
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
   // Celebrant photos take turns, a new one every few seconds.
   const photo = e.photos.length ? e.photos[ready ? Math.floor(now / PHOTO_MS) % e.photos.length : 0] : null;
@@ -224,33 +240,32 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
             {takeover || (showingSpray && current) ? (
               <section key={popKey} className={`m-card spray-pop m-spray${takeover ? ' m-bigspray' : ''}`}>
-                <Burst count={12} />
+                <Burst count={10} />
                 <div className="m-badge">{takeover ? 'Big spray!' : 'New spray!'}</div>
                 <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
                 <div className="m-to">sent to {e.recipientLabel}</div>
-                {(takeover?.t ?? current!).message && <div className="m-msg">“{(takeover?.t ?? current!).message}”</div>}
+                {lineFor(takeover?.t ?? current!) && (
+                  <div className={`m-msg${isHype(takeover?.t ?? current!) ? ' hype' : ''}`}>
+                    {isHype(takeover?.t ?? current!) ? lineFor(takeover?.t ?? current!) : `“${lineFor(takeover?.t ?? current!)}”`}
+                  </div>
+                )}
               </section>
             ) : (
               <section className="m-card">
                 <div className="m-big">Spray {e.celebrantName}!</div>
-                <div className="m-muted">
-                  Type a message in your transfer description and it will show on the big screen. It can take up to a
-                  minute to appear.
-                </div>
+                <div className="m-muted">Want your message on the big screen? Spray with a message:</div>
+                <a href={sprayPath} className="m-spray-btn">Spray with a message</a>
               </section>
             )}
 
-            {recent.length > 0 && (
+            {messages.length > 0 && (
               <section className="m-card">
-                <div className="m-to">Recent sprays</div>
-                <ol className="m-recent">
-                  {recent.map((t) => (
-                    <li key={t.id}>
-                      <strong>{naira(t.amountKobo)}</strong>
-                      {t.message && <span>{t.message}</span>}
-                    </li>
+                <div className="m-to">Latest messages</div>
+                <ul className="m-messages">
+                  {messages.map((t) => (
+                    <li key={t.id}>“{t.message}”</li>
                   ))}
-                </ol>
+                </ul>
               </section>
             )}
           </>
@@ -271,7 +286,9 @@ export default function LiveScreen({ code, initialFeed }: Props) {
             <div className="takeover-badge">Big spray!</div>
             <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
             <div className="takeover-to">sent to {e.recipientLabel}</div>
-            {takeover.t.message && <div className="takeover-msg">“{takeover.t.message}”</div>}
+            {lineFor(takeover.t) && (
+              <div className="takeover-msg">{isHype(takeover.t) ? lineFor(takeover.t) : `“${lineFor(takeover.t)}”`}</div>
+            )}
             {acct && (
               <div className="takeover-acct">
                 <span>Transfer to spray</span>
@@ -320,19 +337,23 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                 <div className="middle">
                   {showingSpray && current ? (
                     <div key={popKey} className="panel-main spray-pop">
-                      <Burst count={22} />
+                      <Burst count={16} />
                       <div className="pop-kicker">New spray!</div>
                       <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
                       <div className="pop-to">sent to {e.recipientLabel}</div>
-                      {current.message && <div className="pop-msg">“{current.message}”</div>}
+                      {lineFor(current) && (
+                        <div className={`pop-msg${isHype(current) ? ' hype' : ''}`}>
+                          {isHype(current) ? lineFor(current) : `“${lineFor(current)}”`}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={`invite panel-main${photo ? ' with-photo' : ''}`}>
                       <div className="invite-text">
                         <div className="invite-big">Spray {e.celebrantName}!</div>
                         <div className="invite-sub">
-                          Transfer any amount from your bank app to the account below. Type a message in the transfer
-                          description and it will show here. It can take up to a minute to appear.
+                          Transfer any amount to the account below, or scan the QR code to spray with a message that
+                          shows up here.
                         </div>
                       </div>
                       {photo && (
@@ -343,18 +364,15 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                   )}
                   <aside className="side">
                     <div className="side-list">
-                      <h2>Recent sprays</h2>
-                      {recent.length === 0 ? (
-                        <p className="side-empty">Be the first to spray!</p>
+                      <h2>Latest messages</h2>
+                      {messages.length === 0 ? (
+                        <p className="side-empty">Scan the QR code below to spray with a message. It will appear here.</p>
                       ) : (
-                        <ol>
-                          {recent.map((t) => (
-                            <li key={t.id}>
-                              <span className="side-amt tabular">{naira(t.amountKobo)}</span>
-                              {t.message && <span className="side-msg">{t.message}</span>}
-                            </li>
+                        <ul className="side-messages">
+                          {messages.map((t) => (
+                            <li key={t.id}>“{t.message}”</li>
                           ))}
-                        </ol>
+                        </ul>
                       )}
                     </div>
                   </aside>
@@ -375,14 +393,12 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                       <div className="paybar-acct" style={{ fontSize: 72 }}>Account number coming soon</div>
                     )}
                   </div>
-                  <div className="paybar-side">
-                    <div>Your transfer description shows on screen. It can take up to a minute to appear.</div>
-                    <div className="paybar-trust">
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" />
-                        <path d="M9 12l2 2 4-4" />
-                      </svg>
-                      <span>Only confirmed transfers appear. Senders stay anonymous.</span>
+                  <div className="paybar-qr">
+                    <div className="qr" role="img" aria-label="QR code to spray with a message" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+                    <div className="paybar-qr-text">
+                      <strong>Want your message on screen?</strong>
+                      <span>Scan to spray with a message</span>
+                      <span className="paybar-small">Transfers can take up to a minute to show.</span>
                     </div>
                   </div>
                 </footer>

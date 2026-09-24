@@ -3,11 +3,13 @@ import type {
   NewPlanner,
   NewSprayEvent,
   NewPaymentLog,
+  NewSprayIntent,
   NewTransfer,
   PasswordReset,
   PaymentLog,
   Planner,
   SprayEvent,
+  SprayIntent,
   Transfer,
 } from '../types';
 
@@ -52,11 +54,17 @@ export interface Store {
   insertTransfer(t: NewTransfer): Promise<{ transfer: Transfer; created: boolean }>;
   /** Newest first. */
   listTransfers(eventId: string, limit?: number): Promise<Transfer[]>;
+  /** Transfers with an id greater than `afterId`, oldest first (so the screen never skips one). */
+  listTransfersAfter(eventId: string, afterId: number, limit?: number): Promise<Transfer[]>;
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
   /** Fill in a description that arrived after the payment was first recorded. */
   setTransferMessage(transferId: number, message: string | null, rawNarration: string | null): Promise<void>;
   /** Totals of transfers that counted (inside the event window). */
   eventStats(eventId: string): Promise<EventStats>;
+
+  createIntent(i: NewSprayIntent): Promise<SprayIntent>;
+  getIntent(reference: string): Promise<SprayIntent | null>;
+  markIntentPaid(reference: string, transferId: number): Promise<void>;
 
   logPayment(l: NewPaymentLog): Promise<void>;
   listPaymentLogs(limit?: number): Promise<PaymentLog[]>;

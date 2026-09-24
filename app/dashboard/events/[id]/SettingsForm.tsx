@@ -4,9 +4,10 @@ import { useActionState, useState } from 'react';
 import { RECIPIENT_CHOICES } from '@/lib/event-info';
 import SlugField from '@/components/SlugField';
 import { THEMES } from '@/lib/themes';
+import { DEFAULT_HYPE_LINES } from '@/lib/hype';
 import { saveEventSettings } from '../../../actions';
 
-type Values = { slug: string; title: string; recipientLabel: string; theme: string; bigSprayNaira: number; endsAt: string };
+type Values = { slug: string; hypeLines: string[]; title: string; recipientLabel: string; theme: string; bigSprayNaira: number; endsAt: string };
 
 function toLocalInput(iso: string): string {
   const d = new Date(iso);
@@ -56,6 +57,21 @@ export default function SettingsForm({ eventId, ended, values }: { eventId: stri
         <select id="s-theme" className="select" value={theme} onChange={(e) => setTheme(e.target.value)}>
           {THEMES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
+      </div>
+      <div className="field">
+        <label htmlFor="s-hype">Lines for sprays without a message</label>
+        <textarea
+          id="s-hype"
+          name="hypeLines"
+          className="input"
+          style={{ height: 'auto', minHeight: 180, padding: 12, lineHeight: 1.5 }}
+          defaultValue={values.hypeLines.join('\n')}
+          placeholder={DEFAULT_HYPE_LINES.join('\n')}
+        />
+        <span className="hint">
+          One per line. When a spray arrives without a message, the screen shows one of these. Leave empty to use ours
+          (shown in grey). Write {'{name}'} for the celebrant’s name.
+        </span>
       </div>
       <div className="field">
         <label htmlFor="s-big">Big spray amount (₦)</label>

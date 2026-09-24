@@ -82,7 +82,10 @@ export async function POST(req: Request) {
   const customerCode = data.customer?.customer_code ?? '';
 
   try {
+    // A spray started on a guest's phone (one-time account) is found by its reference.
+    const intent = await store.getIntent(reference);
     const event =
+      (intent ? await store.getEventById(intent.eventId) : null) ??
       (receiver ? await store.getEventByAccountNumber(receiver) : null) ??
       (customerCode ? await store.getEventByCustomerCode(customerCode) : null);
     if (!event) {
