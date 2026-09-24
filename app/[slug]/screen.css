@@ -276,3 +276,18 @@
 @media (prefers-reduced-motion: reduce) {
   .side-messages li { animation: none; }
 }
+
+/* QR code: spray with a message */
+.paybar-qr { width: 520px; flex-shrink: 0; display: flex; align-items: center; gap: 22px; }
+.paybar-qr .qr { width: 200px; height: 200px; flex-shrink: 0; background: #fff; border-radius: 16px; padding: 8px; line-height: 0; }
+.paybar-qr .qr svg { width: 100%; height: 100%; display: block; }
+.paybar-qr-text { display: flex; flex-direction: column; gap: 6px; font-size: 26px; line-height: 1.25; font-weight: 600; }
+.paybar-qr-text strong { font-family: var(--display); font-weight: 800; font-size: 32px; line-height: 1.1; }
+.paybar-small { font-size: 20px; opacity: .85; }
+.m-spray-btn {
+  margin-top: 6px; min-height: 50px; border-radius: 14px; background: var(--s-accent); color: var(--s-on-accent);
+  display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 800; font-size: 18px; text-decoration: none;
+}
+
+/* Fun line for a spray without a message */
+.pop-msg.hype, .m-msg.hype { font-style: italic; color: var(--s-accent); border-left-style: dashed; }

@@ -150,3 +150,13 @@ test('the best description is picked from Paystack’s notification', () => {
   assert.equal(none.message, null);
   assert.equal(none.raw, 'SPENDBOX/DASHPA');
 });
+
+test('hype lines fill in when there is no message', async () => {
+  const { hypeLinesFor, pickHypeLine, DEFAULT_HYPE_LINES } = await import('../lib/hype.ts');
+  const defaults = hypeLinesFor([], 'Tolu & Dayo');
+  assert.equal(defaults.length, DEFAULT_HYPE_LINES.length);
+  assert.ok(defaults.includes('Big love for Tolu & Dayo!'));
+  assert.deepEqual(hypeLinesFor(['  Spray {name}! ', ''], 'Kemi'), ['Spray Kemi!']);
+  assert.equal(pickHypeLine(['a', 'b', 'c'], 5), pickHypeLine(['a', 'b', 'c'], 5));
+  assert.equal(pickHypeLine([], 1), null);
+});

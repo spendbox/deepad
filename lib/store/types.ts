@@ -3,11 +3,13 @@ import type {
   NewPlanner,
   NewSprayEvent,
   NewPaymentLog,
+  NewSprayIntent,
   NewTransfer,
   PasswordReset,
   PaymentLog,
   Planner,
   SprayEvent,
+  SprayIntent,
   Transfer,
 } from '../types';
 
@@ -59,6 +61,10 @@ export interface Store {
   setTransferMessage(transferId: number, message: string | null, rawNarration: string | null): Promise<void>;
   /** Totals of transfers that counted (inside the event window). */
   eventStats(eventId: string): Promise<EventStats>;
+
+  createIntent(i: NewSprayIntent): Promise<SprayIntent>;
+  getIntent(reference: string): Promise<SprayIntent | null>;
+  markIntentPaid(reference: string, transferId: number): Promise<void>;
 
   logPayment(l: NewPaymentLog): Promise<void>;
   listPaymentLogs(limit?: number): Promise<PaymentLog[]>;

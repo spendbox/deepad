@@ -1,5 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import type { NewPaymentLog, NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, PaymentLog, Planner, SprayEvent, Transfer } from '../types';
+import type {
+  NewPaymentLog,
+  NewPlanner,
+  NewSprayEvent,
+  NewSprayIntent,
+  NewTransfer,
+  PasswordReset,
+  PaymentLog,
+  Planner,
+  SprayEvent,
+  SprayIntent,
+  Transfer,
+} from '../types';
 import { computeStats, type Store } from './types';
 
 // A throwaway store that lives in the server's memory, for developers running
@@ -11,12 +23,13 @@ type Data = {
   transfers: Transfer[];
   resets: PasswordReset[];
   logs: PaymentLog[];
+  intents: SprayIntent[];
   nextTransferId: number;
 };
 
 const g = globalThis as unknown as { __dashpadMemory?: Data };
 function data(): Data {
-  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], nextTransferId: 1 };
+  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], intents: [], nextTransferId: 1 };
   return g.__dashpadMemory;
 }
 
@@ -151,6 +164,19 @@ export class MemoryStore implements Store {
   }
   async eventStats(eventId: string) {
     return computeStats(data().transfers.filter((t) => t.eventId === eventId));
+  }
+
+  async createIntent(i: NewSprayIntent) {
+    const intent: SprayIntent = { ...i, status: 'pending', transferId: null, createdAt: now() };
+    data().intents.push(intent);
+    return intent;
+  }
+  async getIntent(reference: string) {
+    return data().intents.find((i) => i.reference === reference) ?? null;
+  }
+  async markIntentPaid(reference: string, transferId: number) {
+    const i = data().intents.find((x) => x.reference === reference);
+    if (i) Object.assign(i, { status: 'paid', transferId });
   }
 
   async logPayment(l: NewPaymentLog) {

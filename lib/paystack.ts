@@ -145,3 +145,45 @@ export async function listCustomerTransactions(customerId: number, fromIso: stri
   const q = new URLSearchParams({ customer: String(customerId), status: 'success', perPage: '100', from: fromIso });
   return call<PaystackTransaction[]>('GET', `/transaction?${q}`);
 }
+
+export type OneTimeAccount = { accountNumber: string; bankName: string; accountName: string; expiresAt: string };
+
+/**
+ * "Pay with Transfer": a one-time account number for a single spray. The
+ * transfer to it is tied to `reference`, so the guest's message always matches.
+ * Using the event's customer email keeps these payments on the event's customer.
+ */
+export async function createOneTimeAccount(opts: {
+  reference: string;
+  email: string;
+  amountKobo: number;
+  expiresAt: Date;
+  splitCode: string | null;
+  metadata: Record<string, unknown>;
+}): Promise<OneTimeAccount> {
+  const data = await call<{
+    account_number?: string;
+    account_name?: string;
+    bank?: { name?: string };
+    account_expires_at?: string;
+  }>('POST', '/charge', {
+    email: opts.email,
+    amount: opts.amountKobo,
+    reference: opts.reference,
+    bank_transfer: { account_expires_at: opts.expiresAt.toISOString() },
+    ...(opts.splitCode ? { split_code: opts.splitCode } : {}),
+    metadata: opts.metadata,
+  });
+  if (!data.account_number) throw new PaystackError('Paystack did not return an account number.');
+  return {
+    accountNumber: data.account_number,
+    bankName: data.bank?.name ?? 'Bank',
+    accountName: data.account_name ?? 'DashPad',
+    expiresAt: data.account_expires_at ?? opts.expiresAt.toISOString(),
+  };
+}
+
+/** Ask Paystack directly whether a payment went through (backup for missed notifications). */
+export async function verifyTransaction(reference: string): Promise<PaystackTransaction> {
+  return call<PaystackTransaction>('GET', `/transaction/verify/${encodeURIComponent(reference)}`);
+}

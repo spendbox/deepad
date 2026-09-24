@@ -206,6 +206,7 @@ export default async function EventPage({
           ended={phase === 'ended'}
           values={{
             slug: event.slug,
+            hypeLines: event.hypeLines ?? [],
             title: event.title,
             recipientLabel: event.recipientLabel,
             theme: event.theme,

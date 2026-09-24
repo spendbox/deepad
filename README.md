@@ -13,6 +13,7 @@ description. Senders stay anonymous on screen.
 | Sign up / log in | `/signup`, `/login` | Event planners and MCs |
 | Planner dashboard | `/dashboard` | Planners: create and run events |
 | Event big screen | `/<event-link>` e.g. `/tolu-and-dayo` | The venue TV or projector (works on phones too) |
+| Spray with a message | `/<event-link>/spray` (QR code on the big screen) | Guests who want their message on screen |
 | Forgot password | `/forgot-password` | Planners |
 | Admin | `/admin` | DashPad staff (password protected) |
 | Paystack webhook | `/api/webhooks/paystack` | Paystack |
@@ -28,6 +29,9 @@ description. Senders stay anonymous on screen.
 - Payouts reach the bank accounts within 2 business days.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
+- Banks often drop or replace the transfer description, so guests who want a message scan the QR
+  code, type it, and get a one-time account number for that spray: the message always matches.
+  Sprays without a message show a fun “hype line” (planners can write their own).
 - Only transfers confirmed by Paystack ever reach the screen: either its signed webhook, or (as a
   backup while the screen is open) by asking Paystack's API directly for the event's payments.
 - The admin page has a **Setup check** and a **Payment notifications** log for fixing problems.

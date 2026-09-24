@@ -14,8 +14,9 @@ import { hashPassword, verifyPassword } from '@/lib/passwords';
 import { endPlannerSession, requireAdmin, requirePlanner, startPlannerSession } from '@/lib/session';
 import { siteUrl } from '@/lib/site';
 import { slugProblem } from '@/lib/slug';
+import { MAX_HYPE_LENGTH, MAX_HYPE_LINES } from '@/lib/hype';
 import { getStore } from '@/lib/store';
-import { cleanDisplayName } from '@/lib/text';
+import { cleanDisplayName, cleanMessage } from '@/lib/text';
 import { isThemeId } from '@/lib/themes';
 import type { Planner, SprayEvent } from '@/lib/types';
 
@@ -225,6 +226,7 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     event = await getStore().createEvent({
     slug,
     photos: ownPhotos(input.photos, planner.id),
+    hypeLines: [],
     plannerId: planner.id,
     eventType,
     title,
@@ -378,6 +380,14 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   if (title) patch.title = title;
   const label = cleanDisplayName(str(form, 'recipientLabel'));
   if (label) patch.recipientLabel = label;
+
+  if (form.has('hypeLines')) {
+    patch.hypeLines = String(form.get('hypeLines') ?? '')
+      .split('\n')
+      .map((l) => cleanMessage(l)?.slice(0, MAX_HYPE_LENGTH) ?? '')
+      .filter(Boolean)
+      .slice(0, MAX_HYPE_LINES);
+  }
 
   const newSlug = str(form, 'slug').toLowerCase();
   if (newSlug && newSlug !== event.slug) {

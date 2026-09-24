@@ -114,6 +114,32 @@ create index if not exists payment_logs_created_idx on payment_logs (id desc);
 -- Added later: the full notification, to see exactly where the bank put the description.
 alter table payment_logs add column if not exists raw jsonb;
 
+-- Added later: "Spray with a message". A guest types a message on their phone and
+-- gets a one-time account number for that spray, so the message always matches.
+-- (A table called spray_intents may exist from an early version: it is replaced.)
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_name = 'spray_intents' and column_name = 'guest_name') then
+    drop table spray_intents;
+  end if;
+end $$;
+create table if not exists spray_intents (
+  reference text primary key,
+  event_id uuid not null references spray_events (id) on delete cascade,
+  message text,
+  amount_kobo bigint not null check (amount_kobo > 0),
+  account_number text not null,
+  bank_name text not null,
+  account_name text not null,
+  expires_at timestamptz not null,
+  status text not null default 'pending' check (status in ('pending', 'paid')),
+  transfer_id bigint,
+  created_at timestamptz not null default now()
+);
+create index if not exists spray_intents_event_idx on spray_intents (event_id);
+
+-- Added later: fun lines for sprays that arrive without a message.
+alter table spray_events add column if not exists hype_lines jsonb not null default '[]'::jsonb;
+
 -- Public storage folder for celebrant photos (shown on the big screen).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('celebrant-photos', 'celebrant-photos', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
@@ -126,3 +152,4 @@ alter table spray_events enable row level security;
 alter table transfers enable row level security;
 alter table password_resets enable row level security;
 alter table payment_logs enable row level security;
+alter table spray_intents enable row level security;
