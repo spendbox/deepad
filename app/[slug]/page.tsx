@@ -19,6 +19,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function EventScreenPage({ params }: Props) {
   const { slug: code } = await params;
   const event = await getStore().getEventBySlug(code);
-  if (!event) notFound();
+  if (!event || event.deletedAt) notFound();
   return <LiveScreen code={code} initialFeed={await screenFeed(event)} />;
 }

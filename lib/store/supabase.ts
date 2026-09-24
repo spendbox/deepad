@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, Planner, SprayEvent, Transfer } from '../types';
+import type { NewPaymentLog, NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, PaymentLog, Planner, SprayEvent, Transfer } from '../types';
 import { computeStats, type Store } from './types';
 
 // Talks to Supabase with the secret service-role key. Server only: the key
@@ -140,7 +140,12 @@ export class SupabaseStore implements Store {
   }
   async listEventsByPlanner(plannerId: string) {
     const rows = check(
-      await this.db.from('spray_events').select('*').eq('planner_id', plannerId).order('created_at', { ascending: false }),
+      await this.db
+        .from('spray_events')
+        .select('*')
+        .eq('planner_id', plannerId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false }),
     );
     return (rows ?? []).map(toEvent);
   }
@@ -156,6 +161,9 @@ export class SupabaseStore implements Store {
   }
   async updateEvent(id: string, patch: Partial<NewSprayEvent>) {
     return toEvent(check(await this.db.from('spray_events').update(toRow(patch)).eq('id', id).select('*').single()));
+  }
+  async deleteEvent(id: string) {
+    check(await this.db.from('spray_events').delete().eq('id', id));
   }
   async claimReport(eventId: string) {
     const rows = check(
@@ -207,5 +215,34 @@ export class SupabaseStore implements Store {
       if (!rows || rows.length < 1000) break;
     }
     return computeStats(all.map((r) => ({ amountKobo: Number(r.amount_kobo), outsideWindow: r.outside_window })));
+  }
+
+  // ----- Payment notification log -----
+  async logPayment(l: NewPaymentLog) {
+    const res = await this.db.from('payment_logs').insert(toRow(l));
+    // Logging must never stop a payment from being recorded.
+    if (res.error) console.error('payment log failed', res.error.message);
+  }
+  async listPaymentLogs(limit = 50) {
+    const res = await this.db.from('payment_logs').select('*').order('id', { ascending: false }).limit(limit);
+    if (res.error) return [];
+    return (res.data ?? []).map((r) => fromRow<PaymentLog>(r, ['id']));
+  }
+
+  async schemaProblems() {
+    // Ask for one row of each table with every column added in later updates.
+    const probes: [string, string][] = [
+      ['planners', 'id, paystack_subaccount'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id'],
+      ['transfers', 'id, processing_fee_kobo, outside_window'],
+      ['password_resets', 'id'],
+      ['payment_logs', 'id, outcome'],
+    ];
+    const problems: string[] = [];
+    for (const [table, cols] of probes) {
+      const res = await this.db.from(table).select(cols).limit(1);
+      if (res.error) problems.push(`${table}: ${res.error.message}`);
+    }
+    return problems;
   }
 }

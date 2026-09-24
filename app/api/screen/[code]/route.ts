@@ -1,6 +1,6 @@
 import { after, NextResponse } from 'next/server';
 import { eventPhase } from '@/lib/event-info';
-import { closeEvent, screenFeed } from '@/lib/events';
+import { checkPaystackForTransfers, closeEvent, screenFeed } from '@/lib/events';
 import { getStore } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(_req: Request, ctx: { params: Promise<{ code: string }> }) {
   const { code } = await ctx.params;
   const event = await getStore().getEventBySlug(code);
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  if (!event || event.deletedAt) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  // Backup for missed payment notifications: ask Paystack directly every few seconds.
+  after(() => checkPaystackForTransfers(event).catch((err) => console.error('checkPaystack failed', err)));
 
   // The event just finished: switch off its account and email the report
   // straight away (the daily clean-up job is only a backup).

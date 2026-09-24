@@ -2,8 +2,10 @@ import type {
   EventStats,
   NewPlanner,
   NewSprayEvent,
+  NewPaymentLog,
   NewTransfer,
   PasswordReset,
+  PaymentLog,
   Planner,
   SprayEvent,
   Transfer,
@@ -37,6 +39,8 @@ export interface Store {
   /** Events whose end time has passed but which have not been closed yet. */
   listEventsToClose(now: Date): Promise<SprayEvent[]>;
   updateEvent(id: string, patch: Partial<NewSprayEvent>): Promise<SprayEvent>;
+  /** Remove an event completely (only used when it never received money). */
+  deleteEvent(id: string): Promise<void>;
   /**
    * Atomically mark the event's report as sent. Returns false if someone else
    * already claimed it, so the email only ever goes out once.
@@ -51,6 +55,12 @@ export interface Store {
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
   /** Totals of transfers that counted (inside the event window). */
   eventStats(eventId: string): Promise<EventStats>;
+
+  logPayment(l: NewPaymentLog): Promise<void>;
+  listPaymentLogs(limit?: number): Promise<PaymentLog[]>;
+
+  /** Problems with the database set-up (e.g. the latest schema.sql was not run). Empty if fine. */
+  schemaProblems(): Promise<string[]>;
 }
 
 export function computeStats(rows: Pick<Transfer, 'amountKobo' | 'outsideWindow'>[]): EventStats {

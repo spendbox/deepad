@@ -7,7 +7,8 @@ import { revalidatePath } from 'next/cache';
 import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
 import { EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
 import { escapeHtml, sendEmail } from '@/lib/email';
-import { sendEventReport, setupEventPayments } from '@/lib/events';
+import { checkPaystackForTransfers, sendEventReport, setupEventPayments } from '@/lib/events';
+import { deactivateDedicatedAccount, paystackConfigured } from '@/lib/paystack';
 import { clampPlannerFeeBps, MAX_PLANNER_FEE_BPS, PLATFORM_FEE_BPS } from '@/lib/money';
 import { hashPassword, verifyPassword } from '@/lib/passwords';
 import { endPlannerSession, requireAdmin, requirePlanner, startPlannerSession } from '@/lib/session';
@@ -251,6 +252,7 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     setupError: null,
     closedAt: null,
     reportSentAt: null,
+    deletedAt: null,
     });
   } catch (err) {
     if (err instanceof Error && err.message === 'SLUG_TAKEN') return { error: 'That event link is already taken. Please choose another.' };
@@ -265,8 +267,43 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
 async function ownEvent(eventId: string): Promise<SprayEvent> {
   const planner = await requirePlanner();
   const event = await getStore().getEventById(eventId);
-  if (!event || event.plannerId !== planner.id) redirect('/dashboard');
+  if (!event || event.plannerId !== planner.id || event.deletedAt) redirect('/dashboard');
   return event;
+}
+
+/**
+ * Delete an event. Its link and account number stop working straight away.
+ * If it never received money it is removed completely; if it did, it is hidden
+ * from the planner but kept in DashPad's records (money must always be traceable).
+ */
+export async function deleteSprayEvent(eventId: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const event = await ownEvent(eventId);
+  if (str(form, 'confirm').toLowerCase() !== 'delete') return { error: 'Type DELETE to confirm.' };
+  const store = getStore();
+
+  if (event.paystackDvaId && paystackConfigured() && !event.closedAt) {
+    try {
+      await deactivateDedicatedAccount(event.paystackDvaId);
+    } catch (err) {
+      console.error('Could not switch off account while deleting', event.slug, err);
+    }
+  }
+
+  const transfers = await store.listTransfers(event.id, 1);
+  if (transfers.length === 0) {
+    await Promise.all(event.photos.map((u) => store.deleteImage(u).catch(() => {})));
+    await store.deleteEvent(event.id);
+  } else {
+    const now = new Date().toISOString();
+    await store.updateEvent(event.id, {
+      deletedAt: now,
+      closedAt: event.closedAt ?? now,
+      // Free the short link so it can be used again.
+      slug: `${event.slug}-deleted-${randomBytes(3).toString('hex')}`,
+    });
+  }
+  revalidatePath('/dashboard');
+  redirect('/dashboard?deleted=1');
 }
 
 // ---------- Celebrant photos ----------
@@ -388,6 +425,17 @@ export async function adminLogin(_prev: FormState, form: FormData): Promise<Form
 export async function adminLogout() {
   (await cookies()).delete(ADMIN_COOKIE);
   redirect('/admin/login');
+}
+
+export async function adminCheckPaystack(eventId: string, _prev: FormState): Promise<FormState> {
+  await requireAdmin();
+  const event = await getStore().getEventById(eventId);
+  if (!event) return { error: 'Event not found.' };
+  if (!paystackConfigured()) return { error: 'PAYSTACK_SECRET_KEY is not set.' };
+  if (event.setupStatus !== 'ready') return { error: 'This event has no account number yet.' };
+  const found = await checkPaystackForTransfers(event, { force: true });
+  revalidatePath(`/admin/events/${eventId}`);
+  return { ok: found ? `Found ${found} new payment(s) and added them.` : 'Checked Paystack: no new payments found. See the payment log below for any errors.' };
 }
 
 export async function adminRetrySetup(eventId: string) {

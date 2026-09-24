@@ -8,6 +8,8 @@ import { getStore } from '@/lib/store';
 import { adminRetrySetup } from '../../../actions';
 import PhasePill from '../../../dashboard/PhasePill';
 import AdminShell from '../../AdminShell';
+import PaymentLogTable from '../../PaymentLogTable';
+import CheckPaystackButton from './CheckPaystackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +19,12 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
   const store = getStore();
   const event = await store.getEventById(id);
   if (!event) notFound();
-  const [planner, transfers] = await Promise.all([store.getPlannerById(event.plannerId), store.listTransfers(event.id, 100000)]);
+  const [planner, transfers, allLogs] = await Promise.all([
+    store.getPlannerById(event.plannerId),
+    store.listTransfers(event.id, 100000),
+    store.listPaymentLogs(300),
+  ]);
+  const logs = allLogs.filter((l) => l.eventId === event.id).slice(0, 40);
   const s = summarise(transfers);
 
   return (
@@ -42,6 +49,8 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
             <button type="submit" className="btn btn-dark btn-sm">Retry payment setup</button>
           </form>
         )}
+        {event.deletedAt && <span className="pill ended" style={{ alignSelf: 'flex-start' }}>Deleted by planner on {new Date(event.deletedAt).toLocaleString('en-NG')}</span>}
+        {event.setupStatus === 'ready' && <CheckPaystackButton eventId={event.id} />}
         <span>Report emailed: {event.reportSentAt ? new Date(event.reportSentAt).toLocaleString('en-NG') : 'not yet'}</span>
       </div>
       <div className="tiles">
@@ -73,6 +82,7 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
           </table>
         </div>
       </section>
+      <PaymentLogTable logs={logs} title="Payment notifications for this event" />
       <p><Link href="/admin">← Overview</Link></p>
     </AdminShell>
   );

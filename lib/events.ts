@@ -8,6 +8,8 @@ import {
   createSplit,
   createSubaccount,
   deactivateDedicatedAccount,
+  getCustomerId,
+  listCustomerTransactions,
   paystackConfigured,
 } from './paystack';
 import { getStore } from './store';
@@ -124,11 +126,11 @@ export async function recordTransfer(
     paidAt?: string | null;
     processingFeeKobo?: number;
   },
-): Promise<Transfer> {
+): Promise<{ transfer: Transfer; created: boolean }> {
   const when = t.paidAt ? new Date(t.paidAt).getTime() : Date.now();
   const outsideWindow = eventPhase({ startsAt: event.startsAt, endsAt: event.endsAt }, Number.isFinite(when) ? when : Date.now()) !== 'live';
   const split = splitTransfer(t.amountKobo, event.plannerFeeBps, event.platformFeeBps);
-  const { transfer } = await getStore().insertTransfer({
+  return getStore().insertTransfer({
     eventId: event.id,
     reference: t.reference,
     amountKobo: t.amountKobo,
@@ -141,7 +143,86 @@ export async function recordTransfer(
     processingFeeKobo: Math.max(0, Math.round(t.processingFeeKobo ?? 0)),
     outsideWindow,
   });
-  return transfer;
+}
+
+// ---------- Backup: ask Paystack directly ----------
+
+const lastCheckAt = new Map<string, number>();
+const lastErrorLogAt = new Map<string, number>();
+const customerIds = new Map<string, number>();
+const CHECK_EVERY_MS = 8_000;
+
+/**
+ * Payment notifications (webhooks) can fail: a wrong webhook address in
+ * Paystack, a blocked request, a network blip. While the big screen is open we
+ * also ask Paystack for the event's latest successful payments, so every spray
+ * still shows up. Recording is idempotent, so nothing is ever counted twice.
+ * Returns how many new transfers were found.
+ */
+export async function checkPaystackForTransfers(event: SprayEvent, opts: { force?: boolean } = {}): Promise<number> {
+  if (!paystackConfigured() || !event.paystackCustomerCode || event.setupStatus !== 'ready' || event.deletedAt) return 0;
+  const now = Date.now();
+  const start = new Date(event.startsAt).getTime();
+  const end = new Date(event.endsAt).getTime();
+  if (!opts.force) {
+    // Only around the event itself, and not more often than every few seconds.
+    if (now < start - 3600_000 || now > end + 6 * 3600_000) return 0;
+    if (now - (lastCheckAt.get(event.id) ?? 0) < CHECK_EVERY_MS) return 0;
+  }
+  lastCheckAt.set(event.id, now);
+
+  const store = getStore();
+  try {
+    let customerId = customerIds.get(event.paystackCustomerCode);
+    if (!customerId) {
+      customerId = await getCustomerId(event.paystackCustomerCode);
+      customerIds.set(event.paystackCustomerCode, customerId);
+    }
+    // Look back to a day before the start, so early transfers are found too (and kept off screen).
+    const txs = await listCustomerTransactions(customerId, new Date(start - 86_400_000).toISOString());
+    let found = 0;
+    for (const tx of txs) {
+      if (tx.status !== 'success' || !tx.reference || (tx.currency && tx.currency !== 'NGN')) continue;
+      const amountKobo = Math.round(Number(tx.amount ?? 0));
+      if (!(amountKobo > 0)) continue;
+      const auth = tx.authorization ?? {};
+      const { created } = await recordTransfer(event, {
+        reference: tx.reference,
+        amountKobo,
+        senderName: auth.sender_name ?? null,
+        senderBank: auth.sender_bank ?? null,
+        narration: auth.narration ?? null,
+        paidAt: tx.paid_at ?? tx.paidAt ?? null,
+        processingFeeKobo: Number(tx.fees ?? 0) || 0,
+      });
+      if (created) {
+        found += 1;
+        await store.logPayment({
+          source: 'check',
+          paystackEvent: 'transaction.list',
+          reference: tx.reference,
+          outcome: 'recorded',
+          detail: 'Found by asking Paystack directly (no webhook had arrived for it).',
+          eventId: event.id,
+        });
+      }
+    }
+    return found;
+  } catch (err) {
+    // Log problems, but at most every 5 minutes per event so the log stays readable.
+    if (opts.force || now - (lastErrorLogAt.get(event.id) ?? 0) > 300_000) {
+      lastErrorLogAt.set(event.id, now);
+      await store.logPayment({
+        source: 'check',
+        paystackEvent: 'transaction.list',
+        reference: null,
+        outcome: 'error',
+        detail: `Could not check Paystack for ${event.slug}: ${err instanceof Error ? err.message : String(err)}`,
+        eventId: event.id,
+      });
+    }
+    return 0;
+  }
 }
 
 // ---------- After the event ----------
