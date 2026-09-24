@@ -1,3 +1,4 @@
+import { LogoMark } from '@/components/Logo';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -29,7 +30,7 @@ export default async function MessageSprayPage({ params }: Props) {
   return (
     <main className="g-page" style={themeVars(event.theme)}>
       <header>
-        <div className="g-brand">DashPad</div>
+        <div className="g-brand"><LogoMark size={28} /></div>
         <h1 className="g-title">Spray {event.celebrantName} with a message</h1>
       </header>
       {ready ? (

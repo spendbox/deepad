@@ -103,8 +103,10 @@ export class MemoryStore implements Store {
   async getEventByCustomerCode(code: string) {
     return data().events.find((e) => e.paystackCustomerCode === code) ?? null;
   }
-  async listEventsByPlanner(plannerId: string) {
-    return data().events.filter((e) => e.plannerId === plannerId && !e.deletedAt).sort(byNewest);
+  async listEventsByPlanner(plannerId: string, opts: { includeDeleted?: boolean } = {}) {
+    return data()
+      .events.filter((e) => e.plannerId === plannerId && (opts.includeDeleted || !e.deletedAt))
+      .sort(byNewest);
   }
   async listEvents() {
     return [...data().events].sort(byNewest);

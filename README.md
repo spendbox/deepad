@@ -12,6 +12,7 @@ description. Senders stay anonymous on screen.
 | Landing page | `/` | Everyone |
 | Sign up / log in | `/signup`, `/login` | Event planners and MCs |
 | Planner dashboard | `/dashboard` | Planners: create and run events |
+| Earnings | `/dashboard/earnings` | Planners: earnings over time, with time filters |
 | Event big screen | `/<event-link>` e.g. `/tolu-and-dayo` | The venue TV or projector (works on phones too) |
 | Spray with a message | `/<event-link>/spray` (QR code on the big screen) | Guests who want their message on screen |
 | Forgot password | `/forgot-password` | Planners |
@@ -34,6 +35,8 @@ description. Senders stay anonymous on screen.
   Sprays without a message show a fun “hype line” (planners can write their own).
 - Only transfers confirmed by Paystack ever reach the screen: either its signed webhook, or (as a
   backup while the screen is open) by asking Paystack's API directly for the event's payments.
+- After the event, the planner is emailed a short summary with a branded **PDF report** attached
+  (also downloadable from the event page).
 - The admin page has a **Setup check** and a **Payment notifications** log for fixing problems.
 - Planners can delete events. Events that received money are hidden, not erased, so records stay complete.
 

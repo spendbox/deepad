@@ -1,3 +1,4 @@
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import ForgotForm from './ForgotForm';
 
@@ -6,7 +7,7 @@ export const metadata = { title: 'Forgot password · DashPad' };
 export default function ForgotPasswordPage() {
   return (
     <main className="auth">
-      <div className="auth-top"><Link href="/" className="brand">DashPad</Link></div>
+      <div className="auth-top"><Link href="/" className="brand" aria-label="DashPad home"><Logo size={30} /></Link></div>
       <div className="auth-card">
         <div>
           <h1>Forgot your password?</h1>

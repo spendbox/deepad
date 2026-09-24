@@ -1,5 +1,6 @@
 'use client';
 
+import Logo from '@/components/Logo';
 import { useEffect, useRef, useState } from 'react';
 import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
@@ -202,7 +203,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
       <div className="m-screen" style={themeVars}>
         <header className="m-top">
           <div style={{ minWidth: 0 }}>
-            <div className="top-brand" style={{ fontSize: 16 }}>DashPad</div>
+            <div className="top-brand"><Logo size={22} tone={theme.id === 'daylight' ? 'light' : 'dark'} /></div>
             <h1 className="m-title">{e.title}</h1>
           </div>
           {statusBadge}
@@ -301,7 +302,7 @@ export default function LiveScreen({ code, initialFeed, qrSvg, sprayPath }: Prop
           <div className="layout">
             <header className="top">
               <div style={{ minWidth: 0 }}>
-                <div className="top-brand">DashPad</div>
+                <div className="top-brand"><Logo size={34} tone={theme.id === 'daylight' ? 'light' : 'dark'} /></div>
                 <h1 className="top-title">{e.title}</h1>
               </div>
               <div className="top-right">

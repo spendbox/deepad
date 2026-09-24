@@ -165,8 +165,11 @@ export default async function EventPage({
 
       <section className="card">
         <div className="row-between">
-          <h2>Who sprayed</h2>
-          <span className="hint">Private: the screen never shows names</span>
+          <div>
+            <h2>Who sprayed</h2>
+            <span className="hint">Private: the screen never shows names</span>
+          </div>
+          <a href={`/dashboard/events/${event.id}/report`} className="btn btn-sm">Download PDF report</a>
         </div>
         {transfers.length === 0 ? (
           <p className="empty">No sprays yet. They’ll appear here the moment they land (it can take up to a minute).</p>

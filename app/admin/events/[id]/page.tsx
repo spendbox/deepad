@@ -63,7 +63,10 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
       <section className="card">
         <div className="row-between">
           <h2>Transfers</h2>
-          <RecleanButton eventId={event.id} />
+          <div className="actions">
+            <a href={`/admin/events/${event.id}/report`} className="btn btn-sm">PDF report</a>
+            <RecleanButton eventId={event.id} />
+          </div>
         </div>
         <span className="hint">“Re-check all messages” re-reads every bank description with the latest rules (for example, removing the account’s own name).</span>
         <div className="table-wrap">

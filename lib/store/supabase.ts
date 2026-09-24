@@ -151,15 +151,10 @@ export class SupabaseStore implements Store {
     const rows = check(await this.db.from('spray_events').select('*').eq('paystack_customer_code', code).limit(1));
     return rows?.[0] ? toEvent(rows[0]) : null;
   }
-  async listEventsByPlanner(plannerId: string) {
-    const rows = check(
-      await this.db
-        .from('spray_events')
-        .select('*')
-        .eq('planner_id', plannerId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false }),
-    );
+  async listEventsByPlanner(plannerId: string, opts: { includeDeleted?: boolean } = {}) {
+    let q = this.db.from('spray_events').select('*').eq('planner_id', plannerId);
+    if (!opts.includeDeleted) q = q.is('deleted_at', null);
+    const rows = check(await q.order('created_at', { ascending: false }));
     return (rows ?? []).map(toEvent);
   }
   async listEvents() {

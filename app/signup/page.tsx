@@ -1,3 +1,4 @@
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentPlanner } from '@/lib/session';
@@ -9,7 +10,7 @@ export default async function SignupPage() {
   if (await currentPlanner()) redirect('/dashboard');
   return (
     <main className="auth">
-      <div className="auth-top"><Link href="/" className="brand">DashPad</Link></div>
+      <div className="auth-top"><Link href="/" className="brand" aria-label="DashPad home"><Logo size={30} /></Link></div>
       <div className="auth-card">
         <div className="steps-dots" aria-label="Step 1 of 2"><span className="on" /><span /></div>
         <div>
