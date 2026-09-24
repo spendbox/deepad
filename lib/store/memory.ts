@@ -135,6 +135,10 @@ export class MemoryStore implements Store {
       .sort((a, b) => b.id - a.id)
       .slice(0, limit);
   }
+  async setTransferMessage(transferId: number, message: string | null, rawNarration: string | null) {
+    const t = data().transfers.find((x) => x.id === transferId);
+    if (t) Object.assign(t, { message, rawNarration });
+  }
   async setTransferHidden(eventId: string, transferId: number, hidden: boolean) {
     const t = data().transfers.find((x) => x.id === transferId && x.eventId === eventId);
     if (t) t.hidden = hidden;

@@ -155,10 +155,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     '--s-muted': theme.muted,
   } as React.CSSProperties;
 
-  // Totals only include sprays that have already popped up on screen.
-  const queuedKobo = queue.reduce((s, t) => s + t.amountKobo, 0);
-  const totalKobo = feed.stats.totalKobo - queuedKobo;
-  const count = feed.stats.count - queue.length;
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
   const recent = feed.recent.filter((t) => !queue.some((q) => q.id === t.id)).slice(-6).reverse();
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
@@ -209,9 +205,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           </section>
         ) : e.phase === 'ended' ? (
           <section className="m-card m-center">
-            <div className="m-big">Thank you for spraying!</div>
-            <div className="m-amount">{naira(feed.stats.totalKobo)}</div>
-            <div>sent to {e.recipientLabel} from {feed.stats.count.toLocaleString('en-NG')} sprays</div>
+            <div className="m-big">Thank you for spraying {e.celebrantName}!</div>
             <div className="m-muted">Spraying has closed. Please don’t send more transfers.</div>
           </section>
         ) : (
@@ -229,8 +223,9 @@ export default function LiveScreen({ code, initialFeed }: Props) {
             )}
 
             {takeover || (showingSpray && current) ? (
-              <section key={popKey} className={`m-card pop${takeover ? ' m-bigspray' : ''}`}>
-                {takeover && <div className="m-badge">Big spray!</div>}
+              <section key={popKey} className={`m-card spray-pop m-spray${takeover ? ' m-bigspray' : ''}`}>
+                <Burst count={12} />
+                <div className="m-badge">{takeover ? 'Big spray!' : 'New spray!'}</div>
                 <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
                 <div className="m-to">sent to {e.recipientLabel}</div>
                 {(takeover?.t ?? current!).message && <div className="m-msg">“{(takeover?.t ?? current!).message}”</div>}
@@ -238,14 +233,16 @@ export default function LiveScreen({ code, initialFeed }: Props) {
             ) : (
               <section className="m-card">
                 <div className="m-big">Spray {e.celebrantName}!</div>
-                <div className="m-muted">Type a message in your transfer description and it will show on the big screen.</div>
+                <div className="m-muted">
+                  Type a message in your transfer description and it will show on the big screen. It can take up to a
+                  minute to appear.
+                </div>
               </section>
             )}
 
-            <section className="m-card">
-              <div className="m-total">{naira(totalKobo)}</div>
-              <div className="m-muted">sprayed · {count.toLocaleString('en-NG')} sprays</div>
-              {recent.length > 0 && (
+            {recent.length > 0 && (
+              <section className="m-card">
+                <div className="m-to">Recent sprays</div>
                 <ol className="m-recent">
                   {recent.map((t) => (
                     <li key={t.id}>
@@ -254,11 +251,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                     </li>
                   ))}
                 </ol>
-              )}
-            </section>
+              </section>
+            )}
           </>
         )}
-        <p className="m-foot">Only confirmed transfers appear. Senders stay anonymous.</p>
+        <p className="m-foot">It can take up to a minute for a transfer to show. Only confirmed transfers appear, and senders stay anonymous.</p>
       </div>
     );
   }
@@ -312,8 +309,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                   ) : (
                     <>
                       <div className="notice-big">Thank you for spraying!</div>
-                      <div className="notice-amount">{naira(feed.stats.totalKobo)}</div>
-                      <div className="notice-sub">sent to {e.recipientLabel} from {feed.stats.count.toLocaleString('en-NG')} sprays</div>
+                      <div className="notice-sub">{e.celebrantName} appreciates every one of you.</div>
                       <div className="notice-sub muted">Spraying has closed. Please don’t send more transfers.</div>
                     </>
                   )}
@@ -323,8 +319,10 @@ export default function LiveScreen({ code, initialFeed }: Props) {
               <>
                 <div className="middle">
                   {showingSpray && current ? (
-                    <div key={popKey} className="pop panel-main">
-                      <FitText className="pop-amount" text={naira(current.amountKobo)} max={210} />
+                    <div key={popKey} className="panel-main spray-pop">
+                      <Burst count={22} />
+                      <div className="pop-kicker">New spray!</div>
+                      <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
                       <div className="pop-to">sent to {e.recipientLabel}</div>
                       {current.message && <div className="pop-msg">“{current.message}”</div>}
                     </div>
@@ -334,7 +332,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                         <div className="invite-big">Spray {e.celebrantName}!</div>
                         <div className="invite-sub">
                           Transfer any amount from your bank app to the account below. Type a message in the transfer
-                          description and it will show here.
+                          description and it will show here. It can take up to a minute to appear.
                         </div>
                       </div>
                       {photo && (
@@ -344,10 +342,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                     </div>
                   )}
                   <aside className="side">
-                    <div className="side-total">
-                      <div className="side-total-v tabular">{naira(totalKobo)}</div>
-                      <div className="side-total-k">sprayed · {count.toLocaleString('en-NG')} sprays</div>
-                    </div>
                     <div className="side-list">
                       <h2>Recent sprays</h2>
                       {recent.length === 0 ? (
@@ -382,13 +376,13 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                     )}
                   </div>
                   <div className="paybar-side">
-                    <div>Your transfer description shows on screen. Senders stay anonymous.</div>
+                    <div>Your transfer description shows on screen. It can take up to a minute to appear.</div>
                     <div className="paybar-trust">
                       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" />
                         <path d="M9 12l2 2 4-4" />
                       </svg>
-                      <span>Only confirmed transfers appear. No fake alerts.</span>
+                      <span>Only confirmed transfers appear. Senders stay anonymous.</span>
                     </div>
                   </div>
                 </footer>
@@ -398,6 +392,35 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         )}
       </div>
       {fullScreenButton}
+    </div>
+  );
+}
+
+/** Naira notes exploding outwards: every spray gets a celebration, however small. */
+const BURST = Array.from({ length: 24 }, (_, i) => {
+  const angle = (i / 24) * Math.PI * 2 + (i % 3) * 0.35;
+  const dist = 0.55 + ((i * 7) % 5) * 0.12;
+  return {
+    dx: `${Math.round(Math.cos(angle) * dist * 100)}%`,
+    dy: `${Math.round(Math.sin(angle) * dist * 100)}%`,
+    rot: `${((i * 83) % 360) - 180}deg`,
+    delay: `${(i % 4) * 0.05}s`,
+  };
+});
+
+function Burst({ count }: { count: number }) {
+  return (
+    <div className="burst" aria-hidden="true">
+      <div className="burst-flash" />
+      {BURST.slice(0, count).map((b, i) => (
+        <span
+          key={i}
+          className="burst-note"
+          style={{ '--dx': b.dx, '--dy': b.dy, '--rot': b.rot, animationDelay: b.delay } as React.CSSProperties}
+        >
+          ₦
+        </span>
+      ))}
     </div>
   );
 }

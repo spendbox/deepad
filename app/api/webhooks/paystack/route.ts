@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { recordTransfer } from '@/lib/events';
+import { findNarration, recordTransfer } from '@/lib/events';
 import { isValidPaystackSignature } from '@/lib/paystack-signature';
 import { getStore } from '@/lib/store';
 import type { NewPaymentLog } from '@/lib/types';
@@ -95,12 +95,13 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ ok: true, unmatched: true });
     }
+    const narration = findNarration(data);
     const { transfer, created } = await recordTransfer(event, {
       reference,
       amountKobo,
       senderName: auth.sender_name ?? null,
       senderBank: auth.sender_bank ?? null,
-      narration: auth.narration ?? null,
+      narration,
       paidAt: data.paid_at ?? null,
       processingFeeKobo: Number(data.fees ?? 0) || 0,
     });
@@ -110,7 +111,11 @@ export async function POST(req: Request) {
       outcome: created ? 'recorded' : 'duplicate',
       detail: transfer.outsideWindow
         ? 'Arrived outside the event’s start/end time, so it is NOT shown on the big screen.'
-        : `₦${(amountKobo / 100).toLocaleString('en-NG')} for ${event.slug}`,
+        : `₦${(amountKobo / 100).toLocaleString('en-NG')} for ${event.slug}. ${
+            narration
+              ? `Bank description: “${narration.slice(0, 80)}” → on screen: “${transfer.message ?? '(nothing left after removing bank codes and the sender’s name)'}”`
+              : 'No description was included in Paystack’s notification.'
+          }`,
       eventId: event.id,
     });
     return NextResponse.json({ ok: true });

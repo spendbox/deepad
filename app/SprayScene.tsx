@@ -80,18 +80,6 @@ export default function SprayScene() {
         <path d="M172 112 Q200 92 236 108" stroke="#F2B437" strokeWidth="4" fill="none" strokeLinecap="round" />
       </g>
 
-      {/* A guest's hand at the side, spraying notes onto the dancer */}
-      <g className="lp-sprayer">
-        <path d="M-10 236 Q36 226 64 208" stroke="#5C3726" strokeWidth="20" strokeLinecap="round" fill="none" />
-        <circle cx="68" cy="205" r="13" fill="#5C3726" />
-      </g>
-      <g className="lp-flick">
-        <Note x={74} y={198} scale={0.8} />
-      </g>
-      <g className="lp-flick lp-flick-2">
-        <Note x={74} y={198} scale={0.8} />
-      </g>
-
       {/* Notes falling in front */}
       {NOTES.slice(5).map((n, i) => (
         <g key={`f${i}`} className="lp-fall" style={{ animationDelay: `${n.delay}s`, animationDuration: `${n.dur}s` }}>

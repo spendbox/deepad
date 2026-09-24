@@ -53,6 +53,8 @@ export interface Store {
   /** Newest first. */
   listTransfers(eventId: string, limit?: number): Promise<Transfer[]>;
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
+  /** Fill in a description that arrived after the payment was first recorded. */
+  setTransferMessage(transferId: number, message: string | null, rawNarration: string | null): Promise<void>;
   /** Totals of transfers that counted (inside the event window). */
   eventStats(eventId: string): Promise<EventStats>;
 

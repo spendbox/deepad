@@ -196,6 +196,9 @@ export class SupabaseStore implements Store {
     );
     return (rows ?? []).map(toTransfer);
   }
+  async setTransferMessage(transferId: number, message: string | null, rawNarration: string | null) {
+    check(await this.db.from('transfers').update({ message, raw_narration: rawNarration }).eq('id', transferId));
+  }
   async setTransferHidden(eventId: string, transferId: number, hidden: boolean) {
     check(await this.db.from('transfers').update({ hidden }).eq('id', transferId).eq('event_id', eventId));
   }
@@ -234,7 +237,7 @@ export class SupabaseStore implements Store {
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
       ['spray_events', 'id, photos, deleted_at, paystack_dva_id'],
-      ['transfers', 'id, processing_fee_kobo, outside_window'],
+      ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome'],
     ];

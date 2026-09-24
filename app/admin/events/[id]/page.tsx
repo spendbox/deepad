@@ -64,7 +64,7 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
         <h2>Transfers</h2>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Time</th><th>Sender</th><th>Bank</th><th>Amount</th><th>Message</th><th>Note</th><th>Reference</th></tr></thead>
+            <thead><tr><th>Time</th><th>Sender</th><th>Bank</th><th>Amount</th><th>On screen</th><th>Bank description (raw)</th><th>Note</th><th>Reference</th></tr></thead>
             <tbody>
               {transfers.map((t) => (
                 <tr key={t.id}>
@@ -73,11 +73,12 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
                   <td>{t.senderBank ?? '—'}</td>
                   <td className="num"><strong>{naira(t.amountKobo)}</strong></td>
                   <td>{t.message ?? '—'}{t.hidden ? ' (hidden)' : ''}</td>
+                  <td>{t.rawNarration ?? '—'}</td>
                   <td>{t.outsideWindow ? <span className="pill failed">Outside event time: needs refund</span> : ''}</td>
                   <td className="num">{t.reference}</td>
                 </tr>
               ))}
-              {transfers.length === 0 && <tr><td colSpan={7}>No transfers yet.</td></tr>}
+              {transfers.length === 0 && <tr><td colSpan={8}>No transfers yet.</td></tr>}
             </tbody>
           </table>
         </div>

@@ -185,3 +185,65 @@
 .m-recent li span { color: var(--s-muted); font-size: 14px; overflow-wrap: anywhere; }
 .m-foot { color: var(--s-muted); font-size: 13px; text-align: center; margin: 4px 0 0; }
 @media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }
+
+/* ---------- Every spray is a celebration ---------- */
+.spray-pop { position: relative; animation: sprayIn .9s cubic-bezier(.18, .9, .25, 1.15); }
+.spray-pop > *:not(.burst) { position: relative; z-index: 1; }
+@keyframes sprayIn {
+  0% { transform: scale(.7) rotate(-2deg); opacity: 0; box-shadow: 0 0 0 0 var(--s-accent); }
+  45% { transform: scale(1.06) rotate(.6deg); opacity: 1; box-shadow: 0 0 120px 30px color-mix(in srgb, var(--s-accent) 55%, transparent); }
+  70% { transform: scale(.98); }
+  100% { transform: scale(1); box-shadow: 0 0 40px 0 color-mix(in srgb, var(--s-accent) 25%, transparent); }
+}
+.spray-pop { border-width: 5px; animation-fill-mode: both; }
+.pop-kicker {
+  align-self: flex-start; padding: 8px 26px; border-radius: 999px; background: var(--s-accent); color: var(--s-on-accent);
+  font-family: var(--display); font-weight: 800; font-size: 36px; animation: kickerIn .6s .15s both cubic-bezier(.2, .9, .3, 1.3);
+}
+@keyframes kickerIn { from { transform: translateY(-30px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.spray-pop .pop-amount { animation: amountIn .8s .1s both cubic-bezier(.2, .9, .3, 1.25); }
+@keyframes amountIn { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+.spray-pop .pop-to { animation: riseIn .6s .35s both ease-out; }
+.spray-pop .pop-msg {
+  font-size: 54px; line-height: 1.22; color: var(--s-text); font-weight: 600; margin-top: 6px;
+  padding: 14px 28px; border-radius: 22px; background: color-mix(in srgb, var(--s-accent) 16%, transparent);
+  border-left: 8px solid var(--s-accent); -webkit-line-clamp: 2; animation: riseIn .7s .55s both ease-out;
+}
+@keyframes riseIn { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.burst { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; border-radius: inherit; }
+.burst-flash {
+  position: absolute; left: 30%; top: 45%; width: 20px; height: 20px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--s-accent) 90%, #fff) 0%, transparent 70%);
+  transform: translate(-50%, -50%); animation: flash 1.1s ease-out both;
+}
+@keyframes flash { 0% { width: 20px; height: 20px; opacity: 1; } 100% { width: 2400px; height: 2400px; opacity: 0; } }
+.burst-note {
+  position: absolute; left: 30%; top: 45%; width: 96px; height: 46px; margin: -23px 0 0 -48px; border-radius: 7px;
+  background: #1f7a4d; border: 3px solid #3fa56e; color: #cff2dc; display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-weight: 800; font-size: 24px; opacity: 0;
+  animation: burstOut 2.6s cubic-bezier(.15, .7, .3, 1) both;
+}
+@keyframes burstOut {
+  0% { transform: translate(0, 0) scale(.3) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  75% { opacity: .9; }
+  100% { transform: translate(calc(var(--dx) * 12), calc(var(--dy) * 6)) scale(1.1) rotate(var(--rot)); opacity: 0; }
+}
+
+/* Phone version of the celebration */
+.m-spray { position: relative; overflow: hidden; border: 3px solid var(--s-accent); animation: sprayIn .9s cubic-bezier(.18, .9, .25, 1.15) both; }
+.m-spray > *:not(.burst) { position: relative; z-index: 1; }
+.m-spray .burst-note { width: 44px; height: 22px; margin: -11px 0 0 -22px; font-size: 12px; border-width: 2px; }
+.m-spray .burst-note { animation-name: burstOutSmall; }
+@keyframes burstOutSmall {
+  0% { transform: translate(0, 0) scale(.3); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(calc(var(--dx) * 4), calc(var(--dy) * 3)) rotate(var(--rot)); opacity: 0; }
+}
+.m-spray .m-msg { font-size: 20px; color: var(--s-text); font-weight: 600; border-left: 5px solid var(--s-accent); padding: 6px 12px; background: color-mix(in srgb, var(--s-accent) 14%, transparent); border-radius: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spray-pop, .m-spray, .pop-kicker, .spray-pop .pop-amount, .spray-pop .pop-to, .spray-pop .pop-msg { animation: none; }
+  .burst { display: none; }
+}

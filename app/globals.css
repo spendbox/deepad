@@ -265,3 +265,17 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   justify-content: center; font-weight: 800; color: #fff; background: var(--green);
 }
 .checks li.bad .check-icon { background: var(--danger); }
+
+/* "View all sprays" pop-up */
+.sprays-dialog {
+  width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 48px); padding: 0; border: none; border-radius: 18px;
+  display: none; flex-direction: column; overflow: hidden;
+}
+.sprays-dialog[open] { display: flex; }
+.sprays-dialog::backdrop { background: rgba(31, 10, 38, .6); }
+.sprays-dialog-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px;
+  border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0;
+}
+.sprays-dialog-head h2 { font-family: var(--display); font-weight: 800; font-size: 20px; margin: 0; }
+.sprays-dialog-body { overflow-y: auto; padding: 0 18px 12px; -webkit-overflow-scrolling: touch; }

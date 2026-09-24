@@ -130,19 +130,67 @@ export async function recordTransfer(
   const when = t.paidAt ? new Date(t.paidAt).getTime() : Date.now();
   const outsideWindow = eventPhase({ startsAt: event.startsAt, endsAt: event.endsAt }, Number.isFinite(when) ? when : Date.now()) !== 'live';
   const split = splitTransfer(t.amountKobo, event.plannerFeeBps, event.platformFeeBps);
-  return getStore().insertTransfer({
+  const store = getStore();
+  const rawNarration = t.narration?.trim() || null;
+  const message = cleanNarration(rawNarration, t.senderName);
+  const result = await store.insertTransfer({
     eventId: event.id,
     reference: t.reference,
     amountKobo: t.amountKobo,
     senderName: t.senderName?.trim() || null,
     senderBank: t.senderBank?.trim() || null,
-    message: cleanNarration(t.narration, t.senderName),
+    message,
+    rawNarration,
     platformFeeKobo: split.platformFeeKobo,
     plannerFeeKobo: split.plannerFeeKobo,
     celebrantKobo: split.celebrantKobo,
     processingFeeKobo: Math.max(0, Math.round(t.processingFeeKobo ?? 0)),
     outsideWindow,
   });
+  // Seen before without a description (e.g. found by the backup check), and now we have one.
+  if (!result.created && !result.transfer.rawNarration && rawNarration) {
+    await store.setTransferMessage(result.transfer.id, message, rawNarration);
+    result.transfer = { ...result.transfer, message, rawNarration };
+  }
+  return result;
+}
+
+/**
+ * Find the description the sender typed. Paystack normally puts it in
+ * authorization.narration, but we also look in other places banks use.
+ */
+export function findNarration(data: unknown): string | null {
+  const d = (data ?? {}) as Record<string, any>;
+  const direct = [
+    d.authorization?.narration,
+    d.narration,
+    d.metadata?.narration,
+    d.authorization?.description,
+    d.metadata?.description,
+    d.description,
+  ].find((v) => typeof v === 'string' && v.trim());
+  if (direct) return direct.trim();
+  // Last resort: any field whose name sounds like a description.
+  const seen = new Set<unknown>();
+  const walk = (o: unknown, depth: number): string | null => {
+    if (!o || typeof o !== 'object' || depth > 4 || seen.has(o)) return null;
+    seen.add(o);
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (typeof v === 'string' && v.trim() && /narrat|remark|memo|description/i.test(k)) return v.trim();
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          const it = item as Record<string, unknown>;
+          if (it && typeof it.value === 'string' && /narrat|remark|description/i.test(String(it.variable_name ?? it.display_name ?? ''))) {
+            return it.value.trim();
+          }
+        }
+      }
+      const found = walk(v, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(d, 0);
 }
 
 // ---------- Backup: ask Paystack directly ----------
@@ -191,7 +239,7 @@ export async function checkPaystackForTransfers(event: SprayEvent, opts: { force
         amountKobo,
         senderName: auth.sender_name ?? null,
         senderBank: auth.sender_bank ?? null,
-        narration: auth.narration ?? null,
+        narration: findNarration(tx),
         paidAt: tx.paid_at ?? tx.paidAt ?? null,
         processingFeeKobo: Number(tx.fees ?? 0) || 0,
       });
@@ -357,14 +405,13 @@ export type ScreenFeed = {
     accountBank: string | null;
     accountName: string | null;
   };
-  stats: { totalKobo: number; count: number };
-  /** Latest transfers, oldest first. No sender names, ever. */
+  /** Latest transfers, oldest first. No sender names and no totals, ever. */
   recent: ScreenTransfer[];
 };
 
 export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
   const store = getStore();
-  const [stats, transfers] = await Promise.all([store.eventStats(event.id), store.listTransfers(event.id, 40)]);
+  const transfers = await store.listTransfers(event.id, 40);
   return {
     event: {
       title: event.title,
@@ -381,7 +428,6 @@ export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
       accountBank: event.setupStatus === 'ready' ? event.accountBank : null,
       accountName: event.setupStatus === 'ready' ? event.accountName : null,
     },
-    stats,
     recent: transfers
       .filter((t) => !t.outsideWindow)
       .slice(0, 30)

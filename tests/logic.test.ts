@@ -61,11 +61,19 @@ test('messages are trimmed to 60 characters', () => {
 });
 
 test('bank narration keeps the sender’s own words', () => {
+  const who = 'OLUWASEUN ADEBAYO';
   assert.equal(cleanNarration('Happy married life!'), 'Happy married life!');
-  assert.equal(cleanNarration('NIP/OLUWASEUN ADEBAYO/Congrats Tolu', 'OLUWASEUN ADEBAYO'), 'Congrats Tolu');
+  assert.equal(cleanNarration('NIP/OLUWASEUN ADEBAYO/Congrats Tolu', who), 'Congrats Tolu');
   assert.equal(cleanNarration('MOB/UTO/Dance well o', null), 'Dance well o');
-  assert.equal(cleanNarration('TRF FROM OLUWASEUN ADEBAYO', 'OLUWASEUN ADEBAYO'), null);
+  assert.equal(cleanNarration('TRF FROM OLUWASEUN ADEBAYO', who), null);
   assert.equal(cleanNarration('Transfer of love to the couple'), 'Transfer of love to the couple');
+  assert.equal(cleanNarration('NIP FRM OLUWASEUN ADEBAYO-Happy married life', who), 'Happy married life');
+  assert.equal(cleanNarration('WEB TRANSFER FROM OLUWASEUN ADEBAYO - Congrats', who), 'Congrats');
+  assert.equal(cleanNarration('HAPPY BIRTHDAY MAMA', null), 'Happy birthday mama');
+  assert.equal(cleanNarration('NIP FRM JOHN DOE-God bless you', null), 'God bless you');
+  assert.equal(cleanNarration('Enjoy o! from Oluwaseun', who), 'Enjoy o!');
+  assert.equal(cleanNarration('Dance well TO DASHPAD/TOLU AND DAYO', null), 'Dance well');
+  assert.equal(cleanNarration('000123456789012/Love you both', null), 'Love you both');
   assert.equal(cleanNarration(''), null);
 });
 

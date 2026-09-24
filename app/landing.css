@@ -90,9 +90,6 @@
 .lp-arm-l { transform-origin: 168px 190px; animation: lpWaveL 1.2s ease-in-out infinite; }
 .lp-arm-r { transform-origin: 232px 190px; animation: lpWaveR 1.2s ease-in-out infinite; }
 .lp-fall { animation-name: lpFall; animation-timing-function: linear; animation-iteration-count: infinite; opacity: 0; }
-.lp-sprayer { transform-origin: 0 236px; animation: lpFlickHand 1.6s ease-in-out infinite; }
-.lp-flick { animation: lpFlick 1.6s ease-out infinite; opacity: 0; }
-.lp-flick-2 { animation-delay: .8s; }
 @keyframes lpSway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
 @keyframes lpWaveL { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
 @keyframes lpWaveR { 0%, 100% { transform: rotate(8deg); } 50% { transform: rotate(-10deg); } }
@@ -101,15 +98,8 @@
   10% { opacity: 1; }
   100% { transform: translateY(440px) rotate(260deg); opacity: 0; }
 }
-@keyframes lpFlickHand { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-10deg); } }
-@keyframes lpFlick {
-  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
-  10% { opacity: 1; }
-  100% { transform: translate(90px, -110px) rotate(200deg); opacity: 0; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .lp-mock-pop, .lp-dancer, .lp-arm-l, .lp-arm-r, .lp-sprayer { animation: none; }
+  .lp-mock-pop, .lp-dancer, .lp-arm-l, .lp-arm-r { animation: none; }
   .lp-mock-screen { transform: none; }
-  .lp-fall, .lp-flick { display: none; }
+  .lp-fall { display: none; }
 }
