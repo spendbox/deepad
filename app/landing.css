@@ -18,8 +18,14 @@
 .lp-ghost { color: var(--gold); border-color: var(--gold); }
 
 /* Mini big-screen mockup */
-.lp-mock { perspective: 1200px; }
+.lp-mock { position: relative; perspective: 1200px; padding-top: 46%; }
+/* The dancer stands behind the screen: head, arms and notes rise above it. */
+.lp-scene {
+  position: absolute; z-index: 0; left: 50%; top: 0; width: 78%; transform: translateX(-50%);
+  overflow: visible; pointer-events: none;
+}
 .lp-mock-screen {
+  position: relative; z-index: 1;
   background: var(--plum-deep); border: 10px solid #0d0410; border-radius: 22px; padding: 16px;
   display: flex; flex-direction: column; gap: 12px; aspect-ratio: 16 / 10; box-shadow: 0 30px 60px rgba(0,0,0,.45);
   transform: rotateY(-6deg) rotateX(2deg);
@@ -79,4 +85,31 @@
   border-top: 1px solid var(--plum-soft); padding: 22px 16px; display: flex; flex-wrap: wrap; gap: 8px;
   justify-content: space-between; max-width: 1120px; margin: 0 auto; color: var(--lilac); font-size: 14px;
 }
-@media (prefers-reduced-motion: reduce) { .lp-mock-pop { animation: none; } .lp-mock-screen { transform: none; } }
+/* Dancer animation */
+.lp-dancer { transform-origin: 200px 400px; animation: lpSway 2.4s ease-in-out infinite; }
+.lp-arm-l { transform-origin: 168px 190px; animation: lpWaveL 1.2s ease-in-out infinite; }
+.lp-arm-r { transform-origin: 232px 190px; animation: lpWaveR 1.2s ease-in-out infinite; }
+.lp-fall { animation-name: lpFall; animation-timing-function: linear; animation-iteration-count: infinite; opacity: 0; }
+.lp-sprayer { transform-origin: 0 236px; animation: lpFlickHand 1.6s ease-in-out infinite; }
+.lp-flick { animation: lpFlick 1.6s ease-out infinite; opacity: 0; }
+.lp-flick-2 { animation-delay: .8s; }
+@keyframes lpSway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes lpWaveL { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
+@keyframes lpWaveR { 0%, 100% { transform: rotate(8deg); } 50% { transform: rotate(-10deg); } }
+@keyframes lpFall {
+  0% { transform: translateY(-40px) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(440px) rotate(260deg); opacity: 0; }
+}
+@keyframes lpFlickHand { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-10deg); } }
+@keyframes lpFlick {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(90px, -110px) rotate(200deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-mock-pop, .lp-dancer, .lp-arm-l, .lp-arm-r, .lp-sprayer { animation: none; }
+  .lp-mock-screen { transform: none; }
+  .lp-fall, .lp-flick { display: none; }
+}

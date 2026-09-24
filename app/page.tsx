@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { currentPlanner } from '@/lib/session';
+import SprayScene from './SprayScene';
 import './landing.css';
 
 export const dynamic = 'force-dynamic';
@@ -24,18 +25,22 @@ const FEATURES = [
   { title: 'Only real money shows', body: 'Nothing appears on screen until the bank transfer is confirmed. No fake alerts.' },
   { title: 'Guests stay anonymous', body: 'The screen shows the amount and the message, never who sent it.' },
   { title: 'Earn from every spray', body: 'Set your cut from 0% to 45% of every transfer. It’s paid to your account automatically.' },
-  { title: 'Money goes straight out', body: 'Transfers are split automatically and paid to the celebrant and to you. DashPad never holds the funds.' },
+  { title: 'Paid within 2 business days', body: 'Every transfer is split automatically and paid to the celebrant and to you within 2 business days. DashPad never holds the funds.' },
   { title: 'Full report by email', body: 'When the party ends, the account closes and you get a list of everyone who sprayed.' },
 ];
 
 const FAQ = [
   {
     q: 'What does DashPad cost?',
-    a: 'DashPad takes 5% of each transfer. Nothing to pay upfront, no monthly fee.',
+    a: 'DashPad takes 5% of each transfer, and that covers the payment processing fee too. Nothing to pay upfront, no monthly fee.',
   },
   {
     q: 'How much can I earn as the planner or MC?',
     a: 'You choose, from 0% to 45% of every transfer. For example, at 10%, a ₦10,000 spray pays you ₦1,000.',
+  },
+  {
+    q: 'When do the celebrant and I get paid?',
+    a: 'Payouts reach both bank accounts within 2 business days of each spray. DashPad covers the payment processing fee, so nothing else is taken.',
   },
   {
     q: 'Do guests need to download an app?',
@@ -86,8 +91,9 @@ export default async function Home() {
           <p className="lp-small">Free to set up. DashPad takes 5% per transfer.</p>
         </div>
 
-        <div className="lp-mock" aria-hidden="true">
-          <div className="lp-mock-screen">
+        <div className="lp-mock">
+          <SprayScene />
+          <div className="lp-mock-screen" aria-hidden="true">
             <div className="lp-mock-top">
               <span>Tolu &amp; Dayo’s wedding</span>
               <span className="lp-mock-live">● Live</span>
@@ -138,11 +144,11 @@ export default async function Home() {
         <div className="lp-price">
           <div className="lp-price-card">
             <div className="lp-price-big">5%</div>
-            <p>DashPad’s fee on each transfer. No setup fee, no monthly fee.</p>
+            <p>DashPad’s fee on each transfer. It includes the payment processing fee. No setup fee, no monthly fee.</p>
           </div>
           <div className="lp-price-card lp-price-you">
             <div className="lp-price-big">0–45%</div>
-            <p>Your cut, which you choose for each event. Paid to your bank account automatically.</p>
+            <p>Your cut, which you choose for each event. Paid to your bank account within 2 business days.</p>
           </div>
         </div>
       </section>

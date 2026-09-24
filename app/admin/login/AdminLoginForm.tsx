@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import PasswordInput from '@/components/PasswordInput';
 import { adminLogin } from '../../actions';
 
 export default function AdminLoginForm() {
@@ -9,7 +10,7 @@ export default function AdminLoginForm() {
     <form action={action} className="form">
       <div className="field">
         <label htmlFor="password">Admin password</label>
-        <input id="password" name="password" type="password" className="input" autoComplete="current-password" required />
+        <PasswordInput id="password" name="password" autoComplete="current-password" />
       </div>
       {state?.error && <p className="error-text" role="alert">{state.error}</p>}
       <button type="submit" className="btn btn-dark btn-lg btn-block" disabled={pending}>{pending ? 'Checking…' : 'Log in'}</button>

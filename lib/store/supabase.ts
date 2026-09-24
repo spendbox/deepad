@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { NewPlanner, NewSprayEvent, NewTransfer, Planner, SprayEvent, Transfer } from '../types';
+import type { NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, Planner, SprayEvent, Transfer } from '../types';
 import { computeStats, type Store } from './types';
 
 // Talks to Supabase with the secret service-role key. Server only: the key
@@ -25,8 +25,15 @@ function fromRow<T>(row: Row, numeric: string[] = []): T {
 }
 
 const EVENT_NUMS = ['plannerFeeBps', 'platformFeeBps', 'bigSprayKobo'];
-const TRANSFER_NUMS = ['id', 'amountKobo', 'platformFeeKobo', 'plannerFeeKobo', 'celebrantKobo'];
-const toEvent = (r: Row | null) => fromRow<SprayEvent>(r ?? {}, EVENT_NUMS);
+const TRANSFER_NUMS = ['id', 'amountKobo', 'platformFeeKobo', 'plannerFeeKobo', 'celebrantKobo', 'processingFeeKobo'];
+const toEvent = (r: Row | null) => {
+  const e = fromRow<SprayEvent>(r ?? {}, EVENT_NUMS);
+  e.photos = Array.isArray(e.photos) ? e.photos : [];
+  return e;
+};
+const toReset = (r: Row | null) => fromRow<PasswordReset>(r ?? {});
+
+export const PHOTO_BUCKET = 'celebrant-photos';
 const toTransfer = (r: Row | null) => fromRow<Transfer>(r ?? {}, TRANSFER_NUMS);
 const toPlanner = (r: Row | null) => fromRow<Planner>(r ?? {});
 
@@ -68,6 +75,46 @@ export class SupabaseStore implements Store {
   async listPlanners() {
     const rows = check(await this.db.from('planners').select('*').order('created_at', { ascending: false }));
     return (rows ?? []).map(toPlanner);
+  }
+
+  // ----- Password resets -----
+  async createPasswordReset(r: { plannerId: string; tokenHash: string; expiresAt: string }) {
+    check(await this.db.from('password_resets').insert(toRow(r)));
+  }
+  async findPasswordReset(tokenHash: string) {
+    const row = check(await this.db.from('password_resets').select('*').eq('token_hash', tokenHash).maybeSingle());
+    return row ? toReset(row) : null;
+  }
+  async latestPasswordReset(plannerId: string) {
+    const rows = check(
+      await this.db.from('password_resets').select('*').eq('planner_id', plannerId).order('created_at', { ascending: false }).limit(1),
+    );
+    return rows?.[0] ? toReset(rows[0]) : null;
+  }
+  async markPasswordResetUsed(id: string) {
+    // Only succeeds once, so a reset link can't be used twice.
+    const rows = check(
+      await this.db.from('password_resets').update({ used_at: new Date().toISOString() }).eq('id', id).is('used_at', null).select('id'),
+    );
+    return (rows ?? []).length === 1;
+  }
+
+  // ----- Images (Supabase Storage, public bucket) -----
+  async uploadImage(path: string, bytes: Uint8Array, contentType: string) {
+    const bucket = this.db.storage.from(PHOTO_BUCKET);
+    let res = await bucket.upload(path, bytes, { contentType, upsert: false });
+    if (res.error && /bucket not found/i.test(res.error.message)) {
+      await this.db.storage.createBucket(PHOTO_BUCKET, { public: true, fileSizeLimit: 5 * 1024 * 1024 });
+      res = await bucket.upload(path, bytes, { contentType, upsert: false });
+    }
+    if (res.error) throw new Error(res.error.message);
+    return bucket.getPublicUrl(path).data.publicUrl;
+  }
+  async deleteImage(url: string) {
+    const marker = `/object/public/${PHOTO_BUCKET}/`;
+    const i = url.indexOf(marker);
+    if (i < 0) return;
+    await this.db.storage.from(PHOTO_BUCKET).remove([decodeURIComponent(url.slice(i + marker.length))]);
   }
 
   // ----- Events -----

@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import BankAccountFields, { type BankAccount } from '@/components/BankAccountFields';
+import PayoutNote from '@/components/PayoutNote';
+import PhotoPicker from '@/components/PhotoPicker';
+import SlugField from '@/components/SlugField';
+import { slugify, slugProblem } from '@/lib/slug';
 import { EVENT_TYPES, MAX_EVENT_HOURS, RECIPIENT_CHOICES } from '@/lib/event-info';
 import { naira, PLATFORM_FEE_BPS, splitTransfer } from '@/lib/money';
 import { THEMES } from '@/lib/themes';
@@ -11,13 +15,18 @@ import type { EventType } from '@/lib/types';
 import { createSprayEvent } from '../../../actions';
 
 const DRAFT_KEY = 'dashpad:event-draft';
-const STEP_NAMES = ['Celebration', 'Date & time', 'Theme', 'Payout', 'Your cut', 'Review'];
+const STEP_NAMES = ['Celebration', 'Date & time', 'Theme', 'Photos', 'Payout', 'Your cut', 'Review'];
+// Step numbers, so the checks below stay readable.
+const S = { what: 0, when: 1, theme: 2, photos: 3, payout: 4, cut: 5, review: 6 };
 
 type Draft = {
   eventType: EventType;
   celebrantName: string;
   title: string;
   titleEdited: boolean;
+  slug: string;
+  slugEdited: boolean;
+  photos: string[];
   recipientLabel: string;
   startsAt: string; // datetime-local value, in the phone's time zone
   endsAt: string;
@@ -41,6 +50,9 @@ function defaultDraft(): Draft {
     celebrantName: '',
     title: '',
     titleEdited: false,
+    slug: '',
+    slugEdited: false,
+    photos: [],
     recipientLabel: 'the couple',
     startsAt: toLocalInput(start),
     endsAt: toLocalInput(end),
@@ -64,6 +76,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [slugOk, setSlugOk] = useState(true);
 
   // Keep a draft on this phone, so a dropped connection doesn't lose their work.
   useEffect(() => {
@@ -82,6 +95,8 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
 
   const typeInfo = EVENT_TYPES.find((t) => t.id === d.eventType)!;
   const title = d.titleEdited ? d.title : d.celebrantName.trim() ? typeInfo.titleFor(d.celebrantName.trim()) : '';
+  // The link follows the celebrant's name until the planner edits it.
+  const slug = d.slugEdited ? d.slug : slugify(d.celebrantName);
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
 
   const startMs = new Date(d.startsAt).getTime();
@@ -89,19 +104,24 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
   const hours = (endMs - startMs) / 3600_000;
 
   function problem(s: number): string | null {
-    if (s === 0 && d.celebrantName.trim().length < 2) return 'Enter who is being celebrated.';
-    if (s === 1) {
+    if (s === S.what) {
+      if (d.celebrantName.trim().length < 2) return 'Enter who is being celebrated.';
+      const sp = slugProblem(slug);
+      if (sp) return sp;
+      if (!slugOk) return 'That event link is taken. Please choose another.';
+    }
+    if (s === S.when) {
       if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return 'Choose a start and end time.';
       if (endMs <= startMs) return 'The end time must be after the start time.';
       if (endMs < Date.now()) return 'The end time has already passed.';
       if (hours > MAX_EVENT_HOURS) return `An event can run for at most ${MAX_EVENT_HOURS} hours.`;
     }
-    if (s === 3) {
+    if (s === S.payout) {
       if (d.payout.accountNumber.length !== 10) return 'Enter the 10-digit account number.';
       if (!d.payout.bankName) return 'Choose the bank.';
       if (!d.payout.accountName) return 'We need the name on the account.';
     }
-    if (s === 4 && d.plannerFeePercent > 0 && !plannerHasBank) return 'Add your own bank account in your profile first, or set your cut to 0%.';
+    if (s === S.cut && d.plannerFeePercent > 0 && !plannerHasBank) return 'Add your own bank account in your profile first, or set your cut to 0%.';
     return null;
   }
 
@@ -120,7 +140,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
   }
 
   async function create() {
-    for (let s = 0; s < 5; s++) {
+    for (let s = 0; s < S.review; s++) {
       const p = problem(s);
       if (p) {
         setStep(s);
@@ -131,6 +151,8 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
     setError(null);
     try {
       const res = await createSprayEvent({
+        slug,
+        photos: d.photos,
         eventType: d.eventType,
         celebrantName: d.celebrantName,
         title,
@@ -177,7 +199,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
       </header>
 
       <main className="wizard-body">
-        {step === 0 && (
+        {step === S.what && (
           <>
             <h1>What are we celebrating?</h1>
             <div className="type-grid" role="group" aria-label="Type of event">
@@ -201,6 +223,12 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
               <label htmlFor="w-title">Event title (shown on the big screen)</label>
               <input id="w-title" className="input" value={title} placeholder="Filled in for you" onChange={(e) => set({ title: e.target.value, titleEdited: true })} maxLength={40} />
             </div>
+            {slug.length > 0 && (
+              <div className="stack" style={{ gap: 6 }}>
+                <SlugField value={slug} onChange={(v) => set({ slug: v, slugEdited: true })} onStatus={setSlugOk} />
+                <span className="hint">This is the link you open on the big screen. You can change it.</span>
+              </div>
+            )}
             <div className="field">
               <span className="field-label" id="w-label">On screen, sprays are “sent to…”</span>
               <div className="chips" role="group" aria-labelledby="w-label">
@@ -215,7 +243,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
           </>
         )}
 
-        {step === 1 && (
+        {step === S.when && (
           <>
             <h1>When is the party?</h1>
             <p className="hint" style={{ marginTop: -8 }}>
@@ -235,7 +263,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
           </>
         )}
 
-        {step === 2 && (
+        {step === S.theme && (
           <>
             <h1>Pick a theme</h1>
             <p className="hint" style={{ marginTop: -8 }}>These are the colours of your big screen. You can change it any time.</p>
@@ -257,17 +285,28 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
           </>
         )}
 
-        {step === 3 && (
+        {step === S.photos && (
+          <>
+            <h1>Add photos of {d.celebrantName.trim() || 'the celebrants'}</h1>
+            <p className="hint" style={{ marginTop: -8 }}>
+              Optional. Up to 6 photos. They show on the big screen between sprays. You can add them later too.
+            </p>
+            <PhotoPicker value={d.photos} onChange={(photos) => set({ photos })} />
+          </>
+        )}
+
+        {step === S.payout && (
           <>
             <h1>Where should the money go?</h1>
             <p className="hint" style={{ marginTop: -8 }}>
               The account of {d.celebrantName.trim() || 'the celebrant'}. Sprays are paid into it automatically.
             </p>
             <BankAccountFields value={d.payout} onChange={(payout) => set({ payout })} label="Celebrant’s bank" />
+            <PayoutNote />
           </>
         )}
 
-        {step === 4 && (
+        {step === S.cut && (
           <>
             <h1>Your cut</h1>
             <p className="hint" style={{ marginTop: -8 }}>Choose what you earn from every spray, from 0% to 45%. It’s paid to your own account.</p>
@@ -285,6 +324,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
                 <div className="r total"><span>{d.celebrantName.trim() || 'Celebrant'} gets</span><strong>{naira(example.celebrantKobo)}</strong></div>
               </div>
             </div>
+            <PayoutNote>Your cut is paid to your own bank account within 2 business days of each spray.</PayoutNote>
             {!plannerHasBank && d.plannerFeePercent > 0 && (
               <div className="banner warn">
                 To earn a cut, first <Link href="/dashboard/profile">add your bank account</Link>. Your answers here are saved.
@@ -293,12 +333,14 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
           </>
         )}
 
-        {step === 5 && (
+        {step === S.review && (
           <>
             <h1>Check and create</h1>
             <div className="card review">
               <dl>
                 <dt>Event</dt><dd>{title}</dd>
+                <dt>Link</dt><dd>{typeof window !== 'undefined' ? window.location.host : 'dashpad.ng'}/{slug}</dd>
+                <dt>Photos</dt><dd>{d.photos.length ? `${d.photos.length} added` : 'None yet'}</dd>
                 <dt>Screen says</dt><dd>“₦20,000 sent to {d.recipientLabel}”</dd>
                 <dt>Starts</dt><dd>{when(d.startsAt)}</dd>
                 <dt>Ends</dt><dd>{when(d.endsAt)}</dd>
@@ -306,6 +348,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
                 <dt>Money goes to</dt><dd>{d.payout.accountName}<br />{d.payout.bankName} · {d.payout.accountNumber}</dd>
                 <dt>Your cut</dt><dd>{d.plannerFeePercent}%</dd>
                 <dt>DashPad fee</dt><dd>{PLATFORM_FEE_BPS / 100}%</dd>
+                <dt>Payouts</dt><dd>Within 2 business days</dd>
               </dl>
             </div>
             <p className="hint">

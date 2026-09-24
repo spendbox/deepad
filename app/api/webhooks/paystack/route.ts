@@ -9,6 +9,7 @@ type ChargeData = {
   status?: string;
   reference?: string;
   amount?: number; // kobo
+  fees?: number | null; // Paystack's processing fee, kobo
   currency?: string;
   paid_at?: string | null;
   customer?: { customer_code?: string } | null;
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
       senderBank: auth.sender_bank ?? null,
       narration: auth.narration ?? null,
       paidAt: data.paid_at ?? null,
+      processingFeeKobo: Number(data.fees ?? 0) || 0,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {

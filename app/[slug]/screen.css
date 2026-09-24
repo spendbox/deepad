@@ -133,3 +133,55 @@
   .note { display: none; }
   .pop, .takeover, .live-dot { animation: none; }
 }
+
+/* Bank name: large and heavy so it can be read across the hall */
+.paybar-meta { display: flex; align-items: baseline; gap: 24px; min-width: 0; }
+.paybar-bank { font-family: var(--display); font-weight: 800; font-size: 48px; line-height: 1.05; white-space: nowrap; flex-shrink: 0; }
+.paybar-name { font-size: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .9; }
+.takeover-bank { font-family: var(--display); font-weight: 800; font-size: 52px; }
+
+/* Celebrant photos */
+.fade-in { animation: fadeIn .9s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.invite.with-photo { flex-direction: row; align-items: center; gap: 48px; }
+.invite-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.invite-photo { width: 440px; height: 440px; flex-shrink: 0; object-fit: cover; border-radius: 28px; border: 4px solid var(--s-accent); }
+.notice { flex-direction: row; gap: 64px; }
+.notice-text { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.notice-photo { width: 520px; height: 520px; flex-shrink: 0; object-fit: cover; border-radius: 32px; border: 4px solid var(--s-accent); }
+
+/* ---------- Phone layout ---------- */
+.m-screen {
+  min-height: 100dvh; background: var(--s-bg); color: var(--s-text); font-family: var(--body);
+  padding: 16px max(16px, calc((100vw - 640px) / 2)) 32px; display: flex; flex-direction: column; gap: 14px;
+}
+.m-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.m-top .badge { font-size: 15px; padding: 6px 12px; gap: 8px; }
+.m-top .badge .live-dot { width: 10px; height: 10px; }
+.m-title { margin: 2px 0 0; font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+.m-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 20px; border: 3px solid var(--s-accent); }
+.m-pay {
+  background: var(--s-accent); color: var(--s-on-accent); border-radius: 20px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+}
+.m-pay .btn { margin-top: 8px; border-color: var(--s-on-accent); color: var(--s-on-accent); background: transparent; }
+.m-pay-label { font-weight: 700; font-size: 15px; }
+.m-acct { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 8.6vw, 46px); letter-spacing: 1px; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.m-bank { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.15; }
+.m-acct-name { font-weight: 600; font-size: 15px; opacity: .9; }
+.m-card { background: var(--s-panel); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.m-center { align-items: center; text-align: center; }
+.m-bigspray { border: 3px solid var(--s-accent); }
+.m-badge { align-self: flex-start; background: var(--s-accent); color: var(--s-on-accent); font-family: var(--display); font-weight: 800; padding: 4px 12px; border-radius: 999px; }
+.m-big { font-family: var(--display); font-weight: 800; font-size: 28px; line-height: 1.15; color: var(--s-accent); }
+.m-amount { font-family: var(--display); font-weight: 800; font-size: clamp(40px, 13vw, 60px); line-height: 1; color: var(--s-accent); font-variant-numeric: tabular-nums; }
+.m-to { font-family: var(--display); font-weight: 800; font-size: 20px; }
+.m-msg { font-size: 18px; color: var(--s-muted); overflow-wrap: anywhere; }
+.m-muted { color: var(--s-muted); font-size: 15px; line-height: 1.45; }
+.m-total { font-family: var(--display); font-weight: 800; font-size: 32px; font-variant-numeric: tabular-nums; }
+.m-recent { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.m-recent li { display: flex; flex-direction: column; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--s-muted) 30%, transparent); }
+.m-recent li strong { color: var(--s-accent); font-family: var(--display); font-size: 18px; }
+.m-recent li span { color: var(--s-muted); font-size: 14px; overflow-wrap: anywhere; }
+.m-foot { color: var(--s-muted); font-size: 13px; text-align: center; margin: 4px 0 0; }
+@media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }

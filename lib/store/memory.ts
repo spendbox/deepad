@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import type { NewPlanner, NewSprayEvent, NewTransfer, Planner, SprayEvent, Transfer } from '../types';
+import type { NewPlanner, NewSprayEvent, NewTransfer, PasswordReset, Planner, SprayEvent, Transfer } from '../types';
 import { computeStats, type Store } from './types';
 
 // A throwaway store that lives in the server's memory, for developers running
 // the app on their own computer. It is never used on the live site.
 
-type Data = { planners: Planner[]; events: SprayEvent[]; transfers: Transfer[]; nextTransferId: number };
+type Data = { planners: Planner[]; events: SprayEvent[]; transfers: Transfer[]; resets: PasswordReset[]; nextTransferId: number };
 
 const g = globalThis as unknown as { __dashpadMemory?: Data };
 function data(): Data {
-  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], nextTransferId: 1 };
+  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], nextTransferId: 1 };
   return g.__dashpadMemory;
 }
 
@@ -41,6 +41,28 @@ export class MemoryStore implements Store {
   async listPlanners() {
     return [...data().planners].sort(byNewest);
   }
+
+  async createPasswordReset(r: { plannerId: string; tokenHash: string; expiresAt: string }) {
+    data().resets.push({ ...r, id: randomUUID(), usedAt: null, createdAt: now() });
+  }
+  async findPasswordReset(tokenHash: string) {
+    return data().resets.find((r) => r.tokenHash === tokenHash) ?? null;
+  }
+  async latestPasswordReset(plannerId: string) {
+    return data().resets.filter((r) => r.plannerId === plannerId).sort(byNewest)[0] ?? null;
+  }
+  async markPasswordResetUsed(id: string) {
+    const r = data().resets.find((x) => x.id === id);
+    if (!r || r.usedAt) return false;
+    r.usedAt = now();
+    return true;
+  }
+
+  // Images are kept inline as data links. Fine for a developer's computer only.
+  async uploadImage(_path: string, bytes: Uint8Array, contentType: string) {
+    return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+  }
+  async deleteImage() {}
 
   async createEvent(e: NewSprayEvent) {
     const d = data();

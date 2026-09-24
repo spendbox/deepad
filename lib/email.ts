@@ -12,7 +12,8 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
     console.warn(`Email not sent (RESEND_API_KEY / EMAIL_FROM missing): "${opts.subject}" to ${opts.to}`);
     return false;
   }
-  const res = await fetch('https://api.resend.com/emails', {
+  // RESEND_API_BASE is only for automated testing against a pretend email service.
+  const res = await fetch(`${process.env.RESEND_API_BASE || 'https://api.resend.com'}/emails`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [opts.to], subject: opts.subject, html: opts.html, text: opts.text }),

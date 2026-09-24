@@ -1,5 +1,4 @@
 import 'server-only';
-import { randomBytes } from 'node:crypto';
 import { escapeHtml, sendEmail } from './email';
 import { eventPhase, formatWhen } from './event-info';
 import { naira, percent, splitTransfer } from './money';
@@ -13,43 +12,7 @@ import {
 } from './paystack';
 import { getStore } from './store';
 import { cleanNarration } from './text';
-import type { NewSprayEvent, Planner, SprayEvent, Transfer } from './types';
-
-// ---------- Links ----------
-
-const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // no look-alikes (l/1, o/0)
-
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 32)
-    .replace(/-+$/, '');
-}
-
-/** A readable but unguessable link code, e.g. "tolu-and-dayo-k7m2qx". */
-export function makeSlug(celebrantName: string): string {
-  const bytes = randomBytes(6);
-  const code = Array.from(bytes, (b) => SLUG_CHARS[b % SLUG_CHARS.length]).join('');
-  const base = slugify(celebrantName);
-  return base ? `${base}-${code}` : code;
-}
-
-/** Create the event, retrying in the (very unlikely) case the link code is taken. */
-export async function insertEventWithUniqueSlug(e: Omit<NewSprayEvent, 'slug'>): Promise<SprayEvent> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await getStore().createEvent({ ...e, slug: makeSlug(e.celebrantName) });
-    } catch (err) {
-      if (attempt < 4 && err instanceof Error && err.message === 'SLUG_TAKEN') continue;
-      throw err;
-    }
-  }
-}
+import type { Planner, SprayEvent, Transfer } from './types';
 
 // ---------- Payment setup (Paystack) ----------
 
@@ -101,7 +64,7 @@ export async function setupEventPayments(eventId: string): Promise<SprayEvent> {
     if (!event.paystackCustomerCode) {
       const domain = process.env.PAYSTACK_CUSTOMER_EMAIL_DOMAIN || 'events.dashpad.ng';
       const code = await createCustomer({
-        email: `${event.slug}@${domain}`,
+        email: `event-${event.id}@${domain}`,
         firstName: event.celebrantName,
         lastName: 'DashPad',
         phone: planner.phone,
@@ -152,7 +115,15 @@ async function ensurePlannerSubaccount(planner: Planner): Promise<string> {
 /** A confirmed transfer to an event's account. Only these ever reach the screen. */
 export async function recordTransfer(
   event: SprayEvent,
-  t: { reference: string; amountKobo: number; senderName: string | null; senderBank: string | null; narration: string | null; paidAt?: string | null },
+  t: {
+    reference: string;
+    amountKobo: number;
+    senderName: string | null;
+    senderBank: string | null;
+    narration: string | null;
+    paidAt?: string | null;
+    processingFeeKobo?: number;
+  },
 ): Promise<Transfer> {
   const when = t.paidAt ? new Date(t.paidAt).getTime() : Date.now();
   const outsideWindow = eventPhase({ startsAt: event.startsAt, endsAt: event.endsAt }, Number.isFinite(when) ? when : Date.now()) !== 'live';
@@ -167,6 +138,7 @@ export async function recordTransfer(
     platformFeeKobo: split.platformFeeKobo,
     plannerFeeKobo: split.plannerFeeKobo,
     celebrantKobo: split.celebrantKobo,
+    processingFeeKobo: Math.max(0, Math.round(t.processingFeeKobo ?? 0)),
     outsideWindow,
   });
   return transfer;
@@ -224,6 +196,7 @@ export function summarise(transfers: Transfer[]) {
     plannerKobo: sum((t) => t.plannerFeeKobo),
     celebrantKobo: sum((t) => t.celebrantKobo),
     platformKobo: sum((t) => t.platformFeeKobo),
+    processingKobo: transfers.reduce((s, t) => s + (t.processingFeeKobo ?? 0), 0),
     senderCount: senders.size,
     outside: transfers.filter((t) => t.outsideWindow),
   };
@@ -262,6 +235,7 @@ function buildReport(event: SprayEvent, planner: Planner, transfers: Transfer[])
 <tr><td style="padding:4px 12px 4px 0">Your earnings (${percent(event.plannerFeeBps)})</td><td><b>${naira(s.plannerKobo)}</b></td></tr>
 <tr><td style="padding:4px 12px 4px 0">Paid to ${escapeHtml(event.celebrantName)}</td><td><b>${naira(s.celebrantKobo)}</b></td></tr>
 </table>
+<p style="color:#5E4A66">Payouts reach your account and ${escapeHtml(event.celebrantName)}’s account within 2 business days of each spray.</p>
 ${outsideNote}
 <table style="border-collapse:collapse;width:100%;font-size:14px">
 <tr style="background:#F7F0F9;text-align:left"><th style="padding:6px 8px">Time</th><th style="padding:6px 8px">Sender</th><th style="padding:6px 8px">Bank</th><th style="padding:6px 8px;text-align:right">Amount</th><th style="padding:6px 8px">Message</th></tr>
@@ -274,6 +248,7 @@ ${rows || '<tr><td colspan="5" style="padding:8px">No sprays were received.</td>
     `${event.title}`,
     `Total sprayed: ${naira(s.totalKobo)} from ${s.count} sprays (${s.senderCount} different senders)`,
     `Your earnings: ${naira(s.plannerKobo)}`,
+    'Payouts arrive within 2 business days of each spray.',
     '',
     ...transfers.filter((t) => !t.outsideWindow).map((t) => `${time(t.createdAt)}  ${t.senderName ?? 'Unknown'}  ${naira(t.amountKobo)}  ${t.message ?? ''}`),
   ].join('\n');
@@ -291,6 +266,7 @@ export type ScreenFeed = {
     celebrantName: string;
     recipientLabel: string;
     theme: string;
+    photos: string[];
     phase: 'upcoming' | 'live' | 'ended';
     startsAt: string;
     endsAt: string;
@@ -314,6 +290,7 @@ export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
       celebrantName: event.celebrantName,
       recipientLabel: event.recipientLabel,
       theme: event.theme,
+      photos: event.photos ?? [],
       phase: eventPhase(event),
       startsAt: event.startsAt,
       endsAt: event.endsAt,

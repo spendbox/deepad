@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import BankAccountFields, { type BankAccount } from '@/components/BankAccountFields';
+import PayoutNote from '@/components/PayoutNote';
 import { savePayoutAccount } from '../../actions';
 
 type Props = {
@@ -41,6 +42,7 @@ export default function ProfileForm({ welcome, planner }: Props) {
         </>
       )}
       <BankAccountFields value={acct} onChange={setAcct} namePrefix="" label="Your bank" />
+      <PayoutNote>Your cut from each spray is paid into this account within 2 business days.</PayoutNote>
       {state?.error && <p className="error-text" role="alert">{state.error}</p>}
       {state?.ok && <p className="ok-text" role="status">{state.ok}</p>}
       <button type="submit" className="btn btn-dark btn-lg btn-block" disabled={pending || !ready}>

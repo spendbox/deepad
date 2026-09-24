@@ -1,11 +1,11 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
+import PasswordInput from '@/components/PasswordInput';
 import { signup } from '../actions';
 
 export default function SignupForm() {
   const [state, action, pending] = useActionState(signup, null);
-  const [show, setShow] = useState(false);
   return (
     <form action={action} className="form">
       <div className="field">
@@ -23,10 +23,8 @@ export default function SignupForm() {
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>
-        <input id="password" name="password" type={show ? 'text' : 'password'} className="input" autoComplete="new-password" minLength={8} required />
-        <button type="button" className="link-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setShow((v) => !v)}>
-          {show ? 'Hide password' : 'Show password'}
-        </button>
+        <PasswordInput id="password" name="password" autoComplete="new-password" minLength={8} />
+        <span className="hint">At least 8 characters.</span>
       </div>
       {state?.error && <p className="error-text" role="alert">{state.error}</p>}
       <button type="submit" className="btn btn-dark btn-lg btn-block" disabled={pending}>

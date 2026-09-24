@@ -1,6 +1,8 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
+import PasswordInput from '@/components/PasswordInput';
 import { login } from '../actions';
 
 export default function LoginForm() {
@@ -13,7 +15,10 @@ export default function LoginForm() {
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>
-        <input id="password" name="password" type="password" className="input" autoComplete="current-password" required />
+        <PasswordInput id="password" name="password" autoComplete="current-password" />
+        <Link href="/forgot-password" className="hint" style={{ alignSelf: 'flex-end', minHeight: 32, display: 'inline-flex', alignItems: 'center' }}>
+          Forgot password?
+        </Link>
       </div>
       {state?.error && <p className="error-text" role="alert">{state.error}</p>}
       <button type="submit" className="btn btn-dark btn-lg btn-block" disabled={pending}>

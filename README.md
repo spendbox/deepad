@@ -12,7 +12,8 @@ description. Senders stay anonymous on screen.
 | Landing page | `/` | Everyone |
 | Sign up / log in | `/signup`, `/login` | Event planners and MCs |
 | Planner dashboard | `/dashboard` | Planners: create and run events |
-| Event big screen | `/e/<unique-code>` | The venue TV or projector |
+| Event big screen | `/<event-link>` e.g. `/tolu-and-dayo` | The venue TV or projector (works on phones too) |
+| Forgot password | `/forgot-password` | Planners |
 | Admin | `/admin` | DashPad staff (password protected) |
 | Paystack webhook | `/api/webhooks/paystack` | Paystack |
 | Daily clean-up | `/api/cron/close-events` | Vercel (see `vercel.json`) |
@@ -23,6 +24,8 @@ description. Senders stay anonymous on screen.
 - Every transfer is split automatically by Paystack: **5% to DashPad**, the planner's cut
   (**0–45%**, chosen per event) to the planner's bank account, and the rest to the account
   the planner entered for the celebrant. DashPad never holds the money.
+- DashPad pays Paystack's processing fee out of its 5%. The admin page shows earnings after fees.
+- Payouts reach the bank accounts within 2 business days.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
 - Only transfers confirmed by Paystack's signed webhook ever reach the screen.
@@ -30,6 +33,7 @@ description. Senders stay anonymous on screen.
 ## Setting it up
 
 1. **Supabase:** SQL Editor → New query → paste all of `supabase/schema.sql` → Run.
+   (Run it again after updates; it is safe to repeat. It also creates the `celebrant-photos` storage folder.)
 2. **Vercel:** add every setting in `.env.example`, then redeploy.
 3. **Paystack:** set the webhook URL to `https://<your-site>/api/webhooks/paystack`.
    Paystack must have *Dedicated Virtual Accounts* enabled on your business.

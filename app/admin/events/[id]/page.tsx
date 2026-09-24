@@ -29,7 +29,7 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
       <div className="card">
         <span>Planner: <strong>{planner?.name}</strong> ({planner?.email}, {planner?.phone})</span>
         <span>When: {formatWhen(event.startsAt)} → {formatWhen(event.endsAt)}</span>
-        <span>Link: <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer">/e/{event.slug}</a></span>
+        <span>Link: <a href={`/${event.slug}`} target="_blank" rel="noreferrer">/{event.slug}</a></span>
         <span>Payout: {event.payoutAccountName} · {event.payoutBankName} · {event.payoutAccountNumber}</span>
         <span>Fees: DashPad {percent(event.platformFeeBps)} · planner {percent(event.plannerFeeBps)}</span>
         <span>
@@ -45,7 +45,8 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
         <span>Report emailed: {event.reportSentAt ? new Date(event.reportSentAt).toLocaleString('en-NG') : 'not yet'}</span>
       </div>
       <div className="tiles">
-        <div className="tile gold"><div className="v">{naira(s.platformKobo)}</div><div className="k">DashPad earnings</div></div>
+        <div className="tile gold"><div className="v">{naira(s.platformKobo - s.processingKobo)}</div><div className="k">DashPad earnings after fees</div></div>
+        <div className="tile"><div className="v">{naira(s.processingKobo)}</div><div className="k">Paystack fees</div></div>
         <div className="tile"><div className="v">{naira(s.totalKobo)}</div><div className="k">Sprayed ({s.count})</div></div>
         <div className="tile"><div className="v">{naira(s.plannerKobo)}</div><div className="k">Planner cut</div></div>
         <div className="tile"><div className="v">{naira(s.celebrantKobo)}</div><div className="k">Celebrant</div></div>
