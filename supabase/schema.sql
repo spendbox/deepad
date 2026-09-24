@@ -111,6 +111,8 @@ create table if not exists payment_logs (
   created_at timestamptz not null default now()
 );
 create index if not exists payment_logs_created_idx on payment_logs (id desc);
+-- Added later: the full notification, to see exactly where the bank put the description.
+alter table payment_logs add column if not exists raw jsonb;
 
 -- Public storage folder for celebrant photos (shown on the big screen).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

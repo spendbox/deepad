@@ -9,7 +9,7 @@ import { adminRetrySetup } from '../../../actions';
 import PhasePill from '../../../dashboard/PhasePill';
 import AdminShell from '../../AdminShell';
 import PaymentLogTable from '../../PaymentLogTable';
-import CheckPaystackButton from './CheckPaystackButton';
+import CheckPaystackButton, { RecleanButton } from './CheckPaystackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +61,11 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
         <div className="tile"><div className="v">{naira(s.celebrantKobo)}</div><div className="k">Celebrant</div></div>
       </div>
       <section className="card">
-        <h2>Transfers</h2>
+        <div className="row-between">
+          <h2>Transfers</h2>
+          <RecleanButton eventId={event.id} />
+        </div>
+        <span className="hint">“Re-check all messages” re-reads every bank description with the latest rules (for example, removing the account’s own name).</span>
         <div className="table-wrap">
           <table>
             <thead><tr><th>Time</th><th>Sender</th><th>Bank</th><th>Amount</th><th>On screen</th><th>Bank description (raw)</th><th>Note</th><th>Reference</th></tr></thead>

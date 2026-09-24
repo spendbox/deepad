@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findNarration, recordTransfer } from '@/lib/events';
+import { collectNarrations, recordTransfer } from '@/lib/events';
 import { isValidPaystackSignature } from '@/lib/paystack-signature';
 import { getStore } from '@/lib/store';
 import type { NewPaymentLog } from '@/lib/types';
@@ -92,16 +92,17 @@ export async function POST(req: Request) {
         outcome: 'unmatched',
         detail: `No event has account ${receiver || '(none given)'} or customer ${customerCode || '(none given)'}.`,
         eventId: null,
+        raw: payload,
       });
       return NextResponse.json({ ok: true, unmatched: true });
     }
-    const narration = findNarration(data);
+    const narrations = collectNarrations(data);
     const { transfer, created } = await recordTransfer(event, {
       reference,
       amountKobo,
       senderName: auth.sender_name ?? null,
       senderBank: auth.sender_bank ?? null,
-      narration,
+      narrations,
       paidAt: data.paid_at ?? null,
       processingFeeKobo: Number(data.fees ?? 0) || 0,
     });
@@ -112,11 +113,14 @@ export async function POST(req: Request) {
       detail: transfer.outsideWindow
         ? 'Arrived outside the event’s start/end time, so it is NOT shown on the big screen.'
         : `₦${(amountKobo / 100).toLocaleString('en-NG')} for ${event.slug}. ${
-            narration
-              ? `Bank description: “${narration.slice(0, 80)}” → on screen: “${transfer.message ?? '(nothing left after removing bank codes and the sender’s name)'}”`
-              : 'No description was included in Paystack’s notification.'
+            narrations.length
+              ? `Description fields found: ${narrations.map((n) => `“${n.slice(0, 60)}”`).join(', ')} → on screen: “${
+                  transfer.message ?? '(nothing: only bank codes, names or the account’s own name)'
+                }”`
+              : 'No description at all was included in Paystack’s notification.'
           }`,
       eventId: event.id,
+      raw: payload,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {

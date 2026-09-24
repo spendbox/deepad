@@ -112,6 +112,8 @@ export type PaymentLog = {
   outcome: PaymentLogOutcome;
   detail: string | null;
   eventId: string | null;
+  /** The full notification Paystack sent (admin only), to see exactly what the bank passed on. */
+  raw?: unknown;
   createdAt: string;
 };
 

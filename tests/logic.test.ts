@@ -9,6 +9,7 @@ import { eventPhase } from '../lib/event-info.ts';
 import { hashPassword, verifyPassword } from '../lib/passwords.ts';
 import { makePlannerToken, passwordVersion, readPlannerToken } from '../lib/auth.ts';
 import { slugify, slugProblem } from '../lib/slug.ts';
+import { collectNarrations, pickNarration } from '../lib/narration.ts';
 
 test('split: DashPad 5%, planner cut, celebrant gets the rest', () => {
   const s = splitTransfer(10_000_00, 1000);
@@ -124,4 +125,28 @@ test('event links are short and safe', () => {
   assert.notEqual(slugProblem('ab'), null);
   assert.notEqual(slugProblem('Tolu_Dayo'), null);
   assert.notEqual(slugProblem('-tolu'), null);
+});
+
+test('the receiving account’s own name is never shown as a message', () => {
+  const R = ['SPENDBOX/DASHPAD TOLU & DAYO', 'DashPad'];
+  assert.equal(cleanNarration('SPENDBOX/DASHPA', 'JOHN DOE', R), null);
+  assert.equal(cleanNarration('Spendbox/Dashpad Tolu', null, R), null);
+  assert.equal(cleanNarration('SPENDBOX/DASHPA Happy birthday', null, R), 'Happy birthday');
+  assert.equal(cleanNarration('TRF TO SPENDBOX/DASHPAD - Congrats o', null, R), 'Congrats o');
+  assert.equal(cleanNarration('Happy married life Tolu', null, R), 'Happy married life Tolu');
+  assert.equal(cleanNarration('Spend wisely my darling', null, R), 'Spend wisely my darling');
+});
+
+test('the best description is picked from Paystack’s notification', () => {
+  const data = {
+    authorization: { narration: 'SPENDBOX/DASHPA', sender_name: 'JOHN DOE' },
+    metadata: { custom_fields: [{ variable_name: 'narration', value: 'God bless this home' }] },
+  };
+  const all = collectNarrations(data);
+  assert.deepEqual(all, ['SPENDBOX/DASHPA', 'God bless this home']);
+  const pick = pickNarration(all, 'JOHN DOE', ['SPENDBOX/DASHPAD TOLU']);
+  assert.equal(pick.message, 'God bless this home');
+  const none = pickNarration(['SPENDBOX/DASHPA'], null, ['SPENDBOX/DASHPAD TOLU']);
+  assert.equal(none.message, null);
+  assert.equal(none.raw, 'SPENDBOX/DASHPA');
 });

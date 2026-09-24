@@ -239,7 +239,7 @@ export class SupabaseStore implements Store {
       ['spray_events', 'id, photos, deleted_at, paystack_dva_id'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],
-      ['payment_logs', 'id, outcome'],
+      ['payment_logs', 'id, outcome, raw'],
     ];
     const problems: string[] = [];
     for (const [table, cols] of probes) {
