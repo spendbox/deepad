@@ -190,6 +190,18 @@ export class SupabaseStore implements Store {
     }
     return { transfer: toTransfer(check(res)), created: true };
   }
+  async listTransfersAfter(eventId: string, afterId: number, limit = 200) {
+    const rows = check(
+      await this.db
+        .from('transfers')
+        .select('*')
+        .eq('event_id', eventId)
+        .gt('id', afterId)
+        .order('id', { ascending: true })
+        .limit(limit),
+    );
+    return (rows ?? []).map(toTransfer);
+  }
   async listTransfers(eventId: string, limit = 1000) {
     const rows = check(
       await this.db.from('transfers').select('*').eq('event_id', eventId).order('id', { ascending: false }).limit(limit),

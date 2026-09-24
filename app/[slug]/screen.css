@@ -188,7 +188,7 @@
 
 /* ---------- Every spray is a celebration ---------- */
 .spray-pop { position: relative; animation: sprayIn .9s cubic-bezier(.18, .9, .25, 1.15); }
-.spray-pop > *:not(.burst) { position: relative; z-index: 1; }
+.spray-pop > *:not(.burst):not(.vuvu) { position: relative; z-index: 1; }
 @keyframes sprayIn {
   0% { transform: scale(.7) rotate(-2deg); opacity: 0; box-shadow: 0 0 0 0 var(--s-accent); }
   45% { transform: scale(1.06) rotate(.6deg); opacity: 1; box-shadow: 0 0 120px 30px color-mix(in srgb, var(--s-accent) 55%, transparent); }
@@ -233,7 +233,7 @@
 
 /* Phone version of the celebration */
 .m-spray { position: relative; overflow: hidden; border: 3px solid var(--s-accent); animation: sprayIn .9s cubic-bezier(.18, .9, .25, 1.15) both; }
-.m-spray > *:not(.burst) { position: relative; z-index: 1; }
+.m-spray > *:not(.burst):not(.vuvu) { position: relative; z-index: 1; }
 .m-spray .burst-note { width: 44px; height: 22px; margin: -11px 0 0 -22px; font-size: 12px; border-width: 2px; }
 .m-spray .burst-note { animation-name: burstOutSmall; }
 @keyframes burstOutSmall {
@@ -246,4 +246,62 @@
 @media (prefers-reduced-motion: reduce) {
   .spray-pop, .m-spray, .pop-kicker, .spray-pop .pop-amount, .spray-pop .pop-to, .spray-pop .pop-msg { animation: none; }
   .burst { display: none; }
+}
+
+/* ---------- Vuvuzela ---------- */
+.vuvu { position: absolute; pointer-events: none; overflow: visible; color: var(--s-accent); z-index: 2; }
+.pop-vuvu { top: 14px; right: 18px; width: 300px; height: 200px; }
+.vuvu-horn { transform-origin: 27px 171px; animation: vuvuBlow .55s ease-in-out 5 alternate; }
+@keyframes vuvuBlow {
+  from { transform: rotate(0deg) scale(1); }
+  to { transform: rotate(-5deg) scale(1.05); }
+}
+.vuvu-wave { opacity: 0; transform-origin: 240px 70px; animation: vuvuWave 1.1s ease-out 3; }
+.vuvu-wave.w2 { animation-delay: .18s; }
+.vuvu-wave.w3 { animation-delay: .36s; }
+@keyframes vuvuWave {
+  0% { opacity: 0; transform: scale(.6); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+.vuvu-confetti { opacity: 0; transform-box: fill-box; animation: vuvuConfetti 1.4s ease-out 2; }
+@keyframes vuvuConfetti {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(540deg); }
+}
+.takeover-vuvu { top: 30px; width: 420px; height: 280px; color: var(--s-on-accent); }
+.takeover-vuvu.left { left: 40px; transform: scaleX(-1); }
+.takeover-vuvu.right { right: 40px; }
+.m-vuvu { top: 6px; right: 6px; width: 130px; height: 88px; }
+
+/* A compact spray: notes stay around the amount instead of flooding the screen. */
+.spray-pop .pop-amount { max-width: calc(100% - 280px); }
+@keyframes flash { 0% { width: 20px; height: 20px; opacity: .9; } 100% { width: 700px; height: 700px; opacity: 0; } }
+.burst-note { width: 72px; height: 34px; margin: -17px 0 0 -36px; font-size: 18px; }
+@keyframes burstOut {
+  0% { transform: translate(0, 0) scale(.3) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  80% { opacity: .85; }
+  100% { transform: translate(calc(var(--dx) * 5), calc(var(--dy) * 4)) scale(1) rotate(var(--rot)); opacity: 0; }
+}
+
+/* Latest messages (no amounts) */
+.side-messages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.side-messages li {
+  font-size: 30px; line-height: 1.3; font-weight: 600; padding: 14px 18px; border-radius: 18px 18px 18px 4px;
+  background: color-mix(in srgb, var(--s-accent) 14%, transparent); border-left: 6px solid var(--s-accent);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  animation: riseIn .6s ease-out both;
+}
+.side-messages li:first-child { background: color-mix(in srgb, var(--s-accent) 26%, transparent); }
+.m-messages { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.m-messages li {
+  font-size: 16px; font-weight: 600; padding: 8px 12px; border-radius: 12px 12px 12px 4px; overflow-wrap: anywhere;
+  background: color-mix(in srgb, var(--s-accent) 14%, transparent); border-left: 4px solid var(--s-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vuvu-horn, .vuvu-wave, .vuvu-confetti, .side-messages li { animation: none; }
+  .vuvu-wave { opacity: 1; }
 }

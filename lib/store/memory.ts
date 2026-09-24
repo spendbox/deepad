@@ -129,6 +129,12 @@ export class MemoryStore implements Store {
     d.transfers.push(transfer);
     return { transfer, created: true };
   }
+  async listTransfersAfter(eventId: string, afterId: number, limit = 200) {
+    return data()
+      .transfers.filter((t) => t.eventId === eventId && t.id > afterId)
+      .sort((a, b) => a.id - b.id)
+      .slice(0, limit);
+  }
   async listTransfers(eventId: string, limit = 1000) {
     return data()
       .transfers.filter((t) => t.eventId === eventId)

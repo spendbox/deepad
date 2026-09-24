@@ -399,9 +399,17 @@ export type ScreenFeed = {
   recent: ScreenTransfer[];
 };
 
-export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
+/**
+ * What the big screen needs. `afterId` is the newest spray the screen has
+ * already seen: every spray after it is included, so a burst of payments
+ * arriving together is never cut short.
+ */
+export async function screenFeed(event: SprayEvent, afterId?: number): Promise<ScreenFeed> {
   const store = getStore();
-  const transfers = await store.listTransfers(event.id, 40);
+  const latest = await store.listTransfers(event.id, 40);
+  const newer = afterId != null && Number.isFinite(afterId) ? await store.listTransfersAfter(event.id, afterId, 300) : [];
+  const byId = new Map([...latest, ...newer].map((t) => [t.id, t]));
+  const transfers = [...byId.values()].sort((a, b) => b.id - a.id);
   return {
     event: {
       title: event.title,
@@ -420,7 +428,6 @@ export async function screenFeed(event: SprayEvent): Promise<ScreenFeed> {
     },
     recent: transfers
       .filter((t) => !t.outsideWindow)
-      .slice(0, 30)
       .map((t) => ({ id: t.id, amountKobo: t.amountKobo, message: t.hidden ? null : t.message, createdAt: t.createdAt }))
       .reverse(),
   };

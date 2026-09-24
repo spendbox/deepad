@@ -8,7 +8,7 @@ import { getTheme } from '@/lib/themes';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 
 const POLL_MS = 2000;
-const SPRAY_HOLD_MS = 12000; // a spray stays up this long, then the screen invites more
+const SPRAY_HOLD_MS = 8000; // a spray's celebration stays up this long, then the screen invites more
 const TAKEOVER_MS = 7000;
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const STAGE_W = 1920;
@@ -27,6 +27,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const [feed, setFeed] = useState(initialFeed);
   const [online, setOnline] = useState(true);
   const seen = useRef(new Set(initialFeed.recent.map((t) => t.id)));
+  // The newest spray already known. Each poll asks for everything after it, so none are ever skipped.
+  const lastId = useRef(initialFeed.recent.reduce((m, t) => Math.max(m, t.id), 0));
   const [queue, setQueue] = useState<ScreenTransfer[]>([]);
   const [current, setCurrent] = useState<ScreenTransfer | null>(null);
   const [shownAt, setShownAt] = useState(0);
@@ -45,15 +47,19 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/screen/${encodeURIComponent(code)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/screen/${encodeURIComponent(code)}?after=${lastId.current}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as ScreenFeed;
         if (!alive) return;
         fails = 0;
         setOnline(true);
         setFeed(data);
-        const fresh = data.recent.filter((t) => !seen.current.has(t.id));
-        fresh.forEach((t) => seen.current.add(t.id));
+        // Every new spray joins the queue in the order it arrived, even if many came at once.
+        const fresh = data.recent.filter((t) => !seen.current.has(t.id)).sort((a, b) => a.id - b.id);
+        fresh.forEach((t) => {
+          seen.current.add(t.id);
+          lastId.current = Math.max(lastId.current, t.id);
+        });
         if (fresh.length) setQueue((q) => [...q, ...fresh]);
         // Pick up changes to what's showing (e.g. the planner hid a message).
         setCurrent((c) => (c ? data.recent.find((t) => t.id === c.id) ?? c : c));
@@ -86,7 +92,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       return;
     }
     if (!queue.length || paused) return;
-    const gap = queue.length > 3 ? 2500 : 4500;
+    // Each spray gets its moment; when many arrive together they play a little faster.
+    const gap = queue.length > 10 ? 1800 : queue.length > 3 ? 2600 : 4500;
     if (shownAt && now - shownAt < gap) return;
     const [next, ...rest] = queue;
     setQueue(rest);
@@ -156,7 +163,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   } as React.CSSProperties;
 
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
-  const recent = feed.recent.filter((t) => !queue.some((q) => q.id === t.id)).slice(-6).reverse();
+  // Guests' messages only (no amounts), newest first, once their spray has popped up.
+  const messages = feed.recent
+    .filter((t) => t.message && !queue.some((q) => q.id === t.id))
+    .slice(-5)
+    .reverse();
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
   // Celebrant photos take turns, a new one every few seconds.
   const photo = e.photos.length ? e.photos[ready ? Math.floor(now / PHOTO_MS) % e.photos.length : 0] : null;
@@ -224,7 +235,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
             {takeover || (showingSpray && current) ? (
               <section key={popKey} className={`m-card spray-pop m-spray${takeover ? ' m-bigspray' : ''}`}>
-                <Burst count={12} />
+                <Burst count={10} />
+                <Vuvuzela className="m-vuvu" />
                 <div className="m-badge">{takeover ? 'Big spray!' : 'New spray!'}</div>
                 <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
                 <div className="m-to">sent to {e.recipientLabel}</div>
@@ -240,17 +252,14 @@ export default function LiveScreen({ code, initialFeed }: Props) {
               </section>
             )}
 
-            {recent.length > 0 && (
+            {messages.length > 0 && (
               <section className="m-card">
-                <div className="m-to">Recent sprays</div>
-                <ol className="m-recent">
-                  {recent.map((t) => (
-                    <li key={t.id}>
-                      <strong>{naira(t.amountKobo)}</strong>
-                      {t.message && <span>{t.message}</span>}
-                    </li>
+                <div className="m-to">Latest messages</div>
+                <ul className="m-messages">
+                  {messages.map((t) => (
+                    <li key={t.id}>“{t.message}”</li>
                   ))}
-                </ol>
+                </ul>
               </section>
             )}
           </>
@@ -268,6 +277,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
         {takeover ? (
           <div className="takeover">
+            <Vuvuzela className="takeover-vuvu left" />
+            <Vuvuzela className="takeover-vuvu right" />
             <div className="takeover-badge">Big spray!</div>
             <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
             <div className="takeover-to">sent to {e.recipientLabel}</div>
@@ -320,7 +331,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                 <div className="middle">
                   {showingSpray && current ? (
                     <div key={popKey} className="panel-main spray-pop">
-                      <Burst count={22} />
+                      <Burst count={16} />
+                      <Vuvuzela className="pop-vuvu" />
                       <div className="pop-kicker">New spray!</div>
                       <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
                       <div className="pop-to">sent to {e.recipientLabel}</div>
@@ -343,18 +355,15 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                   )}
                   <aside className="side">
                     <div className="side-list">
-                      <h2>Recent sprays</h2>
-                      {recent.length === 0 ? (
-                        <p className="side-empty">Be the first to spray!</p>
+                      <h2>Latest messages</h2>
+                      {messages.length === 0 ? (
+                        <p className="side-empty">Type a message in your transfer description and it will appear here.</p>
                       ) : (
-                        <ol>
-                          {recent.map((t) => (
-                            <li key={t.id}>
-                              <span className="side-amt tabular">{naira(t.amountKobo)}</span>
-                              {t.message && <span className="side-msg">{t.message}</span>}
-                            </li>
+                        <ul className="side-messages">
+                          {messages.map((t) => (
+                            <li key={t.id}>“{t.message}”</li>
                           ))}
-                        </ol>
+                        </ul>
                       )}
                     </div>
                   </aside>
@@ -393,6 +402,60 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       </div>
       {fullScreenButton}
     </div>
+  );
+}
+
+/** A vuvuzela blowing: sound waves and confetti out of the horn. Green-white-green. */
+const CONFETTI = Array.from({ length: 12 }, (_, i) => {
+  const a = (-25 + (i - 5.5) * 7) * (Math.PI / 180); // spread around the horn's direction
+  const d = 90 + (i % 4) * 30;
+  return {
+    dx: `${Math.round(Math.cos(a) * d)}px`,
+    dy: `${Math.round(Math.sin(a) * d)}px`,
+    color: ['#F2B437', '#FFFFFF', '#1F7A4D', '#E8457A', '#4FC3F7'][i % 5],
+    delay: `${(i % 6) * 0.12}s`,
+  };
+});
+
+function Vuvuzela({ className = '' }: { className?: string }) {
+  return (
+    <svg className={`vuvu ${className}`} viewBox="0 -40 360 240" aria-hidden="true">
+      <defs>
+        <linearGradient id="vuvu-stripes" gradientUnits="userSpaceOnUse" x1="30" y1="170" x2="240" y2="70">
+          <stop offset="0" stopColor="#1F7A4D" />
+          <stop offset=".33" stopColor="#1F7A4D" />
+          <stop offset=".33" stopColor="#FFFFFF" />
+          <stop offset=".66" stopColor="#FFFFFF" />
+          <stop offset=".66" stopColor="#1F7A4D" />
+          <stop offset="1" stopColor="#1F7A4D" />
+        </linearGradient>
+      </defs>
+      <g className="vuvu-waves" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round">
+        <path className="vuvu-wave w1" d="M264.6 26.5 A50 50 0 0 1 289.3 78.3" />
+        <path className="vuvu-wave w2" d="M277 4.7 A75 75 0 0 1 314 82.4" />
+        <path className="vuvu-wave w3" d="M289.3 -17 A100 100 0 0 1 338.6 86.6" />
+      </g>
+      <g className="vuvu-horn">
+        <polygon points="27.8,165.5 223.6,35.6 256.4,104.4 32.2,174.5" fill="url(#vuvu-stripes)" stroke="#0B3D26" strokeWidth="3" strokeLinejoin="round" />
+        <ellipse cx="240" cy="70" rx="11" ry="38" transform="rotate(-25.5 240 70)" fill="#0B3D26" stroke="#F2B437" strokeWidth="4" />
+        <circle cx="27" cy="171" r="9" fill="#F2B437" stroke="#0B3D26" strokeWidth="3" />
+      </g>
+      <g>
+        {CONFETTI.map((c, i) => (
+          <rect
+            key={i}
+            className="vuvu-confetti"
+            x="244"
+            y="64"
+            width="12"
+            height="7"
+            rx="2"
+            fill={c.color}
+            style={{ '--dx': c.dx, '--dy': c.dy, animationDelay: c.delay } as React.CSSProperties}
+          />
+        ))}
+      </g>
+    </svg>
   );
 }
 

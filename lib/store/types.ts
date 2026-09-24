@@ -52,6 +52,8 @@ export interface Store {
   insertTransfer(t: NewTransfer): Promise<{ transfer: Transfer; created: boolean }>;
   /** Newest first. */
   listTransfers(eventId: string, limit?: number): Promise<Transfer[]>;
+  /** Transfers with an id greater than `afterId`, oldest first (so the screen never skips one). */
+  listTransfersAfter(eventId: string, afterId: number, limit?: number): Promise<Transfer[]>;
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
   /** Fill in a description that arrived after the payment was first recorded. */
   setTransferMessage(transferId: number, message: string | null, rawNarration: string | null): Promise<void>;

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 // The big screen asks for this every couple of seconds. If the venue internet
 // drops, the screen asks again later and catches up on what it missed.
-export async function GET(_req: Request, ctx: { params: Promise<{ code: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ code: string }> }) {
   const { code } = await ctx.params;
   const event = await getStore().getEventBySlug(code);
   if (!event || event.deletedAt) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -21,5 +21,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
     after(() => closeEvent(event).catch((err) => console.error('closeEvent failed', err)));
   }
 
-  return NextResponse.json(await screenFeed(event), { headers: { 'Cache-Control': 'no-store' } });
+  const afterId = Number(new URL(req.url).searchParams.get('after'));
+  return NextResponse.json(await screenFeed(event, Number.isFinite(afterId) && afterId > 0 ? afterId : undefined), {
+    headers: { 'Cache-Control': 'no-store' },
+  });
 }
