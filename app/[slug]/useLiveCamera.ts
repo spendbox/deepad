@@ -23,6 +23,7 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
   const [localId, setLocalId] = useState<string | null>(null);
   const [devices, setDevices] = useState<CameraDevice[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [phoneProblem, setPhoneProblem] = useState<string | null>(null);
   const pc = useRef<RTCPeerConnection | null>(null);
   const current = useRef<string | null>(null);
 
@@ -49,7 +50,7 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
         const res = await fetch(`/api/screen/${encodeURIComponent(code)}/camera?${q}&session=${session}`, { cache: 'no-store' });
         const { offer } = (await res.json()) as { offer: string | null };
         if (!offer || current.current !== session) return;
-        const iceServers = await fetchIce(`/api/ice?screen=${encodeURIComponent(code)}&${q}`);
+        const { iceServers } = await fetchIce(`/api/ice?screen=${encodeURIComponent(code)}&${q}`);
         if (current.current !== session) return;
         const peer = new RTCPeerConnection({ iceServers });
         pc.current = peer;
@@ -60,8 +61,13 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
         peer.onconnectionstatechange = () => {
           if (pc.current !== peer) return;
           const st = peer.connectionState;
-          if (st === 'connected') clearTimeout(dropTimer);
-          else if (st === 'failed' || st === 'closed') hangUp();
+          if (st === 'connected') {
+            clearTimeout(dropTimer);
+            setPhoneProblem(null);
+          } else if (st === 'failed') {
+            setPhoneProblem('A phone camera tried to connect, but its video couldn’t get through the network. It keeps trying by itself.');
+            hangUp();
+          } else if (st === 'closed') hangUp();
           else if (st === 'disconnected') {
             clearTimeout(dropTimer);
             dropTimer = setTimeout(() => pc.current === peer && peer.connectionState !== 'connected' && hangUp(), DROP_GRACE_MS);
@@ -164,8 +170,13 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
     [code],
   );
 
+  // A phone is trying to go live, but this screen wasn't opened from the dashboard, so it can't accept it.
+  const phoneNeedsKey = enabled && !key && !localId && !!camera && !camera.answered;
+
   return {
     stream: localStream ?? phoneStream,
+    phoneNeedsKey,
+    phoneProblem: localId ? null : phoneProblem,
     source: localStream ? ('local' as const) : phoneStream ? ('phone' as const) : null,
     canUsePhone: !!key,
     devices,

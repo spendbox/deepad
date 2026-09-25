@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { eventByCameraToken, iceServers, isScreenKey } from '@/lib/camera';
+import { eventByCameraToken, iceServers, isScreenKey, relayConfigured } from '@/lib/camera';
 import { getStore } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -18,5 +18,5 @@ export async function GET(req: Request) {
     allowed = !!event && !event.deletedAt && isScreenKey(event.id, q.get('key'));
   }
   if (!allowed) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-  return NextResponse.json({ iceServers: await iceServers() }, { headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ iceServers: await iceServers(), relay: relayConfigured() }, { headers: { 'Cache-Control': 'no-store' } });
 }

@@ -9,8 +9,12 @@ type State = 'off' | 'starting' | 'preview' | 'connecting' | 'waiting' | 'live' 
 type Facing = 'environment' | 'user';
 
 const MAX_BITRATE = 2_500_000; // sharp enough for a big screen, light enough for venue internet
-const WAITING_AFTER_MS = 10_000; // no big screen answered yet: explain what to check
+const WAITING_AFTER_MS = 6_000; // no big screen answered yet: explain what to check
 const DROP_GRACE_MS = 6000; // a short blip is fine; longer than this and we reconnect
+const FOUND_TIMEOUT_MS = 15_000; // the big screen answered but the video can't get through: try again and say why
+
+/** Where "Go live" has got to, so the camera person always knows what's happening. */
+type Step = 'prep' | 'looking' | 'found';
 
 /**
  * The camera person's phone. It shows the camera, and on "Go live" sends the
@@ -22,6 +26,9 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
   const [facing, setFacing] = useState<Facing>('environment');
   const [error, setError] = useState<string | null>(null);
   const [portrait, setPortrait] = useState(false);
+  const [step, setStep] = useState<Step>('prep');
+  const [problem, setProblem] = useState<string | null>(null);
+  const relayOn = useRef(false);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const pc = useRef<RTCPeerConnection | null>(null);
@@ -86,10 +93,12 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
   const connect = useCallback(async () => {
     if (!stream.current || !wantLive.current) return;
     closeConnection();
-    setState('connecting');
+    setState((s) => (s === 'waiting' ? s : 'connecting'));
+    setStep('prep');
     const id = newSessionId();
     session.current = id;
-    const iceServers = await fetchIce(`/api/ice?camera=${encodeURIComponent(token)}`);
+    const { iceServers, relay } = await fetchIce(`/api/ice?camera=${encodeURIComponent(token)}`);
+    relayOn.current = relay;
     if (session.current !== id) return;
     const peer = new RTCPeerConnection({ iceServers });
     pc.current = peer;
@@ -108,9 +117,10 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       const st = peer.connectionState;
       if (st === 'connected') {
         clearTimeout(dropTimer);
+        setProblem(null);
         setState('live');
       } else if (st === 'failed') {
-        reconnect();
+        blocked();
       } else if (st === 'disconnected') {
         clearTimeout(dropTimer);
         dropTimer = setTimeout(() => pc.current === peer && peer.connectionState !== 'connected' && reconnect(), DROP_GRACE_MS);
@@ -134,16 +144,23 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
         closeConnection();
         return;
       }
-      later(reconnect, 3000); // no internet for a moment: try again
+      // No internet for a moment, or a problem on DashPad's side: say so, and keep trying.
+      setProblem(msg ?? 'Can’t reach DashPad. Check this phone’s internet. Trying again…');
+      session.current = null;
+      closeConnection();
+      later(connect, 4000);
       return;
     }
 
     // Wait for the big screen to answer, then keep checking in so it knows we're still here.
+    setStep('looking');
     const started = Date.now();
+    let foundAt = 0;
     const check = async () => {
       if (pc.current !== peer) return;
       try {
         const r = await fetch(`/api/camera/${token}?session=${id}`, { cache: 'no-store' });
+        if (!r.ok) throw new Error(String(r.status)); // a hiccup, not "replaced": just check again
         const data = (await r.json()) as { active: boolean; answer: string | null };
         if (pc.current !== peer) return;
         if (!data.active) {
@@ -154,8 +171,21 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
           setState('replaced');
           return;
         }
-        if (data.answer && !peer.remoteDescription) await peer.setRemoteDescription({ type: 'answer', sdp: sharpFromTheStart(data.answer) });
+        if (data.answer && !peer.remoteDescription) {
+          // Ask for a sharp picture from the start; if this phone's browser won't take that, use the answer as it is.
+          await peer
+            .setRemoteDescription({ type: 'answer', sdp: sharpFromTheStart(data.answer) })
+            .catch(() => peer.setRemoteDescription({ type: 'answer', sdp: data.answer! }));
+          foundAt = Date.now();
+          setStep('found');
+          setState((s) => (s === 'waiting' ? 'connecting' : s));
+        }
         if (!peer.remoteDescription && Date.now() - started > WAITING_AFTER_MS) setState('waiting');
+        // The big screen answered, but the video still hasn't got through.
+        if (foundAt && peer.connectionState !== 'connected' && Date.now() - foundAt > FOUND_TIMEOUT_MS) {
+          blocked();
+          return;
+        }
       } catch {}
       later(check, peer.connectionState === 'connected' ? 5000 : 1500);
     };
@@ -166,6 +196,17 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       hangUp();
       later(connect, 800);
     }
+
+    // The phone and the big screen found each other but the video can't get through the networks.
+    function blocked() {
+      if (pc.current !== peer) return;
+      setProblem(
+        relayOn.current
+          ? 'The video couldn’t get through to the big screen. Trying again… A stronger connection (or the venue Wi-Fi) will help.'
+          : 'The video can’t get through between this phone’s network and the big screen’s. Trying again… To fix it: connect this phone to the same Wi-Fi as the big-screen laptop, or switch on the free Cloudflare relay (DashPad admin → Setup check).',
+      );
+      reconnect();
+    }
   }, [token, closeConnection, hangUp]);
 
   const goLive = () => {
@@ -175,6 +216,7 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
   const stop = () => {
     wantLive.current = false;
     hangUp();
+    setProblem(null);
     setState('preview');
   };
   const flip = () => {
@@ -239,7 +281,7 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
           {isLive ? (
             <><span className="cam-dot" />Live on the big screen</>
           ) : busy ? (
-            'Connecting…'
+            step === 'found' ? 'Almost live…' : 'Connecting…'
           ) : (
             'Not live'
           )}
@@ -277,11 +319,18 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       {on && (
         <>
           {portrait && <div className="cam-tip">Turn your phone sideways for the best picture.</div>}
-          {state === 'waiting' && (
-            <div className="cam-tip warn">
-              Waiting for the big screen… Make sure it’s open, using <strong>Open big screen</strong> in the DashPad dashboard.
+          {busy && !problem && state !== 'waiting' && (
+            <div className="cam-tip">
+              {step === 'prep' ? 'Getting ready…' : step === 'looking' ? 'Looking for the big screen…' : 'Big screen found. Starting the video…'}
             </div>
           )}
+          {state === 'waiting' && !problem && (
+            <div className="cam-tip warn">
+              No big screen has picked this up yet. On the big-screen laptop, open the event with the <strong>Open big screen</strong> button in the
+              DashPad dashboard (not the normal event link) and leave it open. It connects by itself.
+            </div>
+          )}
+          {busy && problem && <div className="cam-tip warn" role="alert">{problem}</div>}
           {state === 'replaced' && <div className="cam-tip warn">Another camera has gone live, so this one stopped.</div>}
           <footer className="cam-bar">
             <button type="button" className="cam-round" onClick={flip} aria-label="Switch between front and back camera">
