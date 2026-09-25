@@ -33,6 +33,8 @@ export type SprayEvent = {
   recipientLabel: string; // "the couple" -> "₦20,000 sent to the couple"
   /** A preset theme, or 'custom' to use `themeColors`. */
   theme: EventThemeId;
+  /** Secret for the view-only page that shows every line as it arrives (null until first shared). */
+  linesViewToken?: string | null;
   /** The planner's own colours (used when theme is 'custom'). */
   themeColors: ThemeColors | null;
   /** Photos of the celebrants (public image links), shown on the big screen. */
@@ -165,8 +167,11 @@ export type SprayLine = {
   /** Optional photo of the writer; otherwise the screen shows their first letter. */
   photoUrl: string | null;
   source: 'planner' | 'guest';
-  hidden: boolean;
+  /** Guests' lines wait for the planner; only approved lines reach the big screen. */
+  status: LineStatus;
   createdAt: string;
 };
 
-export type NewSprayLine = Omit<SprayLine, 'id' | 'createdAt' | 'hidden'>;
+export type LineStatus = 'pending' | 'approved' | 'rejected';
+
+export type NewSprayLine = Omit<SprayLine, 'id' | 'createdAt'>;

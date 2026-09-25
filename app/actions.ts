@@ -539,15 +539,29 @@ export async function addLine(eventId: string, _prev: FormState, form: FormData)
   if (problem) return { error: problem };
   const photo = await storeLinePhoto(event.id, form);
   if (photo && typeof photo === 'object') return photo;
-  await getStore().createLine({ eventId: event.id, text, authorName: name, photoUrl: photo, source: 'planner' });
+  // The planner's own lines go straight to the screen.
+  await getStore().createLine({ eventId: event.id, text, authorName: name, photoUrl: photo, source: 'planner', status: 'approved' });
   revalidatePath(`/dashboard/events/${eventId}`);
   return { ok: 'Added. It will show on the big screen.' };
 }
 
-export async function setLineHidden(eventId: string, lineId: string, hidden: boolean) {
+/** Approve or reject lines, one or many at once. Only approved lines reach the big screen. */
+export async function setLinesStatus(eventId: string, lineIds: string[], status: 'approved' | 'rejected' | 'pending') {
   await ownEvent(eventId);
-  await getStore().setLineHidden(eventId, lineId, hidden);
+  if (!['approved', 'rejected', 'pending'].includes(status)) return;
+  await getStore().setLinesStatus(eventId, lineIds.slice(0, 1000), status);
   revalidatePath(`/dashboard/events/${eventId}`);
+}
+
+/** The secret view-only link for all lines (made the first time it's asked for; `reset` makes a new one). */
+export async function linesViewLink(eventId: string, reset = false): Promise<string> {
+  const event = await ownEvent(eventId);
+  let token = event.linesViewToken;
+  if (!token || reset) {
+    token = randomBytes(12).toString('base64url');
+    await getStore().updateEvent(eventId, { linesViewToken: token });
+  }
+  return `${await siteUrl()}/lines/${token}`;
 }
 
 export async function deleteLine(eventId: string, lineId: string) {
@@ -582,6 +596,7 @@ export async function submitGuestLine(slug: string, _prev: FormState, form: Form
   const photo = await storeLinePhoto(event.id, form);
   if (photo && typeof photo === 'object') return photo;
   lineTries.set(key, [...recent, now]);
-  await store.createLine({ eventId: event.id, text, authorName: name, photoUrl: photo, source: 'guest' });
+  // Guests' lines wait for the planner's approval before they reach the big screen.
+  await store.createLine({ eventId: event.id, text, authorName: name, photoUrl: photo, source: 'guest', status: 'pending' });
   return { ok: 'sent' };
 }

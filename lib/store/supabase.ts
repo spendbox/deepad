@@ -13,6 +13,7 @@ import type {
   SprayEvent,
   SprayIntent,
   SprayLine,
+  LineStatus,
   Transfer,
 } from '../types';
 import { computeStats, type Store } from './types';
@@ -154,6 +155,10 @@ export class SupabaseStore implements Store {
     const rows = check(await this.db.from('spray_events').select('*').eq('paystack_customer_code', code).limit(1));
     return rows?.[0] ? toEvent(rows[0]) : null;
   }
+  async getEventByLinesToken(token: string) {
+    const rows = check(await this.db.from('spray_events').select('*').eq('lines_view_token', token).limit(1));
+    return rows?.[0] ? toEvent(rows[0]) : null;
+  }
   async listEventsByPlanner(plannerId: string, opts: { includeDeleted?: boolean } = {}) {
     let q = this.db.from('spray_events').select('*').eq('planner_id', plannerId);
     if (!opts.includeDeleted) q = q.is('deleted_at', null);
@@ -290,9 +295,9 @@ export class SupabaseStore implements Store {
   async createLine(l: NewSprayLine) {
     return fromRow<SprayLine>(check(await this.db.from('spray_lines').insert(toRow(l)).select('*').single()) ?? {});
   }
-  async listLines(eventId: string, opts: { includeHidden?: boolean; limit?: number } = {}) {
+  async listLines(eventId: string, opts: { status?: LineStatus[]; limit?: number } = {}) {
     let q = this.db.from('spray_lines').select('*').eq('event_id', eventId);
-    if (!opts.includeHidden) q = q.eq('hidden', false);
+    if (opts.status) q = q.in('status', opts.status);
     const rows = check(await q.order('created_at', { ascending: false }).limit(opts.limit ?? 500));
     return (rows ?? []).map((r: Row) => fromRow<SprayLine>(r));
   }
@@ -301,8 +306,9 @@ export class SupabaseStore implements Store {
     if (res.error) throw new Error(res.error.message);
     return res.count ?? 0;
   }
-  async setLineHidden(eventId: string, lineId: string, hidden: boolean) {
-    check(await this.db.from('spray_lines').update({ hidden }).eq('id', lineId).eq('event_id', eventId));
+  async setLinesStatus(eventId: string, lineIds: string[], status: LineStatus) {
+    if (!lineIds.length) return;
+    check(await this.db.from('spray_lines').update({ status }).in('id', lineIds).eq('event_id', eventId));
   }
   async deleteLine(eventId: string, lineId: string) {
     const rows = check(await this.db.from('spray_lines').delete().eq('id', lineId).eq('event_id', eventId).select('*'));
@@ -324,12 +330,12 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token'],
       ['spray_intents', 'reference, message'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome, raw'],
-      ['spray_lines', 'id, text, author_name, photo_url, hidden'],
+      ['spray_lines', 'id, text, author_name, photo_url, status'],
     ];
     const problems: string[] = [];
     for (const [table, cols] of probes) {

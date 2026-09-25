@@ -1,42 +1,102 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Avatar from '@/components/Avatar';
 import CopyButton from '@/components/CopyButton';
 import LineForm from '@/components/LineForm';
-import type { SprayLine } from '@/lib/types';
-import { addLine, deleteLine, setLineHidden } from '../../../actions';
+import type { LineStatus, SprayLine } from '@/lib/types';
+import { addLine, deleteLine, linesViewLink, setLinesStatus } from '../../../actions';
+
+type Filter = LineStatus | 'all';
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: 'pending', label: 'Waiting' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'all', label: 'All' },
+];
+const STATUS_LABEL: Record<LineStatus, string> = { pending: 'Waiting', approved: 'Approved', rejected: 'Rejected' };
+const REFRESH_MS = 4000;
 
 /**
- * Lines on the big screen: the planner writes some, shares a link so guests
- * can write their own, and can hide or delete any of them.
+ * Lines on the big screen. Guests' lines wait here until the planner approves
+ * them (one by one or all at once); only approved lines reach the screen.
+ * The list updates by itself as new lines arrive.
  */
 export default function LinesCard({
   eventId,
-  lines,
+  initialLines,
   writeLink,
   plannerName,
   celebrantName,
   ended,
 }: {
   eventId: string;
-  lines: SprayLine[];
+  initialLines: SprayLine[];
   writeLink: string;
   plannerName: string;
   celebrantName: string;
   ended: boolean;
 }) {
+  const [lines, setLines] = useState(initialLines);
+  const [filter, setFilter] = useState<Filter>(initialLines.some((l) => l.status === 'pending') ? 'pending' : 'all');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
+  const [viewLink, setViewLink] = useState<string | null>(null);
   const [busy, start] = useTransition();
-  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`Write a line for ${celebrantName}! It will show on the big screen at the party: ${writeLink}`)}`;
-  const shown = lines.filter((l) => !l.hidden).length;
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/events/${eventId}/lines`, { cache: 'no-store' });
+      if (res.ok) setLines(((await res.json()) as { lines: SprayLine[] }).lines);
+    } catch {}
+  }, [eventId]);
+
+  // New lines appear by themselves (checked every few seconds while this page is open).
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, REFRESH_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  const counts = useMemo(() => {
+    const c = { pending: 0, approved: 0, rejected: 0, all: lines.length };
+    for (const l of lines) c[l.status] += 1;
+    return c;
+  }, [lines]);
+  const shown = filter === 'all' ? lines : lines.filter((l) => l.status === filter);
+  const shownSelected = shown.filter((l) => selected.has(l.id));
+  const allShownSelected = shown.length > 0 && shownSelected.length === shown.length;
+
+  function act(ids: string[], status: LineStatus) {
+    if (!ids.length) return;
+    // Show the change at once; the server confirms it.
+    setLines((ls) => ls.map((l) => (ids.includes(l.id) ? { ...l, status } : l)));
+    setSelected(new Set());
+    start(async () => {
+      await setLinesStatus(eventId, ids, status);
+      await refresh();
+    });
+  }
+
+  function toggle(id: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`Write a line for ${celebrantName}! It may show on the big screen at the party: ${writeLink}`)}`;
 
   return (
     <section className="card settings-card" aria-labelledby="lines-h">
       <div className="settings-head">
         <h2 id="lines-h">Lines on the big screen</h2>
         <span className="hint">
-          Short wishes for {celebrantName}, with the writer’s name and photo. They take turns on the big screen.
+          Short wishes for {celebrantName}. Guests’ lines wait for your approval; only approved lines show on the big
+          screen, taking turns over and over.
         </span>
       </div>
 
@@ -52,43 +112,147 @@ export default function LinesCard({
         </div>
       )}
 
+      <div className="stack" style={{ gap: 8 }}>
+        <strong>View-only page</strong>
+        <span className="hint">
+          A live page of every line (approved, rejected and waiting) for someone to watch. They can’t change anything,
+          and it shows no money.
+        </span>
+        {viewLink ? (
+          <div className="share-row">
+            <span className="share-url">{viewLink}</span>
+            <CopyButton text={viewLink} label="Copy link" />
+            <button
+              type="button"
+              className="link-btn"
+              disabled={busy}
+              onClick={() => {
+                if (confirm('Make a new link? The old one will stop working.')) start(async () => setViewLink(await linesViewLink(eventId, true)));
+              }}
+            >
+              Make a new link
+            </button>
+          </div>
+        ) : (
+          <div>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => start(async () => setViewLink(await linesViewLink(eventId)))}>
+              Get the view-only link
+            </button>
+          </div>
+        )}
+      </div>
+
       {adding ? (
         <div className="stack" style={{ gap: 8 }}>
-          <LineForm action={addLine.bind(null, eventId)} defaultName={plannerName} submitLabel="Add line" onSent={() => setAdding(false)} />
+          <LineForm
+            action={addLine.bind(null, eventId)}
+            defaultName={plannerName}
+            submitLabel="Add line"
+            onSent={() => {
+              setAdding(false);
+              refresh();
+            }}
+          />
           <button type="button" className="link-btn" onClick={() => setAdding(false)}>Cancel</button>
         </div>
       ) : (
         <div>
           <button type="button" className="btn btn-dark" onClick={() => setAdding(true)}>+ Write a line</button>
+          <span className="hint" style={{ marginLeft: 10 }}>Yours are approved straight away.</span>
         </div>
       )}
 
-      {lines.length === 0 ? (
-        <p className="empty" style={{ margin: 0 }}>No lines yet. Write one, or share the link with guests.</p>
+      <div className="seg lines-filter" role="group" aria-label="Show lines">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            aria-pressed={filter === f.id}
+            onClick={() => {
+              setFilter(f.id);
+              setSelected(new Set());
+            }}
+          >
+            {f.label} <span className="count">{counts[f.id]}</span>
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="empty" style={{ margin: 0 }}>
+          {filter === 'pending' ? 'Nothing waiting for approval.' : lines.length ? 'No lines here.' : 'No lines yet. Write one, or share the link with guests.'}
+        </p>
       ) : (
         <>
-          <span className="hint">{shown} showing{lines.length > shown ? ` · ${lines.length - shown} hidden` : ''}</span>
+          <div className="bulk-bar">
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={allShownSelected}
+                onChange={() => setSelected(allShownSelected ? new Set() : new Set(shown.map((l) => l.id)))}
+              />
+              <span>{shownSelected.length ? `${shownSelected.length} selected` : 'Select all'}</span>
+            </label>
+            {shownSelected.length > 0 ? (
+              <div className="actions">
+                <button type="button" className="btn btn-sm btn-dark" disabled={busy} onClick={() => act(shownSelected.map((l) => l.id), 'approved')}>
+                  Approve selected
+                </button>
+                <button type="button" className="btn btn-sm" disabled={busy} onClick={() => act(shownSelected.map((l) => l.id), 'rejected')}>
+                  Reject selected
+                </button>
+              </div>
+            ) : (
+              counts.pending > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-dark"
+                  disabled={busy}
+                  onClick={() => act(lines.filter((l) => l.status === 'pending').map((l) => l.id), 'approved')}
+                >
+                  Approve all waiting ({counts.pending})
+                </button>
+              )
+            )}
+          </div>
+
           <ul className="lines-list">
-            {lines.map((l) => (
-              <li key={l.id} className={l.hidden ? 'hidden-line' : ''}>
+            {shown.map((l) => (
+              <li key={l.id} className={`line-${l.status}`}>
+                <input
+                  type="checkbox"
+                  className="line-check"
+                  aria-label={`Select the line by ${l.authorName}`}
+                  checked={selected.has(l.id)}
+                  onChange={() => toggle(l.id)}
+                />
                 <Avatar name={l.authorName} photo={l.photoUrl} size={40} />
                 <div className="line-body">
                   <strong>
-                    {l.authorName} <span className="hint">· {l.source === 'guest' ? 'guest' : 'you'}{l.hidden ? ' · hidden' : ''}</span>
+                    {l.authorName} <span className="hint">· {l.source === 'guest' ? 'guest' : 'you'}</span>{' '}
+                    <span className={`line-pill ${l.status}`}>{STATUS_LABEL[l.status]}</span>
                   </strong>
                   <p>“{l.text}”</p>
                 </div>
                 <div className="line-actions">
-                  <button type="button" className="btn btn-sm" disabled={busy} onClick={() => start(() => setLineHidden(eventId, l.id, !l.hidden))}>
-                    {l.hidden ? 'Show' : 'Hide'}
-                  </button>
+                  {l.status !== 'approved' && (
+                    <button type="button" className="btn btn-sm btn-dark" disabled={busy} onClick={() => act([l.id], 'approved')}>Approve</button>
+                  )}
+                  {l.status !== 'rejected' && (
+                    <button type="button" className="btn btn-sm" disabled={busy} onClick={() => act([l.id], 'rejected')}>Reject</button>
+                  )}
                   <button
                     type="button"
                     className="btn btn-sm"
                     disabled={busy}
                     aria-label={`Delete the line by ${l.authorName}`}
                     onClick={() => {
-                      if (confirm('Delete this line for good?')) start(() => deleteLine(eventId, l.id));
+                      if (!confirm('Delete this line for good?')) return;
+                      setLines((ls) => ls.filter((x) => x.id !== l.id));
+                      start(async () => {
+                        await deleteLine(eventId, l.id);
+                        await refresh();
+                      });
                     }}
                   >
                     Delete

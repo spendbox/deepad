@@ -429,7 +429,8 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
   const newer = afterId != null && Number.isFinite(afterId) ? await store.listTransfersAfter(event.id, afterId, 300) : [];
   const byId = new Map([...latest, ...newer].map((t) => [t.id, t]));
   const transfers = [...byId.values()].sort((a, b) => b.id - a.id);
-  const lines = await store.listLines(event.id, { limit: 40 });
+  // Only approved lines, and plenty of them: the screen cycles through them all.
+  const lines = await store.listLines(event.id, { status: ['approved'], limit: 300 });
   return {
     event: {
       title: event.title,

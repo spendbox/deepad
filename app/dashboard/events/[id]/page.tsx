@@ -46,7 +46,7 @@ export default async function EventPage({
     after(() => closeEvent(event).catch((err) => console.error('closeEvent failed', err)));
   }
 
-  const [transfers, lines] = await Promise.all([store.listTransfers(event.id, 1000), store.listLines(event.id, { includeHidden: true })]);
+  const [transfers, lines] = await Promise.all([store.listTransfers(event.id, 1000), store.listLines(event.id, { limit: 1000 })]);
   const s = summarise(transfers);
   const timeline = eventTimeline(
     transfers.filter((t) => !t.outsideWindow).map((t) => ({ at: new Date(t.createdAt).getTime(), kobo: t.plannerFeeKobo })),
@@ -211,7 +211,7 @@ export default async function EventPage({
 
       <LinesCard
         eventId={event.id}
-        lines={lines}
+        initialLines={lines}
         writeLink={`${link}/write`}
         plannerName={planner.name}
         celebrantName={event.celebrantName}

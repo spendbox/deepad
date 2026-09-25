@@ -20,14 +20,14 @@ const STAY_MS = [0, 9000, 12000, 15000, 18000]; // how long someone sprays, by s
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
-type Props = { code: string; initialFeed: ScreenFeed; writeLink: string };
+type Props = { code: string; initialFeed: ScreenFeed };
 type Sprayer = ActiveSprayer & { until: number; leftAt?: number };
 
 function dayAndClock(iso: string) {
   return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function LiveScreen({ code, initialFeed, writeLink }: Props) {
+export default function LiveScreen({ code, initialFeed }: Props) {
   const [feed, setFeed] = useState(initialFeed);
   const [online, setOnline] = useState(true);
   const seen = useRef(new Set(initialFeed.recent.map((t) => t.id)));
@@ -288,7 +288,6 @@ export default function LiveScreen({ code, initialFeed, writeLink }: Props) {
                 </ul>
               </section>
             )}
-            <a href={`/${code}/write`} className="m-write">Write a line for {e.celebrantName} →</a>
           </>
         )}
         <p className="m-foot">Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</p>
@@ -310,7 +309,6 @@ export default function LiveScreen({ code, initialFeed, writeLink }: Props) {
           online={online}
           photo={photo}
           lines={feed.lines}
-          writeLink={writeLink}
         />
       </div>
       {fullScreenButton}

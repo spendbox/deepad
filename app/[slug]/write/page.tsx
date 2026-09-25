@@ -49,7 +49,7 @@ export default async function WriteLinePage({ params }: Props) {
         )}
         <div className="wl-hero-text">
           <h1>Write a line for {event.celebrantName}</h1>
-          <p>Your line shows on the big screen at the party, with your name and photo if you add one.</p>
+          <p>Approved lines show on the big screen at the party, with your name and photo if you add one.</p>
         </div>
       </section>
 

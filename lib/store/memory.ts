@@ -12,6 +12,7 @@ import type {
   SprayEvent,
   SprayIntent,
   SprayLine,
+  LineStatus,
   Transfer,
 } from '../types';
 import { computeStats, type Store } from './types';
@@ -107,6 +108,9 @@ export class MemoryStore implements Store {
   async getEventByCustomerCode(code: string) {
     return data().events.find((e) => e.paystackCustomerCode === code) ?? null;
   }
+  async getEventByLinesToken(token: string) {
+    return data().events.find((e) => e.linesViewToken === token) ?? null;
+  }
   async listEventsByPlanner(plannerId: string, opts: { includeDeleted?: boolean } = {}) {
     return data()
       .events.filter((e) => e.plannerId === plannerId && (opts.includeDeleted || !e.deletedAt))
@@ -190,22 +194,21 @@ export class MemoryStore implements Store {
   }
 
   async createLine(l: NewSprayLine) {
-    const line: SprayLine = { ...l, id: randomUUID(), hidden: false, createdAt: now() };
+    const line: SprayLine = { ...l, id: randomUUID(), createdAt: now() };
     data().lines.push(line);
     return line;
   }
-  async listLines(eventId: string, opts: { includeHidden?: boolean; limit?: number } = {}) {
+  async listLines(eventId: string, opts: { status?: LineStatus[]; limit?: number } = {}) {
     return data()
-      .lines.filter((l) => l.eventId === eventId && (opts.includeHidden || !l.hidden))
+      .lines.filter((l) => l.eventId === eventId && (!opts.status || opts.status.includes(l.status)))
       .sort(byNewest)
       .slice(0, opts.limit ?? 500);
   }
   async countLines(eventId: string) {
     return data().lines.filter((l) => l.eventId === eventId).length;
   }
-  async setLineHidden(eventId: string, lineId: string, hidden: boolean) {
-    const l = data().lines.find((x) => x.id === lineId && x.eventId === eventId);
-    if (l) l.hidden = hidden;
+  async setLinesStatus(eventId: string, lineIds: string[], status: LineStatus) {
+    for (const l of data().lines) if (l.eventId === eventId && lineIds.includes(l.id)) l.status = status;
   }
   async deleteLine(eventId: string, lineId: string) {
     const d = data();
