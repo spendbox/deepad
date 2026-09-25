@@ -111,6 +111,7 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [slugOk, setSlugOk] = useState(true);
+  const [slugUnlocked, setSlugUnlocked] = useState(false);
 
   // Keep a draft on this phone, so a dropped connection doesn't lose their work.
   useEffect(() => {
@@ -362,8 +363,14 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
                   </div>
                   {slug.length > 0 && (
                     <div className="stack" style={{ gap: 6 }}>
-                      <SlugField value={slug} onChange={(v) => set({ slug: v, slugEdited: true })} onStatus={setSlugOk} />
-                      <span className="hint">The link you open on the big screen. You can change it.</span>
+                      <SlugField
+                        value={slug}
+                        onChange={(v) => set({ slug: v, slugEdited: true })}
+                        onStatus={setSlugOk}
+                        locked={!slugUnlocked}
+                        onUnlock={() => setSlugUnlocked(true)}
+                      />
+                      <span className="hint">Made from the name. It’s the link you share and open on the big screen.</span>
                     </div>
                   )}
                 </div>

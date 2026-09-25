@@ -12,12 +12,17 @@ export default function SlugField({
   exceptEventId,
   name,
   onStatus,
+  locked = false,
+  onUnlock,
 }: {
   value: string;
   onChange: (slug: string) => void;
   exceptEventId?: string;
   name?: string;
   onStatus?: (ok: boolean) => void;
+  /** Show the link as text with a small "Change" button, so it isn't edited by accident. */
+  locked?: boolean;
+  onUnlock?: () => void;
 }) {
   const [host, setHost] = useState('dashpad.ng');
   const [status, setStatus] = useState<Status>({ state: 'idle' });
@@ -48,6 +53,27 @@ export default function SlugField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, exceptEventId]);
 
+  const statusLine = (
+    <>
+      {status.state === 'checking' && <span className="hint">Checking…</span>}
+      {status.state === 'ok' && <span className="ok-text" style={{ fontSize: 14 }}>✓ This link is free</span>}
+      {status.state === 'bad' && <span className="error-text" style={{ fontSize: 14 }}>{status.message}</span>}
+    </>
+  );
+
+  if (locked) {
+    return (
+      <div className="field">
+        <span className="field-label">Your event link</span>
+        <div className="link-locked">
+          <span className="link-locked-url">{host}/{value}</span>
+          <button type="button" className="link-btn" style={{ marginLeft: 'auto', flexShrink: 0 }} onClick={onUnlock}>Change</button>
+        </div>
+        {statusLine}
+      </div>
+    );
+  }
+
   return (
     <div className="field">
       <label htmlFor="slug-input">Your event link</label>
@@ -65,9 +91,7 @@ export default function SlugField({
           onBlur={() => onChange(slugify(value))}
         />
       </div>
-      {status.state === 'checking' && <span className="hint">Checking…</span>}
-      {status.state === 'ok' && <span className="ok-text" style={{ fontSize: 14 }}>✓ This link is free</span>}
-      {status.state === 'bad' && <span className="error-text" style={{ fontSize: 14 }}>{status.message}</span>}
+      {statusLine}
     </div>
   );
 }

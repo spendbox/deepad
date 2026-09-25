@@ -88,7 +88,7 @@ export default function Home() {
           <SprayScene />
           <div className="lp-mock-screen" aria-hidden="true">
             <div className="lp-mock-top">
-              <span>Tolu &amp; Dayo’s wedding</span>
+              <span>Beatrice &amp; Lola’s wedding</span>
               <span className="lp-mock-live">● Live</span>
             </div>
             <div className="lp-mock-pop">
@@ -99,7 +99,7 @@ export default function Home() {
             <div className="lp-mock-bar">
               <span className="lp-mock-label">Transfer to spray</span>
               <span className="lp-mock-acct">0123 456 789</span>
-              <span className="lp-mock-bank">Wema Bank · DashPad/Tolu &amp; Dayo</span>
+              <span className="lp-mock-bank">Wema Bank · DashPad/Beatrice &amp; Lola</span>
             </div>
           </div>
         </div>
