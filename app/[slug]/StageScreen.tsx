@@ -1,42 +1,29 @@
 'use client';
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Arena, type BodyKind } from '@/components/arena';
 import Avatar from '@/components/Avatar';
-import { ConfettiRain, SprayCanvas, type Emitter } from '@/components/Confetti';
+import { SprayCanvas } from '@/components/Confetti';
 import FitText from '@/components/FitText';
-import HypeText from '@/components/HypeText';
 import Logo from '@/components/Logo';
-import { luminance } from '@/lib/colors';
 import type { ScreenFeed, ScreenLine, ScreenTransfer } from '@/lib/events';
 import { isCutout } from '@/lib/photos';
 import type { ScreenTheme } from '@/lib/themes';
 
 // The TV / projector layout, drawn at 1920x1080 and scaled to fit.
-// The celebrant stands in the middle; everyone spraying appears around them
-// as a name tag, throwing confetti onto them. Lines written by the planner
-// and guests take turns on the left. The account number stays huge at the
-// bottom. Amounts are never shown.
+// The celebrant stands in the middle. Everyone spraying floats around them as
+// a name tag throwing confetti; approved lines pop up around them in turns.
+// Name tags and lines drift and bounce off each other, so nothing overlaps.
+// The account number stays huge at the bottom. Amounts are never shown.
 
-/** Where sprayers' name tags stand around the celebrant (tag centres, stage pixels). */
-const SLOTS: { x: number; y: number }[] = [
-  { x: 1690, y: 150 },
-  { x: 810, y: 560 },
-  { x: 1620, y: 290 },
-  { x: 520, y: 600 },
-  { x: 1730, y: 420 },
-  { x: 760, y: 675 },
-  { x: 1630, y: 550 },
-  { x: 300, y: 670 },
-  { x: 1730, y: 670 },
-  { x: 1560, y: 90 },
-];
-export const SPRAY_SLOTS = SLOTS.length;
+export const SPRAY_SLOTS = 12; // people spraying at once; the rest wait their turn
 
-// The confetti canvas covers the area around the celebrant only (cheaper than the whole screen).
-const CANVAS = { left: 150, top: 40, width: 1770, height: 712 };
-const TARGET = { x: [1100 - CANVAS.left, 1380 - CANVAS.left] as [number, number], y: [200 - CANVAS.top, 540 - CANVAS.top] as [number, number] };
-const LINE_MS = 7000; // each line stays up this long, then the next one (cycling through all approved lines)
-const BS_BACKGROUND = { color: 'var(--s-on-accent)', glow: 'var(--s-accent)', glowX: 1480, glowY: 460, glowRadius: 680 };
+const ARENA = { x0: 50, y0: 118, x1: 1870, y1: 738 };
+const CELEBRANT_ZONE = { x0: 770, y0: 60, x1: 1150, y1: 760 }; // nothing floats over (or above) the celebrant
+const CANVAS = { left: 0, top: 60, width: 1920, height: 700 };
+const TARGET = { x: [850 - CANVAS.left, 1070 - CANVAS.left] as [number, number], y: [220 - CANVAS.top, 560 - CANVAS.top] as [number, number] };
+const MAX_LINES = 3; // lines on screen at once (fewer when a big crowd is spraying)
+const LINE_GAP_MS = 1300; // time between one line popping up and the next
 
 export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean };
 
@@ -53,37 +40,60 @@ function bubble(t: ScreenTransfer) {
 function monogram(name: string) {
   return name.split(/[\s&]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join(' & ');
 }
+/** Each line stays up 2 to 5 seconds: longer lines get longer. */
+export function lineDuration(text: string) {
+  return Math.round(Math.min(5000, Math.max(2000, 1600 + text.length * 40)));
+}
+
+/** Puts its element into the arena on mount and takes it out on unmount. */
+function ArenaBody({
+  arena,
+  id,
+  kind,
+  big,
+  perSecond,
+  leaving,
+  children,
+}: {
+  arena: Arena;
+  id: string;
+  kind: BodyKind;
+  big?: boolean;
+  perSecond?: number;
+  leaving: boolean;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (ref.current) arena.add(id, ref.current, { kind, big, perSecond });
+    return () => arena.remove(id);
+  }, [arena, id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => arena.setLeaving(id, leaving), [arena, id, leaving]);
+  return (
+    <div ref={ref} className="ab">
+      {children}
+    </div>
+  );
+}
 
 type Props = {
   e: ScreenFeed['event'];
   theme: ScreenTheme;
   acct: string | null;
   sprayers: ActiveSprayer[];
-  big: ScreenTransfer | null;
   paused: boolean;
   online: boolean;
   photo: string | null;
   lines: ScreenLine[];
 };
 
-function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lines }: Props) {
+function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }: Props) {
   const live = e.phase === 'live';
   const cutout = photo ? isCutout(photo) : false;
-
-  const emitters = useMemo<Emitter[]>(
-    () =>
-      live && !big
-        ? sprayers
-            .filter((s) => !s.leaving)
-            .map((s) => ({
-              id: s.t.id,
-              x: SLOTS[s.slot].x - CANVAS.left,
-              y: SLOTS[s.slot].y - CANVAS.top,
-              perSecond: s.t.weight >= 3 ? 2 : s.t.weight === 2 ? 1.5 : 1, // one or two throws a second
-            }))
-        : [],
-    [sprayers, live, big],
-  );
+  const arena = useMemo(() => new Arena(ARENA, [CELEBRANT_ZONE]), []);
+  useEffect(() => () => arena.stop(), [arena]);
+  const spraying = sprayers.some((s) => !s.leaving);
+  const crowd = sprayers.filter((s) => !s.leaving).length;
 
   const status = !online ? (
     <span className="st-status offline" role="status">Reconnecting… transfers still work</span>
@@ -104,7 +114,47 @@ function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lin
         </div>
       </header>
 
-      {live ? <LineStack lines={lines} celebrantName={e.celebrantName} /> : (
+      {/* The celebrant, in the middle */}
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`st-photo fade-in${cutout ? ' cutout' : ''}`} />
+      ) : (
+        <div className="st-monogram" aria-hidden="true">{monogram(e.celebrantName)}</div>
+      )}
+
+      {live ? (
+        <>
+          {!spraying && !lines.length && <div className="st-hello">Spray {e.celebrantName}!</div>}
+          <SprayCanvas
+            source={() => arena.emitters().map((m) => ({ ...m, x: m.x - CANVAS.left, y: m.y - CANVAS.top }))}
+            active={spraying}
+            target={TARGET}
+            width={CANVAS.width}
+            height={CANVAS.height}
+            style={{ left: CANVAS.left, top: CANVAS.top, zIndex: 4 }}
+          />
+          <div className={`st-arena${crowd >= 8 ? ' packed' : crowd >= 5 ? ' crowd' : ''}`} aria-live="polite">
+            {sprayers.map((s) => (
+              <ArenaBody
+                key={`s${s.t.id}`}
+                arena={arena}
+                id={`s${s.t.id}`}
+                kind="sprayer"
+                big={s.t.big}
+                perSecond={s.t.big ? 4 : s.t.weight >= 3 ? 2 : s.t.weight === 2 ? 1.5 : 1}
+                leaving={s.leaving}
+              >
+                <div className={`sp-tag${s.t.big ? ' big' : ''}${s.leaving ? ' leaving' : ''}`}>
+                  {s.t.big && <span className="sp-badge">Big spray!</span>}
+                  <Avatar name={s.t.firstName ?? 'Guest'} size={s.t.big ? 84 : 56} letters={bubble(s.t)} />
+                  <span className="sp-name">{s.t.firstName ?? 'A guest'}</span>
+                </div>
+              </ArenaBody>
+            ))}
+            <LineCycler lines={lines} arena={arena} max={crowd >= 8 ? 1 : crowd >= 5 ? 2 : MAX_LINES} />
+          </div>
+        </>
+      ) : (
         <div className="st-notice">
           <div className="st-notice-big">{e.phase === 'upcoming' ? 'Spraying opens soon' : 'Thank you for spraying!'}</div>
           <div className="st-notice-sub">
@@ -115,36 +165,9 @@ function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lin
         </div>
       )}
 
-      {/* The celebrant */}
-      {photo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`st-photo fade-in${cutout ? ' cutout' : ''}`} />
-      ) : (
-        <div className="st-monogram" aria-hidden="true">{monogram(e.celebrantName)}</div>
-      )}
-
-      {/* Everyone spraying right now, around the celebrant */}
-      {live && (
-        <>
-          <SprayCanvas emitters={emitters} target={TARGET} width={CANVAS.width} height={CANVAS.height} style={{ left: CANVAS.left, top: CANVAS.top, zIndex: 4 }} />
-          <ul className="st-sprayers" aria-label="Spraying now">
-            {sprayers.map((s) => (
-              <li
-                key={s.t.id}
-                className={`sp-tag${s.leaving ? ' leaving' : ''}`}
-                style={{ left: SLOTS[s.slot].x, top: SLOTS[s.slot].y, animationDelay: `${(s.t.id % 7) * -0.23}s` }}
-              >
-                <Avatar name={s.t.firstName ?? 'Guest'} size={56} letters={bubble(s.t)} />
-                <span className="sp-name">{s.t.firstName ?? 'A guest'}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
       <div className="st-rule" />
 
-      {/* The account number: always on screen, as big as it goes */}
+      {/* The account number: always on screen, as big as it goes, with the bank right beside it */}
       <footer className="st-pay">
         {live && acct ? (
           <>
@@ -164,8 +187,6 @@ function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lin
           <div className="st-pay-label">Thank you for celebrating with DashPad.</div>
         )}
       </footer>
-
-      {big && live && <BigSpray key={`b${big.id}`} t={big} e={e} acct={acct} photo={photo} theme={theme} />}
     </div>
   );
 }
@@ -173,108 +194,80 @@ function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lin
 // Re-draw only when something on screen changes, not on every clock tick.
 export default memo(StageScreen);
 
-/** Lines take turns: the current one in front, the last two drifting back. */
-function LineStack({ lines, celebrantName }: { lines: ScreenLine[]; celebrantName: string }) {
-  const [order, setOrder] = useState<string[]>([]); // line ids in the order they were shown
-  // The screen refreshes every 2 seconds; only react when the lines themselves change.
+type ShownLine = { key: string; line: ScreenLine; until: number; leaving: boolean };
+
+/**
+ * Approved lines pop up around the celebrant, a few at a time, each for 2 to 5
+ * seconds (longer lines stay longer), cycling through all of them endlessly.
+ * A newly approved line jumps the queue.
+ */
+function LineCycler({ lines, arena, max }: { lines: ScreenLine[]; arena: Arena; max: number }) {
+  const [shown, setShown] = useState<ShownLine[]>([]);
   const linesRef = useRef(lines);
   linesRef.current = lines;
+  const maxRef = useRef(max);
+  maxRef.current = max;
+  const next = useRef(0);
+  const known = useRef<Set<string> | null>(null);
+  const priority = useRef<string[]>([]);
+  const lastPop = useRef(0);
+  const count = useRef(0);
+
+  // Newly approved lines go to the front of the queue.
   const key = lines.map((l) => l.id).join(',');
-
-  const known = useRef<Set<string> | null>(null); // every line id seen so far
-
-  // A newly approved line goes straight to the front; otherwise they take turns, over and over.
   useEffect(() => {
-    const ls = linesRef.current;
-    if (!ls.length) return;
-    const first = known.current === null;
-    const seen = (known.current ??= new Set());
-    const fresh = first ? undefined : ls.find((l) => !seen.has(l.id));
-    ls.forEach((l) => seen.add(l.id));
-    setOrder((o) => (o.length === 0 ? [ls[0].id] : fresh ? [...o.slice(-20), fresh.id] : o));
-  }, [key]);
+    const seen = known.current;
+    if (seen) for (const l of lines) if (!seen.has(l.id)) priority.current.push(l.id);
+    known.current = new Set(lines.map((l) => l.id));
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
-    if (linesRef.current.length < 2) return;
     const id = setInterval(() => {
-      setOrder((o) => {
+      const now = Date.now();
+      setShown((cur) => {
+        let list = cur
+          .filter((s) => !(s.leaving && now >= s.until + 450)) // gone after fading out
+          .map((s) => (!s.leaving && now >= s.until ? { ...s, leaving: true } : s));
         const ls = linesRef.current;
-        const current = ls.findIndex((l) => l.id === o[o.length - 1]);
-        const next = ls[(current + 1) % ls.length] ?? ls[0];
-        return [...o.slice(-20), next.id];
+        const onScreen = new Set(list.map((s) => s.line.id));
+        const active = list.filter((s) => !s.leaving).length;
+        const room = Math.min(maxRef.current, ls.length);
+        if (ls.length && active < room && now - lastPop.current >= LINE_GAP_MS) {
+          let pick: ScreenLine | undefined;
+          while (priority.current.length && !pick) {
+            const pid = priority.current.shift()!;
+            pick = ls.find((l) => l.id === pid && !onScreen.has(l.id));
+          }
+          for (let tries = 0; !pick && tries < ls.length; tries++) {
+            const cand = ls[next.current % ls.length];
+            next.current += 1;
+            if (!onScreen.has(cand.id)) pick = cand;
+          }
+          if (pick) {
+            lastPop.current = now;
+            count.current += 1;
+            list = [...list, { key: `l${pick.id}-${count.current}`, line: pick, until: now + lineDuration(pick.text), leaving: false }];
+          }
+        }
+        return list.length === cur.length && list.every((s, i) => s === cur[i]) ? cur : list;
       });
-    }, LINE_MS);
+    }, 250);
     return () => clearInterval(id);
-  }, [key]);
+  }, []);
 
-  const byId = new Map(lines.map((l) => [l.id, l]));
-  // The last three shown, most recent last, each line only once.
-  const recent: ScreenLine[] = [];
-  for (let i = order.length - 1; i >= 0 && recent.length < 3; i--) {
-    const l = byId.get(order[i]);
-    if (l && !recent.includes(l)) recent.unshift(l);
-  }
-
-  if (!recent.length) {
-    return (
-      <div className="st-lines">
-        <div className="st-hello">Spray {celebrantName}!</div>
-      </div>
-    );
-  }
   return (
-    <div className="st-lines" aria-live="polite">
-      {recent.map((l, i) => {
-        const age = recent.length - 1 - i;
-        return (
-          <div key={l.id} className={`ln-item age-${age}`}>
+    <>
+      {shown.map((s) => (
+        <ArenaBody key={s.key} arena={arena} id={s.key} kind="line" leaving={s.leaving}>
+          <div className={`ln-bubble${s.leaving ? ' leaving' : ''}`}>
             <div className="ln-head">
-              <Avatar name={l.name} photo={l.photo} size={56} />
-              <span className="ln-name">{l.name}</span>
+              <Avatar name={s.line.name} photo={s.line.photo} size={46} />
+              <span className="ln-name">{s.line.name}</span>
             </div>
-            <div className="ln-text">“{l.text}”</div>
+            <div className="ln-text">“{s.line.text}”</div>
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** A big spray takes over the whole screen for 15 seconds: the sprayer's name, huge. */
-function BigSpray({ t, e, acct, photo, theme }: { t: ScreenTransfer; e: ScreenFeed['event']; acct: string | null; photo: string | null; theme: ScreenTheme }) {
-  const cutout = photo ? isCutout(photo) : false;
-  return (
-    <div className="bs" role="status">
-      <ConfettiRain width={1920} height={1080} seed={t.id} count={t.weight >= 4 ? 130 : 100} background={BS_BACKGROUND} />
-      <header className="st-top bs-top">
-        <div className="st-top-left">
-          <Logo size={30} tone={luminance(theme.onAccent) > 0.4 ? 'light' : 'dark'} />
-          <span className="st-event">{e.title}</span>
-        </div>
-      </header>
-      {photo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photo} alt="" className={`st-photo bs-photo${cutout ? ' cutout' : ''}`} />
-      ) : (
-        <div className="st-monogram bs-monogram" aria-hidden="true">{monogram(e.celebrantName)}</div>
-      )}
-      <div className="bs-kicker"><HypeText text="Big spray!" /></div>
-      <div className="bs-main">
-        <div className="bs-who">
-          <Avatar name={t.firstName ?? 'Guest'} size={150} letters={bubble(t)} className="bs-avatar" />
-          <FitText className="bs-name" text={t.firstName ?? 'A guest'} max={200} />
-        </div>
-        <div className="bs-sub">is spraying {e.celebrantName}!</div>
-      </div>
-      <div className="bs-rule" />
-      {acct && (
-        <div className="bs-pay">
-          <div className="bs-pay-label">Join the spray. Transfer any amount to</div>
-          <div className="bs-pay-row">
-            <span className="bs-acct">{acct}</span>
-            <span className="bs-bank">{e.accountBank}</span>
-          </div>
-        </div>
-      )}
-    </div>
+        </ArenaBody>
+      ))}
+    </>
   );
 }
