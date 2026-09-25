@@ -158,6 +158,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const e = feed.event;
   // Live video of the celebrant: only on the big screen, never on guests' phones.
   const cam = useLiveCamera(code, feed.camera, ready && !compact && e.phase !== 'ended');
+  const camNotice = cam.phoneNeedsKey
+    ? 'A phone camera is trying to go live. To show it, open this screen with the “Open big screen” button in your DashPad dashboard.'
+    : cam.source
+      ? null
+      : cam.phoneProblem;
   const colorsKey = JSON.stringify(e.themeColors ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const theme = useMemo(() => resolveTheme(e.theme, e.themeColors), [e.theme, colorsKey]);
@@ -313,7 +318,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           video={cam.stream}
         />
       </div>
-      <div className={`scr-controls${showControls || camMenu ? '' : ' hidden'}`}>
+      <div className={`scr-controls${showControls || camMenu || camNotice ? '' : ' hidden'}`}>
+        {camNotice && !camMenu && <div className="cam-notice" role="status">{camNotice}</div>}
         {camMenu && (
           <div className="cam-menu" role="menu">
             <div className="cam-menu-h">Show live video from</div>

@@ -20,7 +20,15 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!body?.session || !SESSION_RE.test(body.session) || typeof body.offer !== 'string' || !body.offer.startsWith('v=') || body.offer.length > MAX_SDP) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
-  await getStore().startCamera(event.id, body.session, body.offer);
+  try {
+    await getStore().startCamera(event.id, body.session, body.offer);
+  } catch (err) {
+    console.error('startCamera failed', err);
+    return NextResponse.json(
+      { error: 'DashPad’s database isn’t ready for the live camera yet. The DashPad admin needs to run the latest supabase/schema.sql in Supabase.' },
+      { status: 503 },
+    );
+  }
   return NextResponse.json({ ok: true }, { headers: noStore });
 }
 
@@ -31,8 +39,15 @@ export async function GET(req: Request, ctx: Ctx) {
   const session = new URL(req.url).searchParams.get('session') ?? '';
   if (!SESSION_RE.test(session)) return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   const store = getStore();
-  const active = eventPhase(event) !== 'ended' && (await store.touchCamera(event.id, session));
-  const cam = active ? await store.getCamera(event.id) : null;
+  let active = false;
+  let cam = null;
+  try {
+    active = eventPhase(event) !== 'ended' && (await store.touchCamera(event.id, session));
+    cam = active ? await store.getCamera(event.id) : null;
+  } catch (err) {
+    console.error('camera check failed', err);
+    return NextResponse.json({ error: 'Server problem' }, { status: 503 });
+  }
   return NextResponse.json(
     { active, answer: cam?.sessionId === session ? cam.answer : null },
     { headers: noStore },

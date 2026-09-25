@@ -3,12 +3,15 @@
 export type IceServers = RTCIceServer[];
 
 /** Connection addresses from our server (free STUN, plus Cloudflare's relay when set up). */
-export async function fetchIce(url: string): Promise<IceServers> {
+export async function fetchIce(url: string): Promise<{ iceServers: IceServers; relay: boolean }> {
   try {
     const res = await fetch(url, { cache: 'no-store' });
-    if (res.ok) return ((await res.json()) as { iceServers: IceServers }).iceServers;
+    if (res.ok) {
+      const body = (await res.json()) as { iceServers: IceServers; relay?: boolean };
+      return { iceServers: body.iceServers, relay: !!body.relay };
+    }
   } catch {}
-  return [{ urls: 'stun:stun.l.google.com:19302' }];
+  return { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], relay: false };
 }
 
 /**
