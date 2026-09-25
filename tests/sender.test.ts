@@ -24,3 +24,10 @@ test('sender name: never the receiving account, a bank or a reference', () => {
   assert.equal(findSenderName({ authorization: { narration: 'TRF FRM GTBANK PLC REF 000123' } }, receivers), null);
   assert.equal(findSenderName({ authorization: { narration: 'Happy birthday!' } }, receivers), null);
 });
+
+import { bankFromReference } from '../lib/narration.ts';
+
+test('sending bank from a bank transfer reference', () => {
+  assert.equal(bankFromReference('00001320260925232840000000018005845'), 'GTBank');
+  assert.equal(bankFromReference('RABC123'), null);
+});

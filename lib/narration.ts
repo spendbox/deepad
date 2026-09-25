@@ -114,3 +114,20 @@ export function findSenderName(data: unknown, receivers: string[]): string | nul
   }
   return null;
 }
+
+// The national (NIP) code of the SENDING bank starts a bank transfer's reference,
+// e.g. "000013…" for GTBank. Used when Paystack doesn't say which bank sent it.
+const NIP_BANKS: Record<string, string> = {
+  '000001': 'Sterling Bank', '000002': 'Keystone Bank', '000003': 'FCMB', '000004': 'UBA', '000005': 'Access (Diamond)',
+  '000006': 'Jaiz Bank', '000007': 'Fidelity Bank', '000008': 'Polaris Bank', '000009': 'Citibank', '000010': 'Ecobank',
+  '000011': 'Unity Bank', '000012': 'Stanbic IBTC', '000013': 'GTBank', '000014': 'Access Bank', '000015': 'Zenith Bank',
+  '000016': 'First Bank', '000017': 'Wema Bank', '000018': 'Union Bank', '000020': 'Heritage Bank', '000021': 'Standard Chartered',
+  '000022': 'Suntrust Bank', '000023': 'Providus Bank', '000025': 'Titan Trust Bank', '000026': 'Taj Bank', '000027': 'Globus Bank',
+  '000029': 'Lotus Bank', '000030': 'Parallex Bank', '000031': 'Premium Trust Bank', '000033': 'eNaira',
+  '100004': 'OPay', '100033': 'PalmPay', '090267': 'Kuda', '090405': 'Moniepoint', '100002': 'Paga', '090110': 'VFD',
+};
+
+export function bankFromReference(reference: string | null | undefined): string | null {
+  const m = /^(\d{6})\d{20,}$/.exec(reference ?? '');
+  return m ? NIP_BANKS[m[1]] ?? null : null;
+}

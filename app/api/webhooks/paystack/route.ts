@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { collectNarrations, receiverNames, recordTransfer } from '@/lib/events';
-import { findSenderName } from '@/lib/narration';
+import { after, NextResponse } from 'next/server';
+import { collectNarrations, receiverNames, recordTransfer, senderNameLater } from '@/lib/events';
+import { bankFromReference, findSenderName } from '@/lib/narration';
 import { isValidPaystackSignature } from '@/lib/paystack-signature';
 import { getStore } from '@/lib/store';
 import type { NewPaymentLog } from '@/lib/types';
@@ -8,6 +8,7 @@ import type { NewPaymentLog } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 type ChargeData = {
+  id?: number;
   status?: string;
   reference?: string;
   amount?: number; // kobo
@@ -106,11 +107,13 @@ export async function POST(req: Request) {
       amountKobo,
       // Some banks (e.g. GTBank) leave sender_name empty: look in the rest of the notification too.
       senderName: findSenderName(data, receiverNames(event)),
-      senderBank: auth.sender_bank ?? null,
+      senderBank: auth.sender_bank ?? bankFromReference(reference),
       narrations,
       paidAt: data.paid_at ?? null,
       processingFeeKobo: Number(data.fees ?? 0) || 0,
     });
+    // No name in the notification: ask Paystack once more for the full payment, in the background.
+    if (!transfer.senderName && data.id) after(() => senderNameLater(event, transfer.id, data.id!).catch(() => {}));
     await log({
       paystackEvent: kind,
       reference,

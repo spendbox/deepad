@@ -219,7 +219,7 @@
 .st.phone .ln-text { font-size: 19px; }
 .st.phone .st-monogram { width: 300px; height: 300px; }
 
-.st-pay.m { left: 12px; right: 12px; bottom: 12px; height: 296px; padding: 34px 20px 14px; gap: 10px; border-radius: 26px; justify-content: flex-start; }
+.st-pay.m { left: 12px; right: 12px; bottom: 12px; height: 232px; padding: 34px 20px 16px; gap: 10px; border-radius: 26px; justify-content: flex-start; }
 .st-pay.m .st-pay-tab { left: 18px; gap: 8px; padding: 7px 16px 7px 12px; font-size: 17px; }
 .st-pay.m .st-pay-tab svg { width: 18px; height: 18px; }
 .st-pay.m .st-pay-label { font-size: 12px; letter-spacing: .1em; }
@@ -231,7 +231,7 @@
   display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 14px; padding-top: 10px;
   border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
 }
-.mp-note { margin-top: auto; font-family: var(--body); font-size: 13px; line-height: 1.35; color: var(--s-muted); }
+.mp-note { margin-top: 2px; font-family: var(--body); font-size: 13px; line-height: 1.35; color: var(--s-muted); }
 .st-pay.m.quiet { height: 140px; padding: 0 20px; }
 .st-pay.m .st-pay-quiet { font-size: 28px; text-align: center; }
 .st.phone .st-notice { left: 20px; right: 20px; top: 84px; width: auto; gap: 10px; padding: 22px; border-radius: 22px; background: var(--s-panel); }

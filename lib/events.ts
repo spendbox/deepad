@@ -10,12 +10,13 @@ import {
   createSubaccount,
   deactivateDedicatedAccount,
   getCustomerId,
+  getTransaction,
   listCustomerTransactions,
   paystackConfigured,
 } from './paystack';
 import { getStore } from './store';
 export { collectNarrations } from './narration';
-import { collectNarrations, findSenderName, pickNarration } from './narration';
+import { bankFromReference, collectNarrations, findSenderName, pickNarration } from './narration';
 import { cleanNarration, senderFirstName, senderInitials } from './text';
 import type { MoneyRow, Planner, SprayEvent, Transfer } from './types';
 import type { ThemeColors } from './themes';
@@ -177,6 +178,23 @@ export async function recordTransfer(
   return result;
 }
 
+/**
+ * A payment came without the sender's name (some banks, e.g. GTBank, don't send it).
+ * Ask Paystack for the full payment a little later, and fill the name in if it's there now.
+ */
+export async function senderNameLater(event: SprayEvent, transferId: number, paystackId: number | string): Promise<void> {
+  if (!paystackConfigured()) return;
+  for (const wait of [2000, 6000]) {
+    await new Promise((r) => setTimeout(r, wait));
+    const tx = await getTransaction(paystackId).catch(() => null);
+    const name = tx ? findSenderName(tx, receiverNames(event)) : null;
+    if (name) {
+      await getStore().setTransferSender(transferId, name, tx?.authorization?.sender_bank ?? null);
+      return;
+    }
+  }
+}
+
 /** Names of the event's own receiving account, which must never be shown as a guest's message. */
 export function receiverNames(event: SprayEvent): string[] {
   return [event.accountName, process.env.PAYSTACK_BUSINESS_NAME, 'DashPad'].filter((n): n is string => !!n);
@@ -254,7 +272,7 @@ export async function checkPaystackForTransfers(event: SprayEvent, opts: { force
         reference: tx.reference,
         amountKobo,
         senderName,
-        senderBank: auth.sender_bank ?? null,
+        senderBank: auth.sender_bank ?? bankFromReference(tx.reference),
         narrations: collectNarrations(tx),
         paidAt: tx.paid_at ?? tx.paidAt ?? null,
         processingFeeKobo: Number(tx.fees ?? 0) || 0,
