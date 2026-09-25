@@ -165,29 +165,60 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
         </div>
       )}
 
-      <div className="st-rule" />
-
-      {/* The account number: always on screen, as big as it goes, with the bank right beside it */}
-      <footer className="st-pay">
+      {/* How to spray: a clean card with the account number, and the bank right beside it */}
+      <footer className={`st-pay${live && acct ? '' : ' quiet'}`}>
         {live && acct ? (
           <>
-            <div className="st-pay-label">Transfer to spray</div>
-            <div className="st-pay-row">
-              <FitText className="st-acct" text={acct} max={150} />
-              <FitText className="st-bank" text={e.accountBank ?? ''} max={120} />
+            <div className="st-pay-tab">
+              <BankIcon />
+              Transfer any amount to spray {e.celebrantName}
             </div>
-            <div className="st-pay-note">
-              {e.accountName && <span className="st-acct-name">{e.accountName}</span>}
-              <span>Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</span>
+            <div className="st-pay-main">
+              <div className="st-pay-field">
+                <div className="st-pay-label">Account number</div>
+                <FitText className="st-acct" text={acct} max={128} />
+              </div>
+              <div className="st-pay-divider" aria-hidden="true" />
+              <div className="st-pay-field">
+                <div className="st-pay-label">Bank</div>
+                <FitText className="st-bank" text={e.accountBank ?? ''} max={112} />
+              </div>
+            </div>
+            <div className="st-pay-foot">
+              {e.accountName ? (
+                <span className="st-acct-name">
+                  <span className="st-pay-k">Account name</span> {e.accountName}
+                </span>
+              ) : <span />}
+              <span className="st-pay-note">
+                <ClockIcon />
+                Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.
+              </span>
             </div>
           </>
         ) : live ? (
-          <div className="st-acct" style={{ fontSize: 88 }}>Account number coming soon</div>
+          <div className="st-pay-quiet">Account number coming soon</div>
         ) : (
-          <div className="st-pay-label">Thank you for celebrating with DashPad.</div>
+          <div className="st-pay-quiet">Thank you for celebrating with DashPad.</div>
         )}
       </footer>
     </div>
+  );
+}
+
+function BankIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 10 12 4l9 6" /><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8" /><path d="M3 20h18" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+    </svg>
   );
 }
 
