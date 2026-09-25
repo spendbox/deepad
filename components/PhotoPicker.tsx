@@ -26,7 +26,7 @@ export default function PhotoPicker({
 }: {
   value: string[];
   onChange: (urls: string[]) => void;
-  /** Background removal (Photoroom) is set up. */
+  /** Background removal (FAPIhub or Photoroom) is set up. */
   canRemoveBg?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);

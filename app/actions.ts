@@ -18,7 +18,7 @@ import { MAX_HYPE_LENGTH, MAX_HYPE_LINES } from '@/lib/hype';
 import { getStore } from '@/lib/store';
 import { cleanDisplayName, cleanMessage } from '@/lib/text';
 import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
-import { photoroomConfigured, removeBackground } from '@/lib/photoroom';
+import { cutoutsConfigured, removeBackground } from '@/lib/cutouts';
 import type { Planner, SprayEvent } from '@/lib/types';
 
 type FormState = { error?: string; ok?: string } | null;
@@ -342,8 +342,8 @@ function ownPhotos(urls: unknown, plannerId: string): string[] {
 }
 
 /**
- * Upload one photo (already shrunk on the phone). With `removeBg`, Photoroom
- * cuts out the people first; if that fails, the original photo is kept.
+ * Upload one photo (already shrunk on the phone). With `removeBg`, the cut-out
+ * service removes the background first; if that fails, the original photo is kept.
  * Returns its public link.
  */
 export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: string; note?: string } | { error: string }> {
@@ -358,14 +358,14 @@ export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: strin
   let type = file.type;
   let name = `${randomUUID()}.${ext}`;
   let note: string | undefined;
-  if (form.get('removeBg') === '1' && photoroomConfigured()) {
+  if (form.get('removeBg') === '1' && cutoutsConfigured()) {
     try {
       const cut = await removeBackground(file);
-      if (cut.byteLength > MAX_PHOTO_BYTES) throw new Error('cut-out too large');
-      bytes = cut;
-      type = 'image/png';
+      if (cut.bytes.byteLength > MAX_PHOTO_BYTES) throw new Error('cut-out too large');
+      bytes = cut.bytes;
+      type = cut.type;
       // Marked, so the big screen shows it without a frame.
-      name = `${randomUUID()}-cutout.png`;
+      name = `${randomUUID()}-cutout.webp`;
     } catch (err) {
       console.error('Background removal failed', err);
       note = 'We couldn’t remove the background from this photo, so we kept it as it is.';

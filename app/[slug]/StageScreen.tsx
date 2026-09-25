@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { ConfettiBurst, ConfettiRain } from '@/components/Confetti';
 import FitText from '@/components/FitText';
 import HypeText from '@/components/HypeText';
@@ -13,16 +13,19 @@ import { luminance } from '@/lib/colors';
 import type { ScreenTheme } from '@/lib/themes';
 
 // The TV / projector layout, drawn at 1920x1080 and scaled to fit.
-// Newest spray big at the bottom left, older ones drifting back towards the
-// celebrant (only their messages: no list of amounts), confetti arcing from
-// the spray onto the celebrant, and the account number always huge.
+// Newest spray big at the bottom left with the sender's initials under it,
+// the hype line dancing above it, older messages drifting back towards the
+// celebrant (no list of amounts), confetti arcing from the spray onto the
+// celebrant, and the account number always huge.
 
-const ORIGIN = { x: 230, y: 660 };
+const ORIGIN = { x: 230, y: 620 };
 const LAND_WITH_PHOTO: [number, number] = [1060, 1860];
 const LAND_NO_PHOTO: [number, number] = [320, 1820];
 const PEAK_Y: [number, number] = [40, 300];
-const LAND_Y: [number, number] = [520, 820];
+const LAND_Y: [number, number] = [520, 780];
 const STACK = 4; // newest + 3 drifting back
+// Big spray: the theme's dark-on-accent colour with a soft glow behind the celebrant.
+const BS_BACKGROUND = { color: 'var(--s-on-accent)', glow: 'var(--s-accent)', glowX: 1480, glowY: 460, glowRadius: 680 };
 
 // Depth per age: [translateZ px, opacity, blur px]
 const DEPTH: Record<number, [number, number, number]> = {
@@ -38,6 +41,12 @@ function clock(iso: string) {
 function dayAndClock(iso: string) {
   return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
+/** "from T.M. · “Happy birthday!”": who sprayed (initials only) and their own words. */
+function byLine(t: ScreenTransfer) {
+  const from = `from ${t.initials ?? 'a guest'}`;
+  return t.message ? `${from} · “${t.message}”` : from;
+}
+
 function initials(name: string) {
   return name
     .split(/[\s&]+/)
@@ -78,7 +87,7 @@ type Props = {
   photo: string | null;
 };
 
-export default function StageScreen({ e, theme, acct, history, popKey, takeover, paused, online, photo }: Props) {
+function StageScreen({ e, theme, acct, history, popKey, takeover, paused, online, photo }: Props) {
   const recent = history.slice(-STACK);
   const newest = recent[recent.length - 1] ?? null;
   const live = e.phase === 'live';
@@ -107,7 +116,7 @@ export default function StageScreen({ e, theme, acct, history, popKey, takeover,
       <div className="st-headline">
         <FitText
           className="st-h1"
-          max={132}
+          max={120}
           text={e.phase === 'upcoming' ? 'Spraying opens soon' : e.phase === 'ended' ? 'Thank you for spraying!' : `Spray ${e.celebrantName}!`}
         />
       </div>
@@ -141,9 +150,7 @@ export default function StageScreen({ e, theme, acct, history, popKey, takeover,
                   }}
                 >
                   <div className="st-amount" style={{ opacity: drifting ? 0 : 1 }}>{naira(t.amountKobo)}</div>
-                  <div className={`st-said${drifting ? ' big' : ''}`}>
-                    {t.message ? `“${t.message}”` : `sent to ${e.recipientLabel}`}
-                  </div>
+                  <div className={`st-said${drifting ? ' big' : ''}`}>{drifting ? `“${t.message}”` : byLine(t)}</div>
                 </div>
               );
             })}
@@ -196,9 +203,9 @@ export default function StageScreen({ e, theme, acct, history, popKey, takeover,
           <>
             <div className="st-pay-label">Transfer any amount to spray</div>
             <div className="st-pay-row">
-              <FitText className="st-acct" text={acct} max={180} />
+              <FitText className="st-acct" text={acct} max={160} />
               <div className="st-bank-col">
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={112} />
+                <FitText className="st-bank" text={e.accountBank ?? ''} max={96} />
                 {e.accountName && <div className="st-acct-name">{e.accountName}</div>}
               </div>
             </div>
@@ -216,6 +223,9 @@ export default function StageScreen({ e, theme, acct, history, popKey, takeover,
     </div>
   );
 }
+
+// Re-draw only when something on screen changes, not on every clock tick.
+export default memo(StageScreen);
 
 /** A big spray takes over the whole screen, opening from the newest spray. */
 function BigSpray({
@@ -236,7 +246,7 @@ function BigSpray({
   const cutout = photo ? isCutout(photo) : false;
   return (
     <div className="bs" role="status">
-      <ConfettiRain amountKobo={t.amountKobo} width={1920} height={1080} seed={t.id} />
+      <ConfettiRain amountKobo={t.amountKobo} width={1920} height={1080} seed={t.id} background={BS_BACKGROUND} />
       <header className="st-top bs-top">
         <div className="st-top-left">
           <Logo size={30} tone={luminance(theme.onAccent) > 0.4 ? 'light' : 'dark'} />
@@ -259,8 +269,8 @@ function BigSpray({
         </div>
       </div>
       <div className="bs-main">
-        <FitText className="bs-amount" text={naira(shown)} max={250} />
-        <div className="bs-said">{t.message ? `“${t.message}”` : `sent to ${e.recipientLabel}`}</div>
+        <FitText className="bs-amount" text={naira(shown)} max={230} />
+        <div className="bs-said">{byLine(t)}</div>
       </div>
       <div className="bs-rule" />
       {acct && (

@@ -213,3 +213,13 @@ test('custom theme colours: every random pair stays readable', async () => {
   assert.equal(owambe.accent, '#F2B437');
   assert.deepEqual(owambe.notes, []);
 });
+
+test('the screen shows only the sender\'s initials', async () => {
+  const { senderInitials } = await import('../lib/text.ts');
+  assert.equal(senderInitials('OLUWASEUN ADEBAYO'), 'O.A.');
+  assert.equal(senderInitials('tolu  makinde'), 'T.M.');
+  assert.equal(senderInitials('CHIDI EMEKA OKAFOR'), 'C.O.');
+  assert.equal(senderInitials('Kemi'), 'K.');
+  assert.equal(senderInitials('  '), null);
+  assert.equal(senderInitials(null), null);
+});

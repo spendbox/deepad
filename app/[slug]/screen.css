@@ -52,7 +52,7 @@
 /* A spray on the phone */
 .m-spray { position: relative; overflow: hidden; border: 3px solid var(--s-accent); min-height: 180px; animation: mSprayIn .8s cubic-bezier(.18, .9, .25, 1.15) both; }
 .m-spray > *:not(.cf-layer) { position: relative; z-index: 1; }
-.m-spray .cf-layer { z-index: 2; }
+.m-spray .cf-layer { z-index: 0; } /* behind the words, so the hype line stays readable */
 @keyframes mSprayIn { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(1); } }
 .m-bigspray { border-width: 4px; }
 .m-badge {

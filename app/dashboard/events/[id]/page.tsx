@@ -7,7 +7,7 @@ import { eventTimeline } from '@/lib/earnings';
 import { eventPhase, formatWhen } from '@/lib/event-info';
 import { checkPaystackForTransfers, closeEvent, summarise } from '@/lib/events';
 import { groupAccountNumber, naira, percent } from '@/lib/money';
-import { photoroomConfigured } from '@/lib/photoroom';
+import { cutoutsConfigured } from '@/lib/cutouts';
 import { requirePlanner } from '@/lib/session';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
@@ -54,7 +54,7 @@ export default async function EventPage({
     Date.now(),
   );
   const link = `${await siteUrl()}/${event.slug}`;
-  const canRemoveBg = photoroomConfigured();
+  const canRemoveBg = cutoutsConfigured();
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });

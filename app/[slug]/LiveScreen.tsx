@@ -1,7 +1,7 @@
 'use client';
 
 import Logo from '@/components/Logo';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CopyButton from '@/components/CopyButton';
 import { ConfettiBurst } from '@/components/Confetti';
 import HypeText from '@/components/HypeText';
@@ -15,7 +15,7 @@ import './stage.css';
 
 const POLL_MS = 2000;
 const SPRAY_HOLD_MS = 8000; // a spray's celebration stays up this long, then the screen invites more
-const TAKEOVER_MS = 7000;
+const TAKEOVER_MS = 15000; // big sprays hold the screen this long
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const STAGE_W = 1920;
 const STAGE_H = 1080;
@@ -159,7 +159,9 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   }, []);
 
   const e = feed.event;
-  const theme = resolveTheme(e.theme, e.themeColors);
+  const colorsKey = JSON.stringify(e.themeColors ?? null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const theme = useMemo(() => resolveTheme(e.theme, e.themeColors), [e.theme, colorsKey]);
   const themeVars = toThemeVars(theme) as React.CSSProperties;
 
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
@@ -251,7 +253,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                 />
                 <div className="m-badge"><HypeText text={hypeOf(takeover?.t ?? current!)} /></div>
                 <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
-                <div className="m-to">sent to {e.recipientLabel}</div>
+                <div className="m-to">from {(takeover?.t ?? current!).initials ?? 'a guest'}</div>
                 {(takeover?.t ?? current!).message && <div className="m-msg">“{(takeover?.t ?? current!).message}”</div>}
               </section>
             ) : (
