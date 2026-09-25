@@ -1,3 +1,3 @@
 /* Confetti canvases (see Confetti.tsx) */
-.cf-canvas { position: absolute; pointer-events: none; }
+.cf-canvas { position: absolute; pointer-events: none; will-change: transform; }
 .cf-rain { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }

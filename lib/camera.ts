@@ -14,6 +14,30 @@ export const CAMERA_FRESH_MS = 30_000;
 export const MAX_SDP = 30_000;
 export const SESSION_RE = /^[A-Za-z0-9_-]{8,40}$/;
 export const TOKEN_RE = /^[A-Za-z0-9_-]{10,40}$/;
+/** A big screen that hasn't checked in for this long no longer holds the camera. */
+export const SCREEN_FRESH_MS = 30_000;
+
+/** The big screen currently holding the camera, if it's still open. */
+export function cameraScreen(event: SprayEvent): string | null {
+  if (!event.cameraScreen || !event.cameraScreenSeenAt) return null;
+  return Date.now() - new Date(event.cameraScreenSeenAt).getTime() < SCREEN_FRESH_MS ? event.cameraScreen : null;
+}
+
+/** This screen shows the camera from now on; the phone moves over to it. */
+export async function claimCamera(event: SprayEvent, screenId: string): Promise<void> {
+  const store = getStore();
+  const before = cameraScreen(event);
+  await store.updateEvent(event.id, { cameraScreen: screenId, cameraScreenSeenAt: new Date().toISOString() });
+  if (before !== screenId) await store.resetCameraAnswer(event.id).catch(() => {});
+}
+
+/** The screen holding the camera is still open (checked in at most every few seconds). */
+export async function screenSeen(event: SprayEvent, screenId: string): Promise<void> {
+  if (event.cameraScreen !== screenId) return;
+  const last = event.cameraScreenSeenAt ? new Date(event.cameraScreenSeenAt).getTime() : 0;
+  if (Date.now() - last < 8_000) return;
+  await getStore().updateEvent(event.id, { cameraScreenSeenAt: new Date().toISOString() });
+}
 
 /**
  * The big screen's own key. Only a screen opened from the planner's dashboard

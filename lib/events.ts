@@ -1,5 +1,5 @@
 import 'server-only';
-import { freshCamera } from './camera';
+import { cameraScreen, freshCamera } from './camera';
 import { escapeHtml, sendEmail } from './email';
 import { eventPhase, formatWhen } from './event-info';
 import { naira, percent, splitTransfer } from './money';
@@ -162,6 +162,13 @@ export async function recordTransfer(
     outsideWindow,
   });
   if (intent && intent.status !== 'paid') await store.markIntentPaid(intent.reference, result.transfer.id);
+  // Seen before without the sender's name (the backup check often doesn't get it), and now we have it.
+  const name = t.senderName?.trim();
+  if (!result.created && !result.transfer.senderName && name) {
+    const bank = t.senderBank?.trim() || null;
+    await store.setTransferSender(result.transfer.id, name, bank);
+    result.transfer = { ...result.transfer, senderName: name, senderBank: bank ?? result.transfer.senderBank };
+  }
   // Seen before without a description (e.g. found by the backup check), and now we have one.
   if (!result.created && !result.transfer.message && message) {
     await store.setTransferMessage(result.transfer.id, message, rawNarration);
@@ -201,6 +208,7 @@ const lastCheckAt = new Map<string, number>();
 const lastErrorLogAt = new Map<string, number>();
 const customerIds = new Map<string, number>();
 const CHECK_EVERY_MS = 8_000;
+const NAME_GRACE_MS = 40_000;
 
 /**
  * Payment notifications (webhooks) can fail: a wrong webhook address in
@@ -236,6 +244,11 @@ export async function checkPaystackForTransfers(event: SprayEvent, opts: { force
       const amountKobo = Math.round(Number(tx.amount ?? 0));
       if (!(amountKobo > 0)) continue;
       const auth = tx.authorization ?? {};
+      // Paystack's list often leaves out who sent it, while the payment notification includes it.
+      // For a brand-new payment with no name, give the notification a moment to arrive first,
+      // so the screen shows the person's name instead of "A guest".
+      const paidAt = new Date(tx.paid_at ?? tx.paidAt ?? 0).getTime();
+      if (!auth.sender_name && Number.isFinite(paidAt) && now - paidAt < NAME_GRACE_MS) continue;
       const { created } = await recordTransfer(event, {
         reference: tx.reference,
         amountKobo,
@@ -386,8 +399,20 @@ export type ScreenTransfer = {
   big: boolean;
   /** 1 to 4: bigger sprays stay on screen spraying a little longer. */
   weight: number;
+  /**
+   * How long this person keeps spraying, in pieces of confetti: one per ₦200,
+   * thrown one a second, up to 30 minutes. Never shown as an amount.
+   */
+  pieces: number;
   createdAt: string;
 };
+
+/** One confetti piece per ₦200, one a second, for at most 30 minutes. */
+export const NAIRA_PER_PIECE = 200;
+export const MAX_PIECES = 30 * 60;
+export function sprayPieces(amountKobo: number): number {
+  return Math.min(MAX_PIECES, Math.max(1, Math.floor(amountKobo / 100 / NAIRA_PER_PIECE)));
+}
 
 /** A line written by the planner or a guest (see SprayLine). */
 export type ScreenLine = { id: string; text: string; name: string; photo: string | null; createdAt: string };
@@ -412,8 +437,11 @@ export type ScreenFeed = {
   recent: ScreenTransfer[];
   /** Lines to show, newest first. */
   lines: ScreenLine[];
-  /** A phone camera offering live video to the big screen, if one is on. */
-  camera: { session: string; answered: boolean } | null;
+  /**
+   * A phone camera offering live video, if one is on. `mine`: this screen holds
+   * the camera; `free`: no open screen holds it yet.
+   */
+  camera: { session: string; answered: boolean; mine: boolean; free: boolean } | null;
 };
 
 function sprayWeight(amountKobo: number): number {
@@ -426,7 +454,7 @@ function sprayWeight(amountKobo: number): number {
  * already seen: every spray after it is included, so a burst of payments
  * arriving together is never cut short.
  */
-export async function screenFeed(event: SprayEvent, afterId?: number): Promise<ScreenFeed> {
+export async function screenFeed(event: SprayEvent, afterId?: number, screenId?: string): Promise<ScreenFeed> {
   const store = getStore();
   const latest = await store.listTransfers(event.id, 40);
   const newer = afterId != null && Number.isFinite(afterId) ? await store.listTransfersAfter(event.id, afterId, 300) : [];
@@ -459,10 +487,16 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
         initials: senderInitials(t.senderName),
         big: event.bigSprayKobo > 0 && t.amountKobo >= event.bigSprayKobo,
         weight: sprayWeight(t.amountKobo),
+        pieces: sprayPieces(t.amountKobo),
         createdAt: t.createdAt,
       }))
       .reverse(),
     lines: lines.map((l) => ({ id: l.id, text: l.text, name: l.authorName, photo: l.photoUrl, createdAt: l.createdAt })),
-    camera: cam ? { session: cam.sessionId, answered: !!cam.answer } : null,
+    camera: cam
+      ? (() => {
+          const holder = cameraScreen(event);
+          return { session: cam.sessionId, answered: !!cam.answer, mine: !!screenId && holder === screenId, free: !holder };
+        })()
+      : null,
   };
 }

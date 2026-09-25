@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Logo from '@/components/Logo';
+import { askMotionPermission, correction, FrameRotator, screenAngle, watchHold } from '@/lib/rotator';
 import { fetchIce, iceGathered, newSessionId, sharpFromTheStart } from '@/lib/webrtc';
 
 type Props = { token: string; title: string; celebrantName: string; ended: boolean };
@@ -36,6 +37,35 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
   const wantLive = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const lock = useRef<{ release: () => Promise<void> } | null>(null);
+  // Keeping the big screen's picture upright however the phone is held.
+  const rotator = useRef<FrameRotator | null>(null);
+  const hold = useRef(-1); // which way the phone is held; -1 until the motion sensor has said
+  const [extraTurn, setExtraTurn] = useState(0); // the "Rotate" button, in case the sensor gets it wrong
+  const extraRef = useRef(0);
+  const [turnedNote, setTurnedNote] = useState(false);
+  const [held, setHeld] = useState(-1); // which way the phone is physically held (-1: no motion sensor)
+
+  /** What to send: the camera as it is, or turned upright when the phone is held differently from its screen. */
+  const outgoing = useCallback((): MediaStreamTrack | null => {
+    const cam = stream.current;
+    const raw = cam?.getVideoTracks()[0] ?? null;
+    if (!cam || !raw) return null;
+    // Only turn the picture when the sensor has really told us how the phone is held: without it,
+    // the picture the phone makes is already the right way round for how its screen is turned.
+    const auto = hold.current >= 0 ? correction(hold.current, screenAngle()) : 0;
+    const turn = (auto + extraRef.current) % 360;
+    if (turn === 0) return raw;
+    rotator.current ??= new FrameRotator();
+    rotator.current.setSource(cam);
+    rotator.current.setTurn(turn);
+    return rotator.current.track();
+  }, []);
+
+  const applyTurn = useCallback(() => {
+    const sender = pc.current?.getSenders().find((s) => s.track?.kind === 'video' || s.track === null);
+    const next = outgoing();
+    if (sender && next && sender.track !== next) sender.replaceTrack(next).catch(() => {});
+  }, [outgoing]);
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -55,9 +85,11 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       const old = stream.current;
       stream.current = next;
       if (video.current) video.current.srcObject = next;
+      rotator.current?.setSource(next);
       // Already live? Swap the picture without dropping the connection.
       const sender = pc.current?.getSenders().find((s) => s.track?.kind === 'video');
-      if (sender) await sender.replaceTrack(next.getVideoTracks()[0]).catch(() => {});
+      const out = outgoing();
+      if (sender && out) await sender.replaceTrack(out).catch(() => {});
       old?.getTracks().forEach((t) => t.stop());
       setState((s) => (s === 'starting' || s === 'off' || s === 'error' ? 'preview' : s));
     } catch (err) {
@@ -71,7 +103,7 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       );
       setState('error');
     }
-  }, []);
+  }, [outgoing]);
 
   // --- Going live ---
   const closeConnection = useCallback(() => {
@@ -103,7 +135,7 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
     const peer = new RTCPeerConnection({ iceServers });
     pc.current = peer;
     const cam = stream.current;
-    const sender = peer.addTransceiver(cam.getVideoTracks()[0], { direction: 'sendonly', streams: [cam] }).sender;
+    const sender = peer.addTransceiver(outgoing() ?? cam.getVideoTracks()[0], { direction: 'sendonly', streams: [cam] }).sender;
     try {
       const params = sender.getParameters();
       params.encodings = params.encodings?.length ? params.encodings : [{}];
@@ -171,6 +203,11 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
           setState('replaced');
           return;
         }
+        // The planner moved the video to another big screen: connect to that one.
+        if (!data.answer && peer.remoteDescription) {
+          reconnect();
+          return;
+        }
         if (data.answer && !peer.remoteDescription) {
           // Ask for a sharp picture from the start; if this phone's browser won't take that, use the answer as it is.
           await peer
@@ -187,7 +224,7 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
           return;
         }
       } catch {}
-      later(check, peer.connectionState === 'connected' ? 5000 : 1500);
+      later(check, peer.connectionState === 'connected' ? 2000 : 1200);
     };
     check();
 
@@ -207,10 +244,17 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       );
       reconnect();
     }
-  }, [token, closeConnection, hangUp]);
+  }, [token, closeConnection, hangUp, outgoing]);
 
   const goLive = () => {
     wantLive.current = true;
+    askMotionPermission(); // iPhones ask once, so we can tell which way the phone is held
+    // Android: full screen, turned sideways like a camera app, so the picture is always the right way round.
+    const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    document.documentElement
+      .requestFullscreen?.({ navigationUI: 'hide' })
+      .then(() => o?.lock?.('landscape'))
+      .catch(() => {});
     connect();
   };
   const stop = () => {
@@ -218,7 +262,33 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
     hangUp();
     setProblem(null);
     setState('preview');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   };
+  const rotate = () => {
+    extraRef.current = (extraRef.current + 90) % 360;
+    setExtraTurn(extraRef.current);
+    applyTurn();
+    setTurnedNote(true);
+    setTimeout(() => setTurnedNote(false), 2500);
+  };
+
+  // Which way the phone is really held (and the screen turned): keep the big screen's picture upright.
+  useEffect(() => {
+    const stopWatching = watchHold((angle) => {
+      hold.current = angle;
+      setHeld(angle);
+      applyTurn();
+    });
+    const onScreenTurn = () => applyTurn();
+    screen.orientation?.addEventListener?.('change', onScreenTurn);
+    window.addEventListener('orientationchange', onScreenTurn);
+    return () => {
+      stopWatching();
+      screen.orientation?.removeEventListener?.('change', onScreenTurn);
+      window.removeEventListener('orientationchange', onScreenTurn);
+      rotator.current?.stop();
+    };
+  }, [applyTurn]);
   const flip = () => {
     const next: Facing = facing === 'environment' ? 'user' : 'environment';
     setFacing(next);
@@ -318,7 +388,12 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
 
       {on && (
         <>
-          {portrait && <div className="cam-tip">Turn your phone sideways for the best picture.</div>}
+          {(held >= 0 ? held % 180 === 0 : portrait) && <div className="cam-tip">Turn your phone sideways for the best picture.</div>}
+          {turnedNote && (
+            <div className="cam-tip" role="status">
+              Big screen picture turned {extraTurn ? `${extraTurn}°` : 'back to normal'}. Tap again if it’s still not upright.
+            </div>
+          )}
           {busy && !problem && state !== 'waiting' && (
             <div className="cam-tip">
               {step === 'prep' ? 'Getting ready…' : step === 'looking' ? 'Looking for the big screen…' : 'Big screen found. Starting the video…'}
@@ -326,8 +401,8 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
           )}
           {state === 'waiting' && !problem && (
             <div className="cam-tip warn">
-              No big screen has picked this up yet. On the big-screen laptop, open the event with the <strong>Open big screen</strong> button in the
-              DashPad dashboard (not the normal event link) and leave it open. It connects by itself.
+              No big screen is showing this yet. Open the big screen with <strong>Open big screen</strong> in the DashPad dashboard (it connects by
+              itself), or on the big-screen computer move the mouse and click <strong>Show camera on this screen</strong>.
             </div>
           )}
           {busy && problem && <div className="cam-tip warn" role="alert">{problem}</div>}
@@ -343,7 +418,11 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
             ) : (
               <button type="button" className="cam-btn go" onClick={goLive}><span className="cam-dot" />Go live</button>
             )}
-            <span className="cam-round ghost" aria-hidden="true" />
+            <button type="button" className="cam-round" onClick={rotate} aria-label="Turn the big screen’s picture">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="4" y="9" width="11" height="11" rx="2" /><path d="M13 3a8 8 0 0 1 7 7" /><path d="M20 6v4h-4" />
+              </svg>
+            </button>
           </footer>
         </>
       )}

@@ -178,6 +178,10 @@ export class MemoryStore implements Store {
     const t = data().transfers.find((x) => x.id === transferId);
     if (t) Object.assign(t, { message, rawNarration });
   }
+  async setTransferSender(transferId: number, senderName: string, senderBank: string | null) {
+    const t = data().transfers.find((x) => x.id === transferId);
+    if (t) Object.assign(t, { senderName, senderBank: senderBank ?? t.senderBank });
+  }
   async setTransferHidden(eventId: string, transferId: number, hidden: boolean) {
     const t = data().transfers.find((x) => x.id === transferId && x.eventId === eventId);
     if (t) t.hidden = hidden;
@@ -245,6 +249,10 @@ export class MemoryStore implements Store {
     const c = data().cameras.find((x) => x.eventId === eventId && x.sessionId === sessionId);
     if (c) c.updatedAt = now();
     return !!c;
+  }
+  async resetCameraAnswer(eventId: string) {
+    const c = data().cameras.find((x) => x.eventId === eventId);
+    if (c) c.answer = null;
   }
   async stopCamera(eventId: string, sessionId: string) {
     const d = data();

@@ -1,5 +1,6 @@
 import { after, NextResponse } from 'next/server';
 import { eventPhase } from '@/lib/event-info';
+import { SESSION_RE, screenSeen } from '@/lib/camera';
 import { checkPaystackForTransfers, closeEvent, screenFeed } from '@/lib/events';
 import { getStore } from '@/lib/store';
 
@@ -21,8 +22,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ code: string }>
     after(() => closeEvent(event).catch((err) => console.error('closeEvent failed', err)));
   }
 
-  const afterId = Number(new URL(req.url).searchParams.get('after'));
-  return NextResponse.json(await screenFeed(event, Number.isFinite(afterId) && afterId > 0 ? afterId : undefined), {
+  const q = new URL(req.url).searchParams;
+  const afterId = Number(q.get('after'));
+  // Each big screen has its own id; the one showing the camera checks in so it keeps it.
+  const sid = q.get('sid');
+  const screenId = sid && SESSION_RE.test(sid) ? sid : undefined;
+  if (screenId) after(() => screenSeen(event, screenId).catch(() => {}));
+  return NextResponse.json(await screenFeed(event, Number.isFinite(afterId) && afterId > 0 ? afterId : undefined, screenId), {
     headers: { 'Cache-Control': 'no-store' },
   });
 }

@@ -160,3 +160,82 @@
 .st.video .sp-tag, .st.video .ln-bubble { box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .75); }
 .st.video .st-pay { box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .8); }
 .st.video .st-notice { padding: 44px 48px; border-radius: 36px; background: var(--s-panel); }
+
+/* ---------- Someone still spraying after their big moment: a small bubble that keeps throwing confetti ---------- */
+.st-arena .sp-tag.mini { padding: 4px 16px 4px 4px; gap: 8px; box-shadow: 0 8px 18px -12px rgba(0, 0, 0, .5); animation: spMini .5s ease both; }
+.st-arena .sp-tag.mini .sp-name { font-size: 22px; font-weight: 700; }
+.st-arena .sp-tag.mini.leaving { animation: spOut .6s ease forwards; }
+@keyframes spMini { from { transform: scale(1.25); } to { transform: scale(1); } }
+
+/* ---------- While live video plays: a slimmer transfer card, so it hides less of the picture ---------- */
+.st-pay.slim { height: 196px; padding: 38px 44px 22px; gap: 0; justify-content: flex-end; }
+.st-pay-row3 { display: grid; grid-template-columns: max-content 2px fit-content(640px) 2px minmax(0, 1fr); column-gap: 44px; align-items: stretch; }
+.st-pay-row3:not(:has(> :nth-child(4))) { grid-template-columns: max-content 2px minmax(0, 1fr); }
+.st-pay.slim .st-pay-label { font-size: 17px; }
+.st-pay-note-tab {
+  position: absolute; right: 44px; top: 0; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 18px; border-radius: 999px; background: rgba(20, 12, 24, .72); color: #fff; font-family: var(--body); font-size: 17px; white-space: nowrap;
+}
+.st-pay-note-tab svg { width: 18px; height: 18px; }
+
+/* ---------- Live video that isn't the screen's shape (e.g. a phone held upright): whole, never zoomed ---------- */
+.st-video.whole { object-fit: contain; background: transparent; }
+.st-video-fill {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; transform: scale(1.12);
+  opacity: .75; pointer-events: none;
+}
+
+/* ---------- A soft moving background, so the screen never looks still (hidden during live video) ---------- */
+.st-ambient { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; transition: opacity 1.2s ease, visibility 0s; }
+.st-ambient.off { opacity: 0; visibility: hidden; transition: opacity 1.2s ease, visibility 0s 1.2s; }
+.amb-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.amb-spark {
+  position: absolute; width: 10px; height: 10px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, #fff 0, color-mix(in srgb, var(--s-accent) 60%, #fff) 40%, transparent 70%);
+  animation: ambSpark 5s ease-in-out infinite;
+}
+@keyframes ambSpark { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1.3); } }
+@media (prefers-reduced-motion: reduce) { .amb-spark { animation: none; } }
+
+/* ---------- Phones: the same stage, laid out 540 wide ---------- */
+.st.phone .st-top { top: 18px; left: 16px; right: 16px; font-size: 17px; gap: 10px; }
+.st.phone .st-top-left { gap: 10px; }
+.st.phone .st-top-right { gap: 10px; }
+.st.phone .st-status { gap: 8px; }
+.st.phone .st-status.cam { padding: 4px 12px 4px 10px; }
+.st.phone .st-dot { width: 10px; height: 10px; }
+.st.phone .st-photo:not(.cutout) { border-radius: 24px; }
+.st.phone .sp-tag { padding: 5px 16px 5px 5px; gap: 8px; }
+.st.phone .sp-name { font-size: 21px; }
+.st.phone .sp-tag.big { padding: 8px 22px 8px 8px; gap: 10px; border-width: 2px; }
+.st.phone .sp-tag.big .sp-name { font-size: 30px; }
+.st.phone .sp-tag.big::before { inset: -14px; }
+.st.phone .sp-badge { top: -18px; padding: 2px 10px; font-size: 14px; }
+.st.phone .st-arena .sp-tag.mini { padding: 3px 12px 3px 3px; gap: 6px; }
+.st.phone .st-arena .sp-tag.mini .sp-name { font-size: 16px; }
+.st.phone .ln-bubble { max-width: 300px; padding: 10px 14px 12px; gap: 6px; border-radius: 18px 18px 18px 6px; }
+.st.phone .ln-head { gap: 8px; }
+.st.phone .ln-name { font-size: 15px; }
+.st.phone .ln-text { font-size: 19px; }
+.st.phone .st-monogram { width: 300px; height: 300px; }
+
+.st-pay.m { left: 12px; right: 12px; bottom: 12px; height: 296px; padding: 34px 20px 14px; gap: 10px; border-radius: 26px; justify-content: flex-start; }
+.st-pay.m .st-pay-tab { left: 18px; gap: 8px; padding: 7px 16px 7px 12px; font-size: 17px; }
+.st-pay.m .st-pay-tab svg { width: 18px; height: 18px; }
+.st-pay.m .st-pay-label { font-size: 12px; letter-spacing: .1em; }
+.st-pay.m .st-pay-field { gap: 4px; }
+.mp-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.mp-top .st-pay-field { flex: 1; min-width: 0; }
+.mp-top button { flex-shrink: 0; min-height: 52px; padding: 0 20px; font-size: 17px; border-radius: 14px; }
+.mp-bottom {
+  display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 14px; padding-top: 10px;
+  border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
+}
+.mp-note { margin-top: auto; font-family: var(--body); font-size: 13px; line-height: 1.35; color: var(--s-muted); }
+.st-pay.m.quiet { height: 140px; padding: 0 20px; }
+.st-pay.m .st-pay-quiet { font-size: 28px; text-align: center; }
+.st.phone .st-notice { left: 20px; right: 20px; top: 84px; width: auto; gap: 10px; padding: 22px; border-radius: 22px; background: var(--s-panel); }
+.st.phone .st-notice-big { font-size: 38px; }
+.st.phone .st-notice-sub { font-size: 18px; }
+/* Let the bank and account name use their whole column, so long names shrink instead of running into each other */
+.mp-bottom .st-pay-field > :last-child { align-self: stretch; }
