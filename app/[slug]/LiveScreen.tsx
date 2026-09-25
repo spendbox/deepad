@@ -6,7 +6,7 @@ import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import { groupAccountNumber, naira } from '@/lib/money';
 import { pickHypeLine } from '@/lib/hype';
-import { isCutout } from '@/components/cutout';
+import { isCutout } from '@/lib/photos';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 

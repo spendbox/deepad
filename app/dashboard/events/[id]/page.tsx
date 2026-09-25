@@ -19,7 +19,7 @@ import EventPhotos from './EventPhotos';
 import DashShell from '../../DashShell';
 import PhasePill from '../../PhasePill';
 import ReportButton from './ReportButton';
-import SettingsForm from './SettingsForm';
+import { DetailsForm, HypeForm, LinkForm, ThemeForm } from './SettingsForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -219,9 +219,12 @@ export default async function EventPage({
         <EventPhotos eventId={event.id} initial={event.photos} />
       </details>
 
-      <details className="card">
-        <summary>Event settings</summary>
-        <SettingsForm
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Event details</h2>
+          <span className="hint">What the big screen says, and when spraying closes.</span>
+        </div>
+        <DetailsForm
           eventId={event.id}
           ended={phase === 'ended'}
           values={{
@@ -235,6 +238,30 @@ export default async function EventPage({
             endsAt: event.endsAt,
           }}
         />
+      </section>
+
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Screen colours</h2>
+          <span className="hint">Pick a theme or your own colours. We keep the text easy to read.</span>
+        </div>
+        <ThemeForm
+          eventId={event.id}
+          values={{ theme: event.theme, themeColors: event.themeColors ?? null, recipientLabel: event.recipientLabel }}
+        />
+      </section>
+
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Event link</h2>
+          <span className="hint">The address you share and open on the big screen.</span>
+        </div>
+        <LinkForm eventId={event.id} slug={event.slug} link={link} canChange={phase === 'upcoming'} />
+      </section>
+
+      <details className="card">
+        <summary>Lines for sprays without a message</summary>
+        <HypeForm eventId={event.id} hypeLines={event.hypeLines ?? []} />
       </details>
 
       <details className="card">

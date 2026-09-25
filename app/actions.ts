@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
-import { EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
+import { eventPhase, EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
 import { escapeHtml, sendEmail } from '@/lib/email';
 import { checkPaystackForTransfers, recleanMessages, sendEventReport, setupEventPayments } from '@/lib/events';
 import { deactivateDedicatedAccount, paystackConfigured } from '@/lib/paystack';
@@ -416,6 +416,8 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
 
   const newSlug = str(form, 'slug').toLowerCase();
   if (newSlug && newSlug !== event.slug) {
+    // Changing the link mid-party would break the big screen and every shared link.
+    if (eventPhase(event) !== 'upcoming') return { error: 'The link can’t be changed once spraying has started.' };
     const issue = slugProblem(newSlug);
     if (issue) return { error: issue };
     if (await getStore().getEventBySlug(newSlug)) return { error: 'That event link is already taken.' };
