@@ -151,14 +151,25 @@ test('the best description is picked from Paystack’s notification', () => {
   assert.equal(none.raw, 'SPENDBOX/DASHPA');
 });
 
-test('hype lines fill in when there is no message', async () => {
-  const { hypeLinesFor, pickHypeLine, DEFAULT_HYPE_LINES } = await import('../lib/hype.ts');
-  const defaults = hypeLinesFor([], 'Tolu & Dayo');
-  assert.equal(defaults.length, DEFAULT_HYPE_LINES.length);
-  assert.ok(defaults.includes('Big love for Tolu & Dayo!'));
-  assert.deepEqual(hypeLinesFor(['  Spray {name}! ', ''], 'Kemi'), ['Spray Kemi!']);
-  assert.equal(pickHypeLine(['a', 'b', 'c'], 5), pickHypeLine(['a', 'b', 'c'], 5));
-  assert.equal(pickHypeLine([], 1), null);
+test('hype lines match the amount, or use the planner\'s own', async () => {
+  const { hypeFor, hypeLinesFor, HYPE_TIERS } = await import('../lib/hype.ts');
+  const big = hypeFor(100_000_00, 1, [], 'Kemi');
+  assert.ok(HYPE_TIERS[0].lines.includes(big));
+  const small = hypeFor(500_00, 2, [], 'Kemi');
+  assert.ok(HYPE_TIERS[3].lines.map((l) => l.replaceAll('{name}', 'Kemi')).includes(small));
+  assert.equal(hypeFor(500_00, 5, [], 'Kemi'), hypeFor(500_00, 5, [], 'Kemi'));
+  const own = hypeLinesFor(['  Spray {name}! ', '']);
+  assert.deepEqual(own, ['Spray {name}!']);
+  assert.equal(hypeFor(1_000_00, 3, own, 'Kemi'), 'Spray Kemi!');
+});
+
+test('more money, more confetti', async () => {
+  const { confettiVolume } = await import('../lib/confetti.ts');
+  const total = (k: number) => confettiVolume(k).waves * confettiVolume(k).perWave;
+  assert.ok(total(500_00) < total(5_000_00) && total(5_000_00) < total(50_000_00) && total(50_000_00) < total(1_000_000_00));
+  const small = confettiVolume(500_00);
+  const big = confettiVolume(100_000_00);
+  assert.ok(big.waves * big.perWave > small.waves * small.perWave * 4);
 });
 
 test('earnings are grouped into Nigerian days, weeks and months', async () => {
@@ -201,4 +212,14 @@ test('custom theme colours: every random pair stays readable', async () => {
   assert.equal(owambe.bg, '#1F0A26');
   assert.equal(owambe.accent, '#F2B437');
   assert.deepEqual(owambe.notes, []);
+});
+
+test('the screen shows only the sender\'s initials', async () => {
+  const { senderInitials } = await import('../lib/text.ts');
+  assert.equal(senderInitials('OLUWASEUN ADEBAYO'), 'O.A.');
+  assert.equal(senderInitials('tolu  makinde'), 'T.M.');
+  assert.equal(senderInitials('CHIDI EMEKA OKAFOR'), 'C.O.');
+  assert.equal(senderInitials('Kemi'), 'K.');
+  assert.equal(senderInitials('  '), null);
+  assert.equal(senderInitials(null), null);
 });

@@ -165,3 +165,19 @@ export function cleanNarration(
   if (s.length > 3 && s === s.toUpperCase()) s = s.charAt(0) + s.slice(1).toLowerCase();
   return cleanMessage(s);
 }
+
+/**
+ * "OLUWASEUN ADEBAYO" → "O.A.": the first letters of the sender's first and
+ * last names, all the big screen ever shows about who sprayed.
+ */
+export function senderInitials(name: string | null | undefined): string | null {
+  const words = (name ?? '')
+    .normalize('NFKD')
+    .replace(/[^A-Za-z\s'-]/g, ' ')
+    .split(/[\s'-]+/)
+    .filter((w) => w.length > 1 || /[A-Za-z]/.test(w));
+  if (!words.length) return null;
+  const first = words[0][0].toUpperCase();
+  const last = words.length > 1 ? words[words.length - 1][0].toUpperCase() : '';
+  return last ? `${first}.${last}.` : `${first}.`;
+}

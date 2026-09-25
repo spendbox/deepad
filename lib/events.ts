@@ -15,7 +15,7 @@ import {
 import { getStore } from './store';
 export { collectNarrations } from './narration';
 import { collectNarrations, pickNarration } from './narration';
-import { cleanNarration } from './text';
+import { cleanNarration, senderInitials } from './text';
 import type { MoneyRow, Planner, SprayEvent, Transfer } from './types';
 import { hypeLinesFor } from './hype';
 import type { ThemeColors } from './themes';
@@ -372,7 +372,14 @@ ${row(`Paid to ${escapeHtml(event.celebrantName)}`, naira(s.celebrantKobo))}
 
 // ---------- The big screen ----------
 
-export type ScreenTransfer = { id: number; amountKobo: number; message: string | null; createdAt: string };
+export type ScreenTransfer = {
+  id: number;
+  amountKobo: number;
+  message: string | null;
+  /** Just the sender's initials, e.g. "T.M." Never the full name. */
+  initials: string | null;
+  createdAt: string;
+};
 
 export type ScreenFeed = {
   event: {
@@ -382,7 +389,7 @@ export type ScreenFeed = {
     theme: string;
     themeColors: ThemeColors | null;
     photos: string[];
-    /** Shown when a spray has no message. */
+    /** The planner's own hype lines (empty = ours, matched to the amount). */
     hypeLines: string[];
     phase: 'upcoming' | 'live' | 'ended';
     startsAt: string;
@@ -416,7 +423,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
       theme: event.theme,
       themeColors: event.themeColors ?? null,
       photos: event.photos ?? [],
-      hypeLines: hypeLinesFor(event.hypeLines, event.celebrantName),
+      hypeLines: hypeLinesFor(event.hypeLines),
       phase: eventPhase(event),
       startsAt: event.startsAt,
       endsAt: event.endsAt,
@@ -428,7 +435,13 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
     },
     recent: transfers
       .filter((t) => !t.outsideWindow)
-      .map((t) => ({ id: t.id, amountKobo: t.amountKobo, message: t.hidden ? null : t.message, createdAt: t.createdAt }))
+      .map((t) => ({
+        id: t.id,
+        amountKobo: t.amountKobo,
+        message: t.hidden ? null : t.message,
+        initials: senderInitials(t.senderName),
+        createdAt: t.createdAt,
+      }))
       .reverse(),
   };
 }

@@ -103,7 +103,7 @@ function Check() {
   );
 }
 
-export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolean }) {
+export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHasBank: boolean; canRemoveBg: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [d, setD] = useState<Draft>(defaultDraft);
@@ -435,7 +435,9 @@ export default function EventWizard({ plannerHasBank }: { plannerHasBank: boolea
               />
             )}
 
-            {step === S.photos && <PhotoPicker value={d.photos} onChange={(photos) => set({ photos })} />}
+            {step === S.photos && (
+              <PhotoPicker value={d.photos} onChange={(photos) => set({ photos })} canRemoveBg={canRemoveBg} />
+            )}
 
             {step === S.payout && (
               <>

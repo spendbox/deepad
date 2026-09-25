@@ -1,27 +1,27 @@
 'use client';
 
 import Logo from '@/components/Logo';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CopyButton from '@/components/CopyButton';
-import FitText from '@/components/FitText';
+import { ConfettiBurst } from '@/components/Confetti';
+import HypeText from '@/components/HypeText';
 import { groupAccountNumber, naira } from '@/lib/money';
-import { pickHypeLine } from '@/lib/hype';
+import { hypeFor } from '@/lib/hype';
 import { isCutout } from '@/lib/photos';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
+import StageScreen from './StageScreen';
+import './stage.css';
 
 const POLL_MS = 2000;
 const SPRAY_HOLD_MS = 8000; // a spray's celebration stays up this long, then the screen invites more
-const TAKEOVER_MS = 7000;
+const TAKEOVER_MS = 15000; // big sprays hold the screen this long
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
 type Props = { code: string; initialFeed: ScreenFeed };
 
-function clock(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
-}
 function dayAndClock(iso: string) {
   return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
@@ -37,6 +37,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const [shownAt, setShownAt] = useState(0);
   const [takeover, setTakeover] = useState<{ t: ScreenTransfer; at: number } | null>(null);
   const [popKey, setPopKey] = useState(0);
+  // Sprays already shown, oldest first (the TV shows the newest and a few drifting back).
+  const [history, setHistory] = useState<ScreenTransfer[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
   const [compact, setCompact] = useState(false);
@@ -66,6 +68,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         if (fresh.length) setQueue((q) => [...q, ...fresh]);
         // Pick up changes to what's showing (e.g. the planner hid a message).
         setCurrent((c) => (c ? data.recent.find((t) => t.id === c.id) ?? c : c));
+        setHistory((h) => h.map((x) => data.recent.find((t) => t.id === x.id) ?? x));
       } catch {
         fails += 1;
         if (alive) setOnline(false);
@@ -101,6 +104,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     const [next, ...rest] = queue;
     setQueue(rest);
     setCurrent(next);
+    setHistory((h) => [...h.slice(-9), next]);
     setShownAt(Date.now());
     setPopKey((k) => k + 1);
     if (feed.event.bigSprayKobo > 0 && next.amountKobo >= feed.event.bigSprayKobo) setTakeover({ t: next, at: Date.now() });
@@ -155,13 +159,13 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   }, []);
 
   const e = feed.event;
-  const theme = resolveTheme(e.theme, e.themeColors);
+  const colorsKey = JSON.stringify(e.themeColors ?? null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const theme = useMemo(() => resolveTheme(e.theme, e.themeColors), [e.theme, colorsKey]);
   const themeVars = toThemeVars(theme) as React.CSSProperties;
 
   const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
-  // The guest's message, or a fun line when they didn't leave one.
-  const lineFor = (t: ScreenTransfer) => t.message ?? pickHypeLine(e.hypeLines ?? [], t.id);
-  const isHype = (t: ScreenTransfer) => !t.message;
+  const hypeOf = (t: ScreenTransfer) => hypeFor(t.amountKobo, t.id, e.hypeLines ?? [], e.celebrantName);
 
   // Guests' messages only (no amounts), newest first, once their spray has popped up.
   const messages = feed.recent
@@ -169,8 +173,10 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     .slice(-5)
     .reverse();
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
-  // Celebrant photos take turns, a new one every few seconds.
-  const photo = e.photos.length ? e.photos[ready ? Math.floor(now / PHOTO_MS) % e.photos.length : 0] : null;
+  // Celebrant photos take turns, a new one every few seconds; cut-outs (background removed) first.
+  const cutouts = e.photos.filter(isCutout);
+  const pool = cutouts.length ? cutouts : e.photos;
+  const photo = pool.length ? pool[ready ? Math.floor(now / PHOTO_MS) % pool.length : 0] : null;
 
   const statusBadge = !online ? (
     <div className="badge offline" role="status">Reconnecting… transfers still work</div>
@@ -234,16 +240,21 @@ export default function LiveScreen({ code, initialFeed }: Props) {
             )}
 
             {takeover || (showingSpray && current) ? (
-              <section key={popKey} className={`m-card spray-pop m-spray${takeover ? ' m-bigspray' : ''}`}>
-                <Burst count={10} />
-                <div className="m-badge">{takeover ? 'Big spray!' : 'New spray!'}</div>
+              <section key={popKey} className={`m-card m-spray${takeover ? ' m-bigspray' : ''}`}>
+                <ConfettiBurst
+                  burstKey={popKey}
+                  amountKobo={(takeover?.t ?? current!).amountKobo}
+                  origin={M_ORIGIN}
+                  landX={M_LAND_X}
+                  peakY={M_PEAK_Y}
+                  landY={M_LAND_Y}
+                  size={0.6}
+                  maxPieces={120}
+                />
+                <div className="m-badge"><HypeText text={hypeOf(takeover?.t ?? current!)} /></div>
                 <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
-                <div className="m-to">sent to {e.recipientLabel}</div>
-                {lineFor(takeover?.t ?? current!) && (
-                  <div className={`m-msg${isHype(takeover?.t ?? current!) ? ' hype' : ''}`}>
-                    {isHype(takeover?.t ?? current!) ? lineFor(takeover?.t ?? current!) : `“${lineFor(takeover?.t ?? current!)}”`}
-                  </div>
-                )}
+                <div className="m-to">from {(takeover?.t ?? current!).initials ?? 'a guest'}</div>
+                {(takeover?.t ?? current!).message && <div className="m-msg">“{(takeover?.t ?? current!).message}”</div>}
               </section>
             ) : (
               <section className="m-card">
@@ -273,176 +284,25 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   return (
     <div className="screen-root" style={themeVars}>
       <div className="stage" style={{ transform: `translate(-50%, -50%) scale(${scale})` }}>
-        <NotesRain />
-
-        {takeover ? (
-          <div className="takeover">
-            <div className="takeover-badge">Big spray!</div>
-            <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
-            <div className="takeover-to">sent to {e.recipientLabel}</div>
-            {lineFor(takeover.t) && (
-              <div className="takeover-msg">{isHype(takeover.t) ? lineFor(takeover.t) : `“${lineFor(takeover.t)}”`}</div>
-            )}
-            {acct && (
-              <div className="takeover-acct">
-                <span>Transfer to spray</span>
-                <strong>{acct}</strong>
-                <span className="takeover-bank">{e.accountBank}</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="layout">
-            <header className="top">
-              <div style={{ minWidth: 0 }}>
-                <div className="top-brand"><Logo size={34} tone={theme.light ? 'light' : 'dark'} /></div>
-                <h1 className="top-title">{e.title}</h1>
-              </div>
-              <div className="top-right">
-                {statusBadge}
-                {e.phase === 'live' && <div className="top-note">Spraying closes {clock(e.endsAt)}</div>}
-              </div>
-            </header>
-
-            {e.phase === 'upcoming' || e.phase === 'ended' ? (
-              <section className="notice">
-                {photo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={photo} src={photo} alt="" className={`notice-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
-                )}
-                <div className="notice-text">
-                  {e.phase === 'upcoming' ? (
-                    <>
-                      <div className="notice-big">Spraying opens soon</div>
-                      <div className="notice-sub">{dayAndClock(e.startsAt)}</div>
-                      <div className="notice-sub muted">The account number will appear here when spraying starts.</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="notice-big">Thank you for spraying!</div>
-                      <div className="notice-sub">{e.celebrantName} appreciates every one of you.</div>
-                      <div className="notice-sub muted">Spraying has closed. Please don’t send more transfers.</div>
-                    </>
-                  )}
-                </div>
-              </section>
-            ) : (
-              <>
-                <div className="middle">
-                  {showingSpray && current ? (
-                    <div key={popKey} className="panel-main spray-pop">
-                      <Burst count={16} />
-                      <div className="pop-kicker">New spray!</div>
-                      <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
-                      <div className="pop-to">sent to {e.recipientLabel}</div>
-                      {lineFor(current) && (
-                        <div className={`pop-msg${isHype(current) ? ' hype' : ''}`}>
-                          {isHype(current) ? lineFor(current) : `“${lineFor(current)}”`}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className={`invite panel-main${photo ? ' with-photo' : ''}`}>
-                      <div className="invite-text">
-                        <div className="invite-big">Spray {e.celebrantName}!</div>
-                        <div className="invite-sub">
-                          Transfer any amount to the account below. Add a message in the transfer description and it
-                          may show up here.
-                        </div>
-                      </div>
-                      {photo && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo} src={photo} alt="" className={`invite-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
-                      )}
-                    </div>
-                  )}
-                  <aside className="side">
-                    <div className="side-list">
-                      <h2>Latest messages</h2>
-                      {messages.length === 0 ? (
-                        <p className="side-empty">Messages typed in transfer descriptions will appear here.</p>
-                      ) : (
-                        <ul className="side-messages">
-                          {messages.map((t) => (
-                            <li key={t.id}>“{t.message}”</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </aside>
-                </div>
-
-                <footer className="paybar">
-                  <div className="paybar-main">
-                    {acct ? (
-                      <>
-                        <div className="paybar-label">Transfer to spray</div>
-                        <FitText className="paybar-acct" text={acct} max={150} />
-                        <div className="paybar-meta">
-                          <span className="paybar-bank">{e.accountBank}</span>
-                          {e.accountName && <span className="paybar-name">{e.accountName}</span>}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="paybar-acct" style={{ fontSize: 72 }}>Account number coming soon</div>
-                    )}
-                  </div>
-                  <div className="paybar-side">
-                    <strong>Any amount is welcome</strong>
-                    <span className="paybar-small">Transfers can take up to a minute to show.</span>
-                  </div>
-                </footer>
-              </>
-            )}
-          </div>
-        )}
+        <StageScreen
+          e={e}
+          theme={theme}
+          acct={acct}
+          history={history}
+          popKey={popKey}
+          takeover={takeover?.t ?? null}
+          paused={paused}
+          online={online}
+          photo={photo}
+        />
       </div>
       {fullScreenButton}
     </div>
   );
 }
 
-/** Naira notes exploding outwards: every spray gets a celebration, however small. */
-const BURST = Array.from({ length: 24 }, (_, i) => {
-  const angle = (i / 24) * Math.PI * 2 + (i % 3) * 0.35;
-  const dist = 0.55 + ((i * 7) % 5) * 0.12;
-  return {
-    dx: `${Math.round(Math.cos(angle) * dist * 100)}%`,
-    dy: `${Math.round(Math.sin(angle) * dist * 100)}%`,
-    rot: `${((i * 83) % 360) - 180}deg`,
-    delay: `${(i % 4) * 0.05}s`,
-  };
-});
-
-function Burst({ count }: { count: number }) {
-  return (
-    <div className="burst" aria-hidden="true">
-      <div className="burst-flash" />
-      {BURST.slice(0, count).map((b, i) => (
-        <span
-          key={i}
-          className="burst-note"
-          style={{ '--dx': b.dx, '--dy': b.dy, '--rot': b.rot, animationDelay: b.delay } as React.CSSProperties}
-        >
-          ₦
-        </span>
-      ))}
-    </div>
-  );
-}
-
-const NOTES = Array.from({ length: 14 }, (_, i) => ({
-  left: `${(i * 37) % 96}%`,
-  duration: `${(7 + (i % 5) * 1.3).toFixed(1)}s`,
-  delay: `${(-(i * 1.7)).toFixed(1)}s`,
-}));
-
-function NotesRain() {
-  return (
-    <div className="rain" aria-hidden="true">
-      {NOTES.map((n, i) => (
-        <div key={i} className="note" style={{ left: n.left, animationDuration: n.duration, animationDelay: n.delay }}>₦</div>
-      ))}
-    </div>
-  );
-}
+// Confetti on the phone: from the amount, across the spray card.
+const M_ORIGIN = { x: 70, y: 90 };
+const M_LAND_X: [number, number] = [10, 360];
+const M_PEAK_Y: [number, number] = [-20, 40];
+const M_LAND_Y: [number, number] = [160, 280];

@@ -1,4 +1,5 @@
 import { emailConfigured } from '@/lib/email';
+import { cutoutStatus } from '@/lib/cutouts';
 import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
@@ -52,6 +53,10 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
       ok: emailConfigured(),
       title: 'Email (Resend)',
       detail: emailConfigured() ? 'Set up.' : 'RESEND_API_KEY and EMAIL_FROM are missing: reports and password resets can’t be sent.',
+    },
+    {
+      ...cutoutStatus(),
+      title: 'Background removal for photos',
     },
     {
       ok: !!process.env.CRON_SECRET,
