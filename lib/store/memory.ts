@@ -208,7 +208,12 @@ export class MemoryStore implements Store {
     return data().lines.filter((l) => l.eventId === eventId).length;
   }
   async setLinesStatus(eventId: string, lineIds: string[], status: LineStatus) {
-    for (const l of data().lines) if (l.eventId === eventId && lineIds.includes(l.id)) l.status = status;
+    for (const l of data().lines) {
+      if (l.eventId === eventId && lineIds.includes(l.id)) {
+        l.status = status;
+        l.reviewedAt = now();
+      }
+    }
   }
   async deleteLine(eventId: string, lineId: string) {
     const d = data();

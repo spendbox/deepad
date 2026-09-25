@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Avatar from '@/components/Avatar';
+import SectionCard from '@/components/SectionCard';
 import CopyButton from '@/components/CopyButton';
 import LineForm from '@/components/LineForm';
 import type { LineStatus, SprayLine } from '@/lib/types';
@@ -42,6 +43,8 @@ export default function LinesCard({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [viewLink, setViewLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<Set<string>>(new Set());
   const [busy, start] = useTransition();
 
   const refresh = useCallback(async () => {
@@ -70,12 +73,17 @@ export default function LinesCard({
 
   function act(ids: string[], status: LineStatus) {
     if (!ids.length) return;
-    // Show the change at once; the server confirms it.
-    setLines((ls) => ls.map((l) => (ids.includes(l.id) ? { ...l, status } : l)));
-    setSelected(new Set());
+    setError(null);
+    setSaving(new Set(ids));
+    // Only show a line as approved once it's really saved.
     start(async () => {
-      await setLinesStatus(eventId, ids, status);
-      await refresh();
+      const res = await setLinesStatus(eventId, ids, status).catch(() => ({ error: 'That didn’t save. Check your internet and try again.' }));
+      if ('error' in res) setError(res.error);
+      else {
+        setLines(res.lines);
+        setSelected(new Set());
+      }
+      setSaving(new Set());
     });
   }
 
@@ -91,57 +99,57 @@ export default function LinesCard({
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`Write a line for ${celebrantName}! It may show on the big screen at the party: ${writeLink}`)}`;
 
   return (
-    <section className="card settings-card" aria-labelledby="lines-h">
-      <div className="settings-head">
-        <h2 id="lines-h">Lines on the big screen</h2>
-        <span className="hint">
-          Short wishes for {celebrantName}. Guests’ lines wait for your approval; only approved lines show on the big
-          screen, taking turns over and over.
-        </span>
-      </div>
-
-      {!ended && (
-        <div className="stack" style={{ gap: 8 }}>
-          <strong>Let guests write lines</strong>
-          <span className="hint">Share this link. Guests write a line, add their name and (if they like) a photo.</span>
-          <div className="share-row">
-            <span className="share-url">{writeLink}</span>
-            <CopyButton text={writeLink} label="Copy link" />
-            <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-sm">Share on WhatsApp</a>
+    <>
+      <SectionCard icon="link" title="Share" hint="Guests write lines from one link; someone else can watch them all from another.">
+        <div className="subcards">
+          {!ended && (
+            <div className="subcard">
+              <strong>Let guests write lines</strong>
+              <span className="hint">They write a line, add their name and (if they like) a photo. You approve before it shows.</span>
+              <span className="share-url">{writeLink}</span>
+              <div className="actions">
+                <CopyButton text={writeLink} label="Copy link" />
+                <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-sm">Share on WhatsApp</a>
+              </div>
+            </div>
+          )}
+          <div className="subcard">
+            <strong>View-only page</strong>
+            <span className="hint">Every line, live, with its status. Nothing can be changed there, and it shows no money.</span>
+            {viewLink ? (
+              <>
+                <span className="share-url">{viewLink}</span>
+                <div className="actions">
+                  <CopyButton text={viewLink} label="Copy link" />
+                  <button
+                    type="button"
+                    className="link-btn"
+                    disabled={busy}
+                    onClick={() => {
+                      if (confirm('Make a new link? The old one will stop working.')) start(async () => setViewLink(await linesViewLink(eventId, true)));
+                    }}
+                  >
+                    Make a new link
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div>
+                <button type="button" className="btn btn-sm" disabled={busy} onClick={() => start(async () => setViewLink(await linesViewLink(eventId)))}>
+                  Get the view-only link
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </SectionCard>
 
-      <div className="stack" style={{ gap: 8 }}>
-        <strong>View-only page</strong>
-        <span className="hint">
-          A live page of every line (approved, rejected and waiting) for someone to watch. They can’t change anything,
-          and it shows no money.
-        </span>
-        {viewLink ? (
-          <div className="share-row">
-            <span className="share-url">{viewLink}</span>
-            <CopyButton text={viewLink} label="Copy link" />
-            <button
-              type="button"
-              className="link-btn"
-              disabled={busy}
-              onClick={() => {
-                if (confirm('Make a new link? The old one will stop working.')) start(async () => setViewLink(await linesViewLink(eventId, true)));
-              }}
-            >
-              Make a new link
-            </button>
-          </div>
-        ) : (
-          <div>
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => start(async () => setViewLink(await linesViewLink(eventId)))}>
-              Get the view-only link
-            </button>
-          </div>
-        )}
-      </div>
-
+      <SectionCard
+        icon="lines"
+        title="Lines on the big screen"
+        id="lines"
+        hint={`Short wishes for ${celebrantName}. Only approved lines show on the big screen, taking turns over and over.`}
+      >
       {adding ? (
         <div className="stack" style={{ gap: 8 }}>
           <LineForm
@@ -177,6 +185,8 @@ export default function LinesCard({
           </button>
         ))}
       </div>
+
+      {error && <p className="error-text" role="alert">{error}</p>}
 
       {shown.length === 0 ? (
         <p className="empty" style={{ margin: 0 }}>
@@ -218,7 +228,7 @@ export default function LinesCard({
 
           <ul className="lines-list">
             {shown.map((l) => (
-              <li key={l.id} className={`line-${l.status}`}>
+              <li key={l.id} className={`line-${l.status}${saving.has(l.id) ? ' saving' : ''}`}>
                 <input
                   type="checkbox"
                   className="line-check"
@@ -230,7 +240,7 @@ export default function LinesCard({
                 <div className="line-body">
                   <strong>
                     {l.authorName} <span className="hint">· {l.source === 'guest' ? 'guest' : 'you'}</span>{' '}
-                    <span className={`line-pill ${l.status}`}>{STATUS_LABEL[l.status]}</span>
+                    <span className={`line-pill ${l.status}`}>{saving.has(l.id) ? 'Saving…' : STATUS_LABEL[l.status]}</span>
                   </strong>
                   <p>“{l.text}”</p>
                 </div>
@@ -263,6 +273,7 @@ export default function LinesCard({
           </ul>
         </>
       )}
-    </section>
+      </SectionCard>
+    </>
   );
 }

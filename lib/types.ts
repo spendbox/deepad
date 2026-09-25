@@ -169,6 +169,8 @@ export type SprayLine = {
   source: 'planner' | 'guest';
   /** Guests' lines wait for the planner; only approved lines reach the big screen. */
   status: LineStatus;
+  /** When the planner last approved or rejected it (null = never reviewed). */
+  reviewedAt?: string | null;
   createdAt: string;
 };
 

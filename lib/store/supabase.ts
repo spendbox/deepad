@@ -308,7 +308,13 @@ export class SupabaseStore implements Store {
   }
   async setLinesStatus(eventId: string, lineIds: string[], status: LineStatus) {
     if (!lineIds.length) return;
-    check(await this.db.from('spray_lines').update({ status }).in('id', lineIds).eq('event_id', eventId));
+    check(
+      await this.db
+        .from('spray_lines')
+        .update({ status, reviewed_at: new Date().toISOString() })
+        .in('id', lineIds)
+        .eq('event_id', eventId),
+    );
   }
   async deleteLine(eventId: string, lineId: string) {
     const rows = check(await this.db.from('spray_lines').delete().eq('id', lineId).eq('event_id', eventId).select('*'));
@@ -335,7 +341,7 @@ export class SupabaseStore implements Store {
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome, raw'],
-      ['spray_lines', 'id, text, author_name, photo_url, status'],
+      ['spray_lines', 'id, text, author_name, photo_url, status, reviewed_at'],
     ];
     const problems: string[] = [];
     for (const [table, cols] of probes) {
