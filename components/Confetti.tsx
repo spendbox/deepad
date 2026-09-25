@@ -38,7 +38,7 @@ export type Emitter = { id: number; x: number; y: number; perSecond: number };
 
 /**
  * People spraying: every emitter (a sprayer's name on screen) throws a piece
- * of confetti one or two times a second, arcing onto the celebrant's
+ * of confetti about once a second (now and then twice), arcing onto the celebrant's
  * `target` area, where it flutters down and fades. Coordinates are in the
  * canvas's own pixels. The drawing loop stops when nobody is spraying.
  */
@@ -105,7 +105,8 @@ export function SprayCanvas({
         if (due === undefined) nextAt.set(e.id, now + r(0, 300));
         else if (now >= due) {
           spawn(e, now);
-          nextAt.set(e.id, now + (1000 / e.perSecond) * r(0.7, 1.3));
+          // Usually one piece a second, now and then two.
+          nextAt.set(e.id, now + (1000 / e.perSecond) * (r(0, 1) < 0.25 ? 0.5 : 1) * r(0.85, 1.15));
         }
       }
 
