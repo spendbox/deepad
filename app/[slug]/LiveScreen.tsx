@@ -12,7 +12,7 @@ import StageScreen, { SPRAY_SLOTS, type ActiveSprayer } from './StageScreen';
 import './stage.css';
 
 const POLL_MS = 2000;
-const TAKEOVER_MS = 15000; // big sprays hold the screen this long
+const BIG_STAY_MS = 15000; // a big sprayer's name stays up this long, bigger and glowing
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const JOIN_GAP_MS = 600; // new sprayers step in one after another, not all at once
 const LEAVE_MS = 700; // time for a name tag to fade away
@@ -35,7 +35,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const lastId = useRef(initialFeed.recent.reduce((m, t) => Math.max(m, t.id), 0));
   const [waiting, setWaiting] = useState<ScreenTransfer[]>([]);
   const [sprayers, setSprayers] = useState<Sprayer[]>([]);
-  const [big, setBig] = useState<{ t: ScreenTransfer; at: number } | null>(null);
   const lastJoin = useRef(0);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
@@ -94,29 +93,15 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           .map((s) => (!s.leaving && now >= s.until ? { ...s, leaving: true, leftAt: now } : s)),
       );
     }
-    if (big) {
-      if (now - big.at >= TAKEOVER_MS) {
-        setBig(null);
-        // After their big moment, they keep spraying with everyone else.
-        setWaiting((w) => [{ ...big.t, big: false }, ...w]);
-      }
-      return;
-    }
     if (!live || paused || !waiting.length || now - lastJoin.current < JOIN_GAP_MS) return;
     const [next, ...rest] = waiting;
-    if (next.big) {
-      setWaiting(rest);
-      setBig({ t: next, at: now });
-      lastJoin.current = now;
-      return;
-    }
     const used = new Set(sprayers.map((s) => s.slot));
     const slot = Array.from({ length: SPRAY_SLOTS }, (_, i) => i).find((i) => !used.has(i));
-    if (slot === undefined) return; // everyone waits for a free spot
+    if (slot === undefined && !next.big) return; // everyone waits for a free spot (big sprayers go straight in)
     // A crowd waiting? Everyone sprays a little shorter so all get a turn.
-    const stay = Math.max(6000, (STAY_MS[next.weight] ?? 9000) * (rest.length > 4 ? 0.5 : 1));
+    const stay = next.big ? BIG_STAY_MS : Math.max(6000, (STAY_MS[next.weight] ?? 9000) * (rest.length > 4 ? 0.5 : 1));
     setWaiting(rest);
-    setSprayers((list) => [...list, { t: next, slot, leaving: false, until: now + stay }]);
+    setSprayers((list) => [...list, { t: next, slot: slot ?? -1, leaving: false, until: now + stay }]);
     lastJoin.current = now;
   }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -205,6 +190,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // ---------- Phone layout (someone opened the link on their phone) ----------
   if (compact) {
     const active = sprayers.filter((s) => !s.leaving);
+    const big = active.find((s) => s.t.big);
     return (
       <div className="m-screen" style={themeVars}>
         <header className="m-top">
@@ -267,6 +253,18 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                     </li>
                   ))}
                 </ul>
+              ) : feed.recent.length ? (
+                <>
+                  <div className="m-muted">Recently sprayed:</div>
+                  <ul className="m-sprayers recent">
+                    {feed.recent.slice(-6).reverse().map((t) => (
+                      <li key={t.id}>
+                        <Avatar name={t.firstName ?? 'Guest'} size={32} letters={(t.initials ?? '?').replace(/\./g, '')} />
+                        {t.firstName ?? 'A guest'}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               ) : (
                 <div className="m-muted">Be the first to spray {e.celebrantName}! Transfer any amount to the account above.</div>
               )}
@@ -304,7 +302,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           theme={theme}
           acct={acct}
           sprayers={shownSprayers}
-          big={big?.t ?? null}
           paused={paused}
           online={online}
           photo={photo}

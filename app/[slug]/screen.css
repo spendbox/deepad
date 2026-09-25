@@ -60,6 +60,7 @@
   display: inline-flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px; border-radius: 999px; font-weight: 700;
   background: color-mix(in srgb, var(--s-accent) 14%, transparent); animation: mSprayIn .6s ease both;
 }
+.m-sprayers.recent li { background: color-mix(in srgb, var(--s-muted) 14%, transparent); animation: none; }
 .m-lines { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .m-lines li { display: flex; gap: 10px; align-items: flex-start; }
 .m-lines strong { font-size: 15px; }

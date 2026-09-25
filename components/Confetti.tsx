@@ -44,13 +44,19 @@ export type Emitter = { id: number; x: number; y: number; perSecond: number };
  */
 export function SprayCanvas({
   emitters,
+  source,
+  active,
   target,
   width,
   height,
   className = '',
   style,
 }: {
-  emitters: Emitter[];
+  emitters?: Emitter[];
+  /** Live positions (e.g. from moving name tags), asked for every frame instead of `emitters`. */
+  source?: () => Emitter[];
+  /** With `source`: true while anyone is spraying, to wake the drawing loop. */
+  active?: boolean;
   target: { x: [number, number]; y: [number, number] };
   width: number;
   height: number;
@@ -58,9 +64,10 @@ export function SprayCanvas({
   style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const emittersRef = useRef(emitters);
+  const read = () => (source ? source() : emitters ?? []);
+  const readRef = useRef(read);
   const kick = useRef<() => void>(() => {});
-  emittersRef.current = emitters;
+  readRef.current = read;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -90,7 +97,7 @@ export function SprayCanvas({
 
     const frame = (now: number) => {
       // New throws, one or two a second per sprayer.
-      const live = emittersRef.current;
+      const live = readRef.current();
       const ids = new Set(live.map((e) => e.id));
       for (const id of [...nextAt.keys()]) if (!ids.has(id)) nextAt.delete(id);
       for (const e of live) {
@@ -140,7 +147,7 @@ export function SprayCanvas({
       }
       ctx.globalAlpha = 1;
 
-      if (pieces.length || emittersRef.current.length) raf = requestAnimationFrame(frame);
+      if (pieces.length || live.length) raf = requestAnimationFrame(frame);
       else running = false; // nothing to draw: rest until someone sprays
     };
 
@@ -159,103 +166,8 @@ export function SprayCanvas({
 
   // Wake the loop when someone new starts spraying.
   useEffect(() => {
-    if (emitters.length) kick.current();
-  }, [emitters]);
+    if (emitters?.length || active) kick.current();
+  }, [emitters, active]);
 
   return <canvas ref={ref} className={`cf-canvas ${className}`} width={width} height={height} style={style} aria-hidden="true" />;
-}
-
-/**
- * Confetti raining over the whole screen (big spray). Paints its own
- * background too (a colour plus a soft glow): one solid layer is much
- * cheaper than two stacked ones.
- */
-export function ConfettiRain({
-  width,
-  height,
-  seed = 7,
-  count = 110,
-  background,
-}: {
-  width: number;
-  height: number;
-  seed?: number;
-  count?: number;
-  background?: { color: string; glow: string; glowX: number; glowY: number; glowRadius: number };
-}) {
-  const ref = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    const ctx = canvas?.getContext('2d', { alpha: !background });
-    if (!canvas || !ctx) return;
-    const css = getComputedStyle(canvas);
-    const resolve = (c: string) => (c.startsWith('var(') ? css.getPropertyValue(c.slice(4, -1).split(',')[0].trim()).trim() : c);
-    const colors = resolveColors(canvas);
-    let bg: HTMLCanvasElement | null = null;
-    if (background) {
-      bg = document.createElement('canvas');
-      bg.width = width;
-      bg.height = height;
-      const b = bg.getContext('2d')!;
-      b.fillStyle = resolve(background.color) || '#1F0A26';
-      b.fillRect(0, 0, width, height);
-      const g = b.createRadialGradient(background.glowX, background.glowY, 0, background.glowX, background.glowY, background.glowRadius);
-      g.addColorStop(0, resolve(background.glow) || colors[0]);
-      g.addColorStop(1, 'transparent');
-      b.globalAlpha = 0.4;
-      b.fillStyle = g;
-      b.fillRect(0, 0, width, height);
-    }
-    if (reducedMotion()) {
-      if (bg) ctx.drawImage(bg, 0, 0);
-      return;
-    }
-    const r = seeded(seed);
-    const pieces = Array.from({ length: count }, (_, i) => {
-      const ribbon = r(0, 1) < 0.6;
-      const w = ribbon ? r(22, 38) : r(12, 18);
-      return {
-        x: r(-40, width + 40), y: r(-height, height), w, h: ribbon ? w * 0.45 : w, round: !ribbon && r(0, 1) < 0.5,
-        color: colors[i % colors.length], vy: r(220, 380), vx: r(-40, 40), sway: r(0, 6.28), rot: r(0, 6.28), vr: r(-4, 4),
-        flip: r(0, 6.28), vf: r(3, 9),
-      };
-    });
-    let raf = 0;
-    let last = performance.now();
-    const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      if (bg) ctx.drawImage(bg, 0, 0);
-      else ctx.clearRect(0, 0, width, height);
-      for (const p of pieces) {
-        p.y += p.vy * dt;
-        p.sway += dt * 2;
-        p.x += (p.vx + Math.sin(p.sway) * 30) * dt;
-        p.rot += p.vr * dt;
-        p.flip += p.vf * dt;
-        if (p.y > height + 40) {
-          p.y = -40;
-          p.x = r(-40, width + 40);
-        }
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
-        ctx.scale(1, Math.cos(p.flip));
-        ctx.fillStyle = p.color;
-        if (p.round) {
-          ctx.beginPath();
-          ctx.arc(0, 0, p.w / 2, 0, 6.2832);
-          ctx.fill();
-        } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-        ctx.restore();
-      }
-      raf = requestAnimationFrame(frame);
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, seed, count, JSON.stringify(background ?? null)]);
-
-  return <canvas ref={ref} className="cf-rain" width={width} height={height} aria-hidden="true" />;
 }
