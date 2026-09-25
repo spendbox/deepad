@@ -19,7 +19,7 @@
 
 /* The celebrant, in the middle */
 .st-photo { position: absolute; z-index: 2; display: block; }
-.st-photo.cutout { left: 690px; top: 86px; width: 540px; height: 666px; object-fit: contain; object-position: 50% 100%; }
+.st-photo.cutout { left: 675px; top: 86px; width: 570px; height: 720px; object-fit: contain; object-position: 50% 100%; }
 .st-photo:not(.cutout) { left: 725px; top: 150px; width: 470px; height: 560px; object-fit: cover; border-radius: 40px; }
 .st-monogram {
   position: absolute; left: 750px; top: 200px; width: 420px; height: 420px; border-radius: 50%; z-index: 2;
@@ -82,18 +82,38 @@
 .st-notice-sub { font-family: var(--body); font-size: 32px; line-height: 1.35; color: var(--s-muted); }
 
 /* The account number */
-.st-rule { position: absolute; left: 80px; right: 80px; top: 752px; height: 2px; background: color-mix(in srgb, var(--s-muted) 30%, transparent); z-index: 3; }
-.st-pay { position: absolute; left: 80px; right: 80px; bottom: 40px; display: flex; flex-direction: column; gap: 10px; z-index: 3; }
-/* The bank sits right beside the account number, big and bold, so nobody misses it. */
-.st-pay-row { display: flex; align-items: flex-end; gap: 56px; min-width: 0; }
-.st-pay-row .st-acct { flex: 0 1 auto; min-width: 0; }
-.st-pay-row .st-bank { flex: 1 1 0; min-width: 0; }
-.st-pay-note { display: flex; align-items: baseline; gap: 22px; min-width: 0; font-family: var(--body); font-size: 22px; color: var(--s-muted); white-space: nowrap; overflow: hidden; }
-.st-pay-note span:last-child { overflow: hidden; text-overflow: ellipsis; }
-.st-pay-label { font-family: var(--body); font-size: 26px; font-weight: 600; color: var(--s-muted); }
-.st-acct { font-weight: 800; line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.st-bank { font-weight: 800; line-height: .95; letter-spacing: -0.03em; color: var(--s-accent); padding-bottom: 4px; }
-.st-acct-name { font-weight: 700; letter-spacing: .02em; color: var(--s-text); flex-shrink: 0; }
+/* How to spray: one clean card along the bottom */
+.st-pay {
+  position: absolute; left: 60px; right: 60px; bottom: 30px; height: 276px; z-index: 5;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 0 52px 26px;
+  border-radius: 36px; background: var(--s-panel);
+  border: 2px solid color-mix(in srgb, var(--s-accent) 22%, transparent);
+  box-shadow: 0 30px 60px -38px rgba(0, 0, 0, .55);
+}
+.st-pay.quiet { justify-content: center; align-items: center; padding: 0 52px; }
+.st-pay-quiet { font-weight: 800; font-size: 64px; letter-spacing: -0.02em; color: var(--s-muted); }
+.st-pay-tab {
+  position: absolute; left: 44px; top: 0; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 12px; padding: 10px 26px 10px 20px; border-radius: 999px;
+  background: var(--s-accent); color: var(--s-on-accent); font-weight: 800; font-size: 28px; white-space: nowrap;
+  box-shadow: 0 12px 24px -14px rgba(0, 0, 0, .5);
+}
+.st-pay-main { display: grid; grid-template-columns: max-content 2px minmax(0, 1fr); align-items: stretch; column-gap: 64px; }
+.st-pay-field { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; }
+.st-pay-divider { align-self: stretch; margin: 6px 0; background: color-mix(in srgb, var(--s-muted) 28%, transparent); border-radius: 2px; }
+.st-pay-label {
+  font-family: var(--body); font-size: 20px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s-muted);
+}
+.st-acct { font-weight: 800; line-height: .95; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--s-text); }
+.st-bank { font-weight: 800; line-height: .95; letter-spacing: -0.025em; color: var(--s-accent); }
+.st-pay-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 32px; min-width: 0;
+  padding-top: 14px; border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
+  font-family: var(--body); font-size: 21px; color: var(--s-muted); white-space: nowrap;
+}
+.st-acct-name { font-weight: 700; color: var(--s-text); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.st-pay-k { font-weight: 600; color: var(--s-muted); margin-right: 8px; }
+.st-pay-note { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .ln-bubble { animation: none; }
