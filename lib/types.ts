@@ -35,6 +35,8 @@ export type SprayEvent = {
   theme: EventThemeId;
   /** Secret for the view-only page that shows every line as it arrives (null until first shared). */
   linesViewToken?: string | null;
+  /** Secret for the "connect a camera" link (a phone that streams video to the big screen). */
+  cameraToken?: string | null;
   /** The planner's own colours (used when theme is 'custom'). */
   themeColors: ThemeColors | null;
   /** Photos of the celebrants (public image links), shown on the big screen. */
@@ -177,3 +179,12 @@ export type SprayLine = {
 export type LineStatus = 'pending' | 'approved' | 'rejected';
 
 export type NewSprayLine = Omit<SprayLine, 'id' | 'createdAt'>;
+
+/** A phone camera offering live video to the big screen (WebRTC offer/answer, one per event). */
+export type CameraSession = {
+  eventId: string;
+  sessionId: string;
+  offer: string;
+  answer: string | null;
+  updatedAt: string;
+};

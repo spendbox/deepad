@@ -8,11 +8,33 @@
   transform-origin: center center; overflow: hidden; background: var(--s-bg);
 }
 
-.fs-btn {
-  position: fixed; right: 16px; bottom: 16px; z-index: 5; min-height: 44px; padding: 0 18px; border-radius: 12px;
-  border: 2px solid var(--s-accent); background: var(--s-bg); color: var(--s-accent); font-weight: 700; transition: opacity .3s;
+.scr-controls {
+  position: fixed; right: 16px; bottom: 16px; z-index: 5; display: flex; align-items: flex-end; gap: 10px; transition: opacity .3s;
 }
-.fs-btn.hidden { opacity: 0; pointer-events: none; }
+.scr-controls.hidden { opacity: 0; pointer-events: none; }
+.fs-btn {
+  min-height: 44px; padding: 0 18px; border-radius: 12px; cursor: pointer;
+  border: 2px solid var(--s-accent); background: var(--s-bg); color: var(--s-accent); font-weight: 700;
+}
+.fs-btn.live { background: #e0245e; border-color: #e0245e; color: #fff; }
+
+/* Big screen: choose where the live video comes from */
+.cam-menu {
+  position: absolute; right: 0; bottom: 56px; width: 340px; padding: 8px; border-radius: 16px;
+  background: var(--s-panel); color: var(--s-text); box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .6);
+  display: flex; flex-direction: column; gap: 4px; font-family: var(--body);
+}
+.cam-menu-h { padding: 8px 10px 4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--s-muted); }
+.cam-menu button {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 10px;
+  border: 2px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.cam-menu button:hover { background: color-mix(in srgb, var(--s-accent) 10%, transparent); }
+.cam-menu button.on { border-color: var(--s-accent); }
+.cam-menu button strong { font-size: 15px; }
+.cam-menu button span { font-size: 13px; color: var(--s-muted); line-height: 1.35; }
+.cam-menu-note { margin: 4px 12px 8px; font-size: 13px; color: var(--s-muted); }
+.cam-menu-note.err { color: #e0245e; }
 
 .fade-in { animation: fadeIn .9s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

@@ -576,6 +576,17 @@ export async function linesViewLink(eventId: string, reset = false): Promise<str
   return `${await siteUrl()}/lines/${token}`;
 }
 
+/** The secret "connect a camera" link for a phone (made the first time it's asked for; `reset` makes a new one). */
+export async function cameraLink(eventId: string, reset = false): Promise<string> {
+  const event = await ownEvent(eventId);
+  let token = event.cameraToken;
+  if (!token || reset) {
+    token = randomBytes(12).toString('base64url');
+    await getStore().updateEvent(eventId, { cameraToken: token });
+  }
+  return `${await siteUrl()}/camera/${token}`;
+}
+
 export async function deleteLine(eventId: string, lineId: string) {
   await ownEvent(eventId);
   const line = await getStore().deleteLine(eventId, lineId);

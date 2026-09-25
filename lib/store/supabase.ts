@@ -15,6 +15,7 @@ import type {
   SprayLine,
   LineStatus,
   Transfer,
+  CameraSession,
 } from '../types';
 import { computeStats, type Store } from './types';
 
@@ -153,6 +154,10 @@ export class SupabaseStore implements Store {
   }
   async getEventByCustomerCode(code: string) {
     const rows = check(await this.db.from('spray_events').select('*').eq('paystack_customer_code', code).limit(1));
+    return rows?.[0] ? toEvent(rows[0]) : null;
+  }
+  async getEventByCameraToken(token: string) {
+    const rows = check(await this.db.from('spray_events').select('*').eq('camera_token', token).limit(1));
     return rows?.[0] ? toEvent(rows[0]) : null;
   }
   async getEventByLinesToken(token: string) {
@@ -321,6 +326,42 @@ export class SupabaseStore implements Store {
     return rows?.[0] ? fromRow<SprayLine>(rows[0]) : null;
   }
 
+  // ----- Live camera (a phone streaming to the big screen) -----
+  async getCamera(eventId: string) {
+    const row = check(await this.db.from('camera_sessions').select('*').eq('event_id', eventId).maybeSingle());
+    return row ? fromRow<CameraSession>(row) : null;
+  }
+  async startCamera(eventId: string, sessionId: string, offer: string) {
+    const row = { event_id: eventId, session_id: sessionId, offer, answer: null, updated_at: new Date().toISOString() };
+    check(await this.db.from('camera_sessions').upsert(row, { onConflict: 'event_id' }));
+  }
+  async answerCamera(eventId: string, sessionId: string, answer: string) {
+    const rows = check(
+      await this.db
+        .from('camera_sessions')
+        .update({ answer, updated_at: new Date().toISOString() })
+        .eq('event_id', eventId)
+        .eq('session_id', sessionId)
+        .is('answer', null)
+        .select('event_id'),
+    );
+    return !!rows?.length;
+  }
+  async touchCamera(eventId: string, sessionId: string) {
+    const rows = check(
+      await this.db
+        .from('camera_sessions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('event_id', eventId)
+        .eq('session_id', sessionId)
+        .select('event_id'),
+    );
+    return !!rows?.length;
+  }
+  async stopCamera(eventId: string, sessionId: string) {
+    check(await this.db.from('camera_sessions').delete().eq('event_id', eventId).eq('session_id', sessionId));
+  }
+
   async logPayment(l: NewPaymentLog) {
     const res = await this.db.from('payment_logs').insert(toRow(l));
     // Logging must never stop a payment from being recorded.
@@ -336,7 +377,8 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token'],
+      ['camera_sessions', 'event_id, session_id, offer, answer, updated_at'],
       ['spray_intents', 'reference, message'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],

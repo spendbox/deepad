@@ -15,6 +15,7 @@ import type {
   SprayLine,
   LineStatus,
   Transfer,
+  CameraSession,
 } from '../types';
 
 export interface Store {
@@ -41,6 +42,7 @@ export interface Store {
   getEventByAccountNumber(accountNumber: string): Promise<SprayEvent | null>;
   getEventByCustomerCode(code: string): Promise<SprayEvent | null>;
   getEventByLinesToken(token: string): Promise<SprayEvent | null>;
+  getEventByCameraToken(token: string): Promise<SprayEvent | null>;
   /** A planner's events, newest first. Deleted ones only with includeDeleted (e.g. for earnings). */
   listEventsByPlanner(plannerId: string, opts?: { includeDeleted?: boolean }): Promise<SprayEvent[]>;
   listEvents(): Promise<SprayEvent[]>;
@@ -82,6 +84,16 @@ export interface Store {
   setLinesStatus(eventId: string, lineIds: string[], status: LineStatus): Promise<void>;
   /** Returns the deleted line (so its photo can be removed too), or null. */
   deleteLine(eventId: string, lineId: string): Promise<SprayLine | null>;
+
+  /** The phone camera currently offered to the big screen, if any. */
+  getCamera(eventId: string): Promise<CameraSession | null>;
+  /** A phone starts streaming: replaces any older camera for this event. */
+  startCamera(eventId: string, sessionId: string, offer: string): Promise<void>;
+  /** The big screen accepts. Only the first answer counts; false if too late or replaced. */
+  answerCamera(eventId: string, sessionId: string, answer: string): Promise<boolean>;
+  /** The phone is still there. False if another camera has taken over. */
+  touchCamera(eventId: string, sessionId: string): Promise<boolean>;
+  stopCamera(eventId: string, sessionId: string): Promise<void>;
 
   logPayment(l: NewPaymentLog): Promise<void>;
   listPaymentLogs(limit?: number): Promise<PaymentLog[]>;

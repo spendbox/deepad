@@ -133,3 +133,29 @@
 /* The bank sits on the right, hugging its own name, so the account number has room to breathe */
 .st-pay-field.right { align-items: flex-end; text-align: right; }
 .st-pay-note { justify-content: flex-end; text-align: right; }
+
+/* ---------- Live camera: the video fills the screen, everything else floats over it ---------- */
+.st-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000;
+  opacity: 0; transition: opacity .9s ease;
+}
+.st-video.portrait { object-fit: contain; }
+.st-video.on { opacity: 1; }
+/* Soft dark fades at the top and bottom, so the title and the transfer card always read well */
+.st-scrim {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .9s ease;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, .6) 0, rgba(0, 0, 0, 0) 220px),
+    linear-gradient(to top, rgba(0, 0, 0, .55) 0, rgba(0, 0, 0, 0) 420px);
+}
+.st-scrim.on { opacity: 1; }
+.st-photo, .st-monogram { transition: opacity .9s ease; }
+.st.video .st-photo, .st.video .st-monogram { opacity: 0; }
+.st.video .st-top { color: #fff; }
+.st.video .st-event, .st.video .st-closes { color: rgba(255, 255, 255, .85); }
+.st-status.cam { padding: 6px 18px 6px 14px; border-radius: 999px; background: #e0245e; color: #fff; }
+.st-status.cam .st-dot { background: #fff; animation: camBlink 1.4s ease-in-out infinite; }
+@keyframes camBlink { 50% { opacity: .3; } }
+.st.video .sp-tag, .st.video .ln-bubble { box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .75); }
+.st.video .st-pay { box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .8); }
+.st.video .st-notice { padding: 44px 48px; border-radius: 36px; background: var(--s-panel); }

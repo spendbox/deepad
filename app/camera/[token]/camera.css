@@ -1,0 +1,70 @@
+/* The camera person's phone: a dark, full-screen camera view. */
+.cam {
+  position: fixed; inset: 0; overflow: hidden; background: #120b16; color: #fff; font-family: var(--body);
+  display: flex; flex-direction: column;
+}
+.cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
+.cam.on .cam-video { opacity: 1; }
+.cam-video.mirror { transform: scaleX(-1); }
+
+.cam-top {
+  position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: max(14px, env(safe-area-inset-top)) 16px 28px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, .55), transparent);
+}
+.cam-pill {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
+  background: rgba(255, 255, 255, .16); font-size: 14px; font-weight: 700; white-space: nowrap;
+}
+.cam-pill.busy { background: rgba(242, 180, 55, .9); color: #2a1a00; }
+.cam-pill.live { background: #e0245e; }
+.cam-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.cam-pill.live .cam-dot { background: #fff; animation: camBlink 1.4s ease-in-out infinite; }
+@keyframes camBlink { 50% { opacity: .3; } }
+
+.cam-intro {
+  position: relative; z-index: 2; margin: auto 16px; padding: 28px 22px; border-radius: 24px; max-width: 440px; align-self: center;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1); text-align: center;
+}
+.cam-icon { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; display: grid; place-items: center; background: var(--gold); color: #2a1a00; }
+.cam-intro h1 { font-family: var(--display); font-size: 24px; line-height: 1.2; margin: 0 0 6px; }
+.cam-sub { margin: 0 0 18px; color: rgba(255, 255, 255, .65); font-size: 15px; }
+.cam-steps { text-align: left; margin: 0 0 20px; padding-left: 22px; display: grid; gap: 8px; font-size: 15px; line-height: 1.4; color: rgba(255, 255, 255, .85); }
+.cam-msg { color: rgba(255, 255, 255, .8); }
+.cam-error { margin: 0 0 14px; padding: 10px 12px; border-radius: 12px; background: rgba(224, 36, 94, .18); color: #ffc2d4; font-size: 14px; text-align: left; }
+
+.cam-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 0 30px;
+  border: 0; border-radius: 999px; font: inherit; font-size: 18px; font-weight: 800; cursor: pointer;
+}
+.cam-btn:disabled { opacity: .6; }
+.cam-btn.primary { width: 100%; background: var(--gold); color: #2a1a00; }
+.cam-btn.go { background: #e0245e; color: #fff; box-shadow: 0 10px 30px -10px rgba(224, 36, 94, .8); min-width: 170px; }
+.cam-btn.stop { background: #fff; color: #120b16; min-width: 170px; }
+
+.cam-tip {
+  position: relative; z-index: 2; margin: 0 16px; align-self: center; max-width: 440px; padding: 10px 14px; border-radius: 14px;
+  background: rgba(0, 0, 0, .55); font-size: 14px; line-height: 1.4; text-align: center;
+}
+.cam-tip.warn { background: rgba(242, 180, 55, .92); color: #2a1a00; margin-top: 8px; }
+
+.cam-bar {
+  position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 36px 24px max(22px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0, 0, 0, .6), transparent);
+}
+.cam-round {
+  width: 52px; height: 52px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer;
+  background: rgba(255, 255, 255, .18); color: #fff;
+}
+.cam-round.ghost { visibility: hidden; }
+/* Before the camera is on, the page can scroll (short, sideways phones) */
+.cam:not(.on) { overflow-y: auto; }
+.cam:not(.on) .cam-intro { margin: 8px 16px 24px; }
+@media (max-height: 520px) {
+  .cam-icon { display: none; }
+  .cam-intro { padding: 18px 20px; }
+  .cam-intro h1 { font-size: 20px; }
+  .cam-sub { margin-bottom: 10px; }
+  .cam-steps { gap: 4px; margin-bottom: 14px; }
+}

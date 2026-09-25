@@ -1,4 +1,5 @@
 import 'server-only';
+import { freshCamera } from './camera';
 import { escapeHtml, sendEmail } from './email';
 import { eventPhase, formatWhen } from './event-info';
 import { naira, percent, splitTransfer } from './money';
@@ -411,6 +412,8 @@ export type ScreenFeed = {
   recent: ScreenTransfer[];
   /** Lines to show, newest first. */
   lines: ScreenLine[];
+  /** A phone camera offering live video to the big screen, if one is on. */
+  camera: { session: string; answered: boolean } | null;
 };
 
 function sprayWeight(amountKobo: number): number {
@@ -431,6 +434,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
   const transfers = [...byId.values()].sort((a, b) => b.id - a.id);
   // Only approved lines, and plenty of them: the screen cycles through them all.
   const lines = await store.listLines(event.id, { status: ['approved'], limit: 300 });
+  const cam = eventPhase(event) === 'ended' ? null : await freshCamera(event.id);
   return {
     event: {
       title: event.title,
@@ -459,5 +463,6 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
       }))
       .reverse(),
     lines: lines.map((l) => ({ id: l.id, text: l.text, name: l.authorName, photo: l.photoUrl, createdAt: l.createdAt })),
+    camera: cam ? { session: cam.sessionId, answered: !!cam.answer } : null,
   };
 }
