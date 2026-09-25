@@ -50,6 +50,12 @@ export class Arena {
     private obstacles: Rect[],
   ) {}
 
+  /** The screen changed shape: new play area (everything settles into it on the next frame). */
+  setBounds(bounds: Rect, obstacles: Rect[]) {
+    this.bounds = bounds;
+    this.obstacles = obstacles;
+  }
+
   private rand(a: number, b: number) {
     this.seed = (this.seed * 16807) % 2147483647;
     return a + ((this.seed - 1) / 2147483646) * (b - a);

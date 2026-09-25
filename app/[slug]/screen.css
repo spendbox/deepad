@@ -2,7 +2,7 @@
    frame that scales it to any screen, and the phone layout. Colours come
    from the theme the planner picked (--s-*). */
 
-.screen-root { position: fixed; inset: 0; overflow: hidden; background: #000; color: var(--s-text); font-family: var(--body); }
+.screen-root { position: fixed; inset: 0; overflow: hidden; background: var(--s-bg); color: var(--s-text); font-family: var(--body); }
 .stage {
   position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px;
   transform-origin: center center; overflow: hidden; background: var(--s-bg);

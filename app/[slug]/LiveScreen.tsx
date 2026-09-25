@@ -8,7 +8,7 @@ import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
-import StageScreen, { SPRAY_SLOTS, type ActiveSprayer } from './StageScreen';
+import StageScreen, { SPRAY_SLOTS, type ActiveSprayer, type StageSize } from './StageScreen';
 import { useLiveCamera } from './useLiveCamera';
 import './stage.css';
 
@@ -39,6 +39,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const lastJoin = useRef(0);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
+  const [size, setSize] = useState<StageSize>({ w: STAGE_W, h: STAGE_H });
   const [compact, setCompact] = useState(false);
   const [ready, setReady] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -110,7 +111,14 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // --- Fit the 1920x1080 design to any TV or projector. ---
   useEffect(() => {
     const fit = () => {
-      setScale(Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H));
+      // Designed at 1920x1080, then stretched to the screen's own shape so it fills it edge to edge (no black bands).
+      const k = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+      setScale(k);
+      setSize((old) => {
+        const w = Math.round(window.innerWidth / k);
+        const h = Math.round(window.innerHeight / k);
+        return old.w === w && old.h === h ? old : { w, h };
+      });
       // Phones and narrow windows get a layout made for them instead of a tiny TV picture.
       setCompact(window.innerWidth < 900 || window.innerHeight > window.innerWidth);
       setReady(true);
@@ -305,7 +313,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // ---------- Big screen layout (TV or projector) ----------
   return (
     <div className="screen-root" style={themeVars}>
-      <div className="stage" style={{ transform: `translate(-50%, -50%) scale(${scale})` }}>
+      <div className="stage" style={{ width: size.w, height: size.h, transform: `translate(-50%, -50%) scale(${scale})` }}>
         <StageScreen
           e={e}
           theme={theme}
@@ -316,6 +324,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           photo={photo}
           lines={feed.lines}
           video={cam.stream}
+          size={size}
         />
       </div>
       <div className={`scr-controls${showControls || camMenu || camNotice ? '' : ' hidden'}`}>

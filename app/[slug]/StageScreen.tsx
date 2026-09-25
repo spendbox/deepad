@@ -18,10 +18,35 @@ import type { ScreenTheme } from '@/lib/themes';
 
 export const SPRAY_SLOTS = 12; // people spraying at once; the rest wait their turn
 
-const ARENA = { x0: 50, y0: 118, x1: 1870, y1: 714 };
-const CELEBRANT_ZONE = { x0: 770, y0: 60, x1: 1150, y1: 760 }; // nothing floats over (or above) the celebrant
-const CANVAS = { left: 0, top: 60, width: 1920, height: 700 };
-const TARGET = { x: [850 - CANVAS.left, 1070 - CANVAS.left] as [number, number], y: [220 - CANVAS.top, 560 - CANVAS.top] as [number, number] };
+/** Stage size in design pixels: at least 1920x1080, stretched to the screen's shape so nothing is letterboxed. */
+export type StageSize = { w: number; h: number };
+const CARD_SPACE = 366; // the transfer card along the bottom, and the gap above it
+
+/**
+ * Where everything goes on a stage of this size. The celebrant stands in the
+ * middle, as tall as the screen allows (their lower half tucks behind the
+ * transfer card); names and lines float either side.
+ */
+function layoutFor({ w, h }: StageSize) {
+  const cx = w / 2;
+  const photoTop = 64;
+  const cutoutH = h - photoTop - 40; // most of the screen's height
+  const photoH = h - CARD_SPACE - photoTop + 70; // framed photos: the bottom edge hides behind the card
+  const half = Math.min(260, cutoutH * 0.27); // clear space kept around the celebrant
+  const canvas = { left: 0, top: 60, width: Math.round(w), height: Math.round(h - 380) };
+  return {
+    arena: { x0: 50, y0: 118, x1: w - 50, y1: h - CARD_SPACE },
+    zone: { x0: cx - half, y0: 60, x1: cx + half, y1: h - CARD_SPACE + 46 }, // nothing floats over (or above) the celebrant
+    canvas,
+    target: {
+      x: [cx - 130, cx + 130] as [number, number],
+      y: [200 - canvas.top, h - 520 - canvas.top] as [number, number],
+    },
+    cutout: { left: cx - cutoutH * 0.36, top: photoTop, width: cutoutH * 0.72, height: cutoutH },
+    photo: { left: cx - photoH * 0.4, top: photoTop, width: photoH * 0.8, height: photoH },
+    monogram: { left: cx - 210, top: (h - CARD_SPACE) / 2 - 170 },
+  };
+}
 const MAX_LINES = 3; // lines on screen at once (fewer when a big crowd is spraying)
 const LINE_GAP_MS = 1300; // time between one line popping up and the next
 
@@ -87,14 +112,18 @@ type Props = {
   lines: ScreenLine[];
   /** Live video of the celebrant (a phone or a plugged-in camera), when one is on. */
   video: MediaStream | null;
+  size: StageSize;
 };
 
-function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video }: Props) {
+function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video, size }: Props) {
   const [videoOn, setVideoOn] = useState(false);
   const live = e.phase === 'live';
   const cutout = photo ? isCutout(photo) : false;
-  const arena = useMemo(() => new Arena(ARENA, [CELEBRANT_ZONE]), []);
+  const layout = useMemo(() => layoutFor(size), [size]);
+  const arena = useMemo(() => new Arena(layout.arena, [layout.zone]), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => arena.setBounds(layout.arena, [layout.zone]), [arena, layout]);
   useEffect(() => () => arena.stop(), [arena]);
+  const { canvas } = layout;
   const spraying = sprayers.some((s) => !s.leaving);
   const crowd = sprayers.filter((s) => !s.leaving).length;
 
@@ -123,21 +152,27 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
       {/* The celebrant, in the middle */}
       {photo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`st-photo fade-in${cutout ? ' cutout' : ''}`} />
+        <img
+          key={photo}
+          src={photo}
+          alt={`Photo of ${e.celebrantName}`}
+          className={`st-photo fade-in${cutout ? ' cutout' : ''}`}
+          style={cutout ? layout.cutout : layout.photo}
+        />
       ) : (
-        <div className="st-monogram" aria-hidden="true">{monogram(e.celebrantName)}</div>
+        <div className="st-monogram" style={layout.monogram} aria-hidden="true">{monogram(e.celebrantName)}</div>
       )}
 
       {live ? (
         <>
           {!spraying && !lines.length && !videoOn && <div className="st-hello">Spray {e.celebrantName}!</div>}
           <SprayCanvas
-            source={() => arena.emitters().map((m) => ({ ...m, x: m.x - CANVAS.left, y: m.y - CANVAS.top }))}
+            source={() => arena.emitters().map((m) => ({ ...m, x: m.x - canvas.left, y: m.y - canvas.top }))}
             active={spraying}
-            target={TARGET}
-            width={CANVAS.width}
-            height={CANVAS.height}
-            style={{ left: CANVAS.left, top: CANVAS.top, zIndex: 4 }}
+            target={layout.target}
+            width={canvas.width}
+            height={canvas.height}
+            style={{ left: canvas.left, top: canvas.top, zIndex: 4 }}
           />
           <div className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`} aria-live="polite">
             {sprayers.map((s) => (
@@ -238,7 +273,7 @@ function LiveVideo({ stream, onShowing }: { stream: MediaStream; onShowing: (on:
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [portrait, setPortrait] = useState(false);
+  const [upright, setUpright] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -274,15 +309,13 @@ function LiveVideo({ stream, onShowing }: { stream: MediaStream; onShowing: (on:
     <>
       <video
         ref={ref}
-        className={`st-video${showing ? ' on' : ''}${portrait ? ' portrait' : ''}`}
+        className={`st-video${showing ? ' on' : ''}${upright ? ' upright' : ''}`}
         autoPlay
         playsInline
         muted
         onPlaying={() => setPlaying(true)}
-        onResize={(ev) => {
-          const v = ev.currentTarget;
-          setPortrait(v.videoHeight > v.videoWidth);
-        }}
+        // A phone held upright still fills the screen; keep the top of the picture (where faces are) in view.
+        onResize={(ev) => setUpright(ev.currentTarget.videoHeight > ev.currentTarget.videoWidth)}
       />
       <div className={`st-scrim${showing ? ' on' : ''}`} aria-hidden="true" />
     </>
