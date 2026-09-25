@@ -179,7 +179,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
                 <FitText className="st-acct" text={acct} max={118} />
               </div>
               <div className="st-pay-divider" aria-hidden="true" />
-              <div className="st-pay-field">
+              <div className="st-pay-field right">
                 <div className="st-pay-label">Bank</div>
                 <FitText className="st-bank" text={e.accountBank ?? ''} max={104} />
               </div>

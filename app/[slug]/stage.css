@@ -98,7 +98,7 @@
   background: var(--s-accent); color: var(--s-on-accent); font-weight: 800; font-size: 28px; white-space: nowrap;
   box-shadow: 0 12px 24px -14px rgba(0, 0, 0, .5);
 }
-.st-pay-main { display: grid; grid-template-columns: max-content 2px minmax(0, 1fr); align-items: stretch; column-gap: 64px; }
+.st-pay-main { display: grid; grid-template-columns: minmax(0, 1fr) 2px fit-content(760px); align-items: stretch; column-gap: 56px; }
 .st-pay-field { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; }
 .st-pay-divider { align-self: stretch; margin: 6px 0; background: color-mix(in srgb, var(--s-muted) 28%, transparent); border-radius: 2px; }
 .st-pay-label {
@@ -130,3 +130,6 @@
 .st-arena.packed .sp-tag:not(.big) .sp-name { font-size: 26px; }
 .st-arena.packed .sp-tag:not(.big) .avatar { transform: scale(.8); margin: -6px; }
 .st-arena.packed .ln-text { font-size: 28px; }
+/* The bank sits on the right, hugging its own name, so the account number has room to breathe */
+.st-pay-field.right { align-items: flex-end; text-align: right; }
+.st-pay-note { justify-content: flex-end; text-align: right; }
