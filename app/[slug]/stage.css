@@ -84,8 +84,8 @@
 /* The account number */
 /* How to spray: one clean card along the bottom */
 .st-pay {
-  position: absolute; left: 60px; right: 60px; bottom: 30px; height: 276px; z-index: 5;
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 0 52px 26px;
+  position: absolute; left: 60px; right: 60px; bottom: 22px; height: 312px; z-index: 5;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 44px 52px 22px;
   border-radius: 36px; background: var(--s-panel);
   border: 2px solid color-mix(in srgb, var(--s-accent) 22%, transparent);
   box-shadow: 0 30px 60px -38px rgba(0, 0, 0, .55);
@@ -107,13 +107,16 @@
 .st-acct { font-weight: 800; line-height: .95; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--s-text); }
 .st-bank { font-weight: 800; line-height: .95; letter-spacing: -0.025em; color: var(--s-accent); }
 .st-pay-foot {
-  display: flex; justify-content: space-between; align-items: center; gap: 32px; min-width: 0;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 48px; min-width: 0;
   padding-top: 14px; border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
-  font-family: var(--body); font-size: 21px; color: var(--s-muted); white-space: nowrap;
 }
-.st-acct-name { font-weight: 700; color: var(--s-text); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.st-pay-k { font-weight: 600; color: var(--s-muted); margin-right: 8px; }
-.st-pay-note { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.st-acct-name { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.st-acct-name-v { font-weight: 800; letter-spacing: -0.005em; line-height: 1.1; color: var(--s-text); }
+.st-pay-note {
+  display: flex; align-items: flex-start; gap: 10px; flex: 0 0 auto; max-width: 560px; padding-bottom: 4px;
+  font-family: var(--body); font-size: 19px; line-height: 1.35; color: var(--s-muted);
+}
+.st-pay-note svg { flex-shrink: 0; margin-top: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .ln-bubble { animation: none; }

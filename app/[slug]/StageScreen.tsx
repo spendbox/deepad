@@ -18,7 +18,7 @@ import type { ScreenTheme } from '@/lib/themes';
 
 export const SPRAY_SLOTS = 12; // people spraying at once; the rest wait their turn
 
-const ARENA = { x0: 50, y0: 118, x1: 1870, y1: 738 };
+const ARENA = { x0: 50, y0: 118, x1: 1870, y1: 714 };
 const CELEBRANT_ZONE = { x0: 770, y0: 60, x1: 1150, y1: 760 }; // nothing floats over (or above) the celebrant
 const CANVAS = { left: 0, top: 60, width: 1920, height: 700 };
 const TARGET = { x: [850 - CANVAS.left, 1070 - CANVAS.left] as [number, number], y: [220 - CANVAS.top, 560 - CANVAS.top] as [number, number] };
@@ -133,7 +133,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
             height={CANVAS.height}
             style={{ left: CANVAS.left, top: CANVAS.top, zIndex: 4 }}
           />
-          <div className={`st-arena${crowd >= 8 ? ' packed' : crowd >= 5 ? ' crowd' : ''}`} aria-live="polite">
+          <div className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`} aria-live="polite">
             {sprayers.map((s) => (
               <ArenaBody
                 key={`s${s.t.id}`}
@@ -151,7 +151,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
                 </div>
               </ArenaBody>
             ))}
-            <LineCycler lines={lines} arena={arena} max={crowd >= 8 ? 1 : crowd >= 5 ? 2 : MAX_LINES} />
+            <LineCycler lines={lines} arena={arena} max={crowd >= 7 ? 1 : crowd >= 4 ? 2 : MAX_LINES} />
           </div>
         </>
       ) : (
@@ -176,23 +176,24 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
             <div className="st-pay-main">
               <div className="st-pay-field">
                 <div className="st-pay-label">Account number</div>
-                <FitText className="st-acct" text={acct} max={128} />
+                <FitText className="st-acct" text={acct} max={118} />
               </div>
               <div className="st-pay-divider" aria-hidden="true" />
               <div className="st-pay-field">
                 <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={112} />
+                <FitText className="st-bank" text={e.accountBank ?? ''} max={104} />
               </div>
             </div>
             <div className="st-pay-foot">
               {e.accountName ? (
-                <span className="st-acct-name">
-                  <span className="st-pay-k">Account name</span> {e.accountName}
-                </span>
+                <div className="st-acct-name">
+                  <div className="st-pay-label">Account name</div>
+                  <FitText className="st-acct-name-v" text={e.accountName} max={40} />
+                </div>
               ) : <span />}
               <span className="st-pay-note">
                 <ClockIcon />
-                Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.
+                <span>Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</span>
               </span>
             </div>
           </>
