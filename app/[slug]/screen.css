@@ -49,26 +49,23 @@
 .m-muted { color: var(--s-muted); font-size: 15px; line-height: 1.45; }
 .m-foot { color: var(--s-muted); font-size: 13px; text-align: center; margin: 4px 0 0; }
 
-/* A spray on the phone */
-.m-spray { position: relative; overflow: hidden; border: 3px solid var(--s-accent); min-height: 180px; animation: mSprayIn .8s cubic-bezier(.18, .9, .25, 1.15) both; }
-.m-spray > *:not(.cf-layer) { position: relative; z-index: 1; }
-.m-spray .cf-layer { z-index: 0; } /* behind the words, so the hype line stays readable */
+/* Phone: big spray, who is spraying, lines */
+.m-bigspray { border: 3px solid var(--s-accent); animation: mSprayIn .8s cubic-bezier(.18, .9, .25, 1.15) both; }
 @keyframes mSprayIn { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(1); } }
-.m-bigspray { border-width: 4px; }
-.m-badge {
-  align-self: flex-start; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--s-accent);
-  transform: rotate(-4deg); transform-origin: 0 100%; margin-bottom: 4px;
-}
-.m-amount { font-family: var(--display); font-weight: 800; font-size: clamp(40px, 13vw, 60px); line-height: 1; font-variant-numeric: tabular-nums; }
+.m-badge { align-self: flex-start; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--s-accent); transform: rotate(-4deg); transform-origin: 0 100%; }
+.m-big-who { display: flex; align-items: center; gap: 12px; font-family: var(--display); font-weight: 800; font-size: 34px; }
 .m-to { font-family: var(--display); font-weight: 800; font-size: 20px; }
-.m-msg { font-size: 20px; font-weight: 600; color: var(--s-muted); overflow-wrap: anywhere; }
-
-.m-messages { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.m-messages li {
-  font-size: 16px; font-weight: 600; padding: 8px 12px; border-radius: 12px 12px 12px 4px; overflow-wrap: anywhere;
-  background: color-mix(in srgb, var(--s-accent) 14%, transparent); border-left: 4px solid var(--s-accent);
+.m-sprayers { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.m-sprayers li {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px; border-radius: 999px; font-weight: 700;
+  background: color-mix(in srgb, var(--s-accent) 14%, transparent); animation: mSprayIn .6s ease both;
 }
+.m-lines { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.m-lines li { display: flex; gap: 10px; align-items: flex-start; }
+.m-lines strong { font-size: 15px; }
+.m-lines p { margin: 2px 0 0; font-weight: 600; font-size: 17px; overflow-wrap: anywhere; }
+.m-write { align-self: center; font-weight: 800; color: var(--s-accent); padding: 12px; min-height: 44px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .live-dot, .m-spray { animation: none; }
+  .fade-in, .live-dot, .m-bigspray, .m-sprayers li { animation: none; }
 }

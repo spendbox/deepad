@@ -11,7 +11,7 @@ import { cutoutsConfigured } from '@/lib/cutouts';
 import { requirePlanner } from '@/lib/session';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
-import { retrySetup, setPaused, setTransferHidden } from '../../../actions';
+import { retrySetup, setPaused } from '../../../actions';
 import AutoRefresh from '../../AutoRefresh';
 import EarningsChart from '../../earnings/EarningsChart';
 import AllSpraysDialog from './AllSpraysDialog';
@@ -20,7 +20,8 @@ import EventPhotos from './EventPhotos';
 import DashShell from '../../DashShell';
 import PhasePill from '../../PhasePill';
 import ReportButton from './ReportButton';
-import { DetailsForm, HypeForm, LinkForm, ThemeForm } from './SettingsForm';
+import LinesCard from './LinesCard';
+import { DetailsForm, LinkForm, ThemeForm } from './SettingsForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,7 @@ export default async function EventPage({
     after(() => closeEvent(event).catch((err) => console.error('closeEvent failed', err)));
   }
 
-  const transfers = await store.listTransfers(event.id, 1000);
+  const [transfers, lines] = await Promise.all([store.listTransfers(event.id, 1000), store.listLines(event.id, { includeHidden: true })]);
   const s = summarise(transfers);
   const timeline = eventTimeline(
     transfers.filter((t) => !t.outsideWindow).map((t) => ({ at: new Date(t.createdAt).getTime(), kobo: t.plannerFeeKobo })),
@@ -68,19 +69,11 @@ export default async function EventPage({
           {t.senderBank ? ` · ${t.senderBank}` : ''}
           {t.outsideWindow ? ' · outside event time, not shown' : ''}
         </div>
-        {t.message ? (
-          <div className={`msg${t.hidden ? ' hidden-msg' : ''}`}>“{t.message}”</div>
-        ) : (
-          <div className="msg">{t.rawNarration ? 'No message after removing bank codes' : 'No description typed'}</div>
-        )}
+        {/* The bank description: only you see it (the big screen shows lines instead). */}
+        {t.message && <div className="msg">“{t.message}”</div>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         <span className="amt">{naira(t.amountKobo)}</span>
-        {t.message && !t.outsideWindow && (
-          <form action={setTransferHidden.bind(null, event.id, t.id, !t.hidden)}>
-            <button type="submit" className="btn btn-sm">{t.hidden ? 'Show message' : 'Hide message'}</button>
-          </form>
-        )}
       </div>
     </div>
   );
@@ -186,7 +179,7 @@ export default async function EventPage({
         <div className="row-between">
           <div>
             <h2>Who sprayed</h2>
-            <span className="hint">Private: the screen never shows names</span>
+            <span className="hint">The big screen shows only first names and initials, never amounts</span>
           </div>
           <a href={`/dashboard/events/${event.id}/report`} className="btn btn-sm">Download PDF report</a>
         </div>
@@ -216,6 +209,15 @@ export default async function EventPage({
         </section>
       )}
 
+      <LinesCard
+        eventId={event.id}
+        lines={lines}
+        writeLink={`${link}/write`}
+        plannerName={planner.name}
+        celebrantName={event.celebrantName}
+        ended={phase === 'ended'}
+      />
+
       <section className="card settings-card">
         <div className="settings-head">
           <h2>Celebrant photos</h2>
@@ -242,7 +244,6 @@ export default async function EventPage({
           ended={phase === 'ended'}
           values={{
             slug: event.slug,
-            hypeLines: event.hypeLines ?? [],
             title: event.title,
             recipientLabel: event.recipientLabel,
             theme: event.theme,
@@ -272,10 +273,6 @@ export default async function EventPage({
         <LinkForm eventId={event.id} slug={event.slug} link={link} canChange={phase === 'upcoming'} />
       </section>
 
-      <details className="card">
-        <summary>Lines for sprays without a message</summary>
-        <HypeForm eventId={event.id} hypeLines={event.hypeLines ?? []} />
-      </details>
 
       <details className="card">
         <summary>Delete event</summary>

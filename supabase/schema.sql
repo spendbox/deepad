@@ -149,9 +149,24 @@ on conflict (id) do nothing;
 
 -- Lock everything down: only our server (with the secret service-role key)
 -- can read or write. Browsers never talk to the database directly.
+-- Lines on the big screen: short wishes for the celebrant, written by the
+-- planner or by guests on the event's "write a line" page.
+create table if not exists spray_lines (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references spray_events(id) on delete cascade,
+  text text not null,
+  author_name text not null,
+  photo_url text,
+  source text not null default 'guest',
+  hidden boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists spray_lines_event_idx on spray_lines (event_id, created_at desc);
+
 alter table planners enable row level security;
 alter table spray_events enable row level security;
 alter table transfers enable row level security;
 alter table password_resets enable row level security;
 alter table payment_logs enable row level security;
 alter table spray_intents enable row level security;
+alter table spray_lines enable row level security;

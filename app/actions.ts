@@ -1,7 +1,7 @@
 'use server';
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
@@ -14,9 +14,8 @@ import { hashPassword, verifyPassword } from '@/lib/passwords';
 import { endPlannerSession, requireAdmin, requirePlanner, startPlannerSession } from '@/lib/session';
 import { siteUrl } from '@/lib/site';
 import { slugProblem } from '@/lib/slug';
-import { MAX_HYPE_LENGTH, MAX_HYPE_LINES } from '@/lib/hype';
 import { getStore } from '@/lib/store';
-import { cleanDisplayName, cleanMessage } from '@/lib/text';
+import { cleanDisplayName, cleanLine } from '@/lib/text';
 import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
 import { cutoutsConfigured, removeBackground } from '@/lib/cutouts';
 import type { Planner, SprayEvent } from '@/lib/types';
@@ -427,13 +426,6 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   const label = cleanDisplayName(str(form, 'recipientLabel'));
   if (label) patch.recipientLabel = label;
 
-  if (form.has('hypeLines')) {
-    patch.hypeLines = String(form.get('hypeLines') ?? '')
-      .split('\n')
-      .map((l) => cleanMessage(l)?.slice(0, MAX_HYPE_LENGTH) ?? '')
-      .filter(Boolean)
-      .slice(0, MAX_HYPE_LINES);
-  }
 
   const newSlug = str(form, 'slug').toLowerCase();
   if (newSlug && newSlug !== event.slug) {
@@ -509,4 +501,87 @@ export async function adminRetrySetup(eventId: string) {
   await requireAdmin();
   await setupEventPayments(eventId);
   revalidatePath(`/admin/events/${eventId}`);
+}
+
+// ---------- Lines on the big screen ----------
+
+const MAX_LINES_PER_EVENT = 500;
+const LINE_PHOTO_BYTES = 3 * 1024 * 1024;
+
+/** Save a writer's photo (already shrunk on their phone). Returns its link, or null if none was given. */
+async function storeLinePhoto(eventId: string, form: FormData): Promise<string | null | { error: string }> {
+  const file = form.get('photo');
+  if (!(file instanceof File) || file.size === 0) return null;
+  const ext = PHOTO_TYPES[file.type];
+  if (!ext) return { error: 'Please use a JPG, PNG or WebP photo.' };
+  if (file.size > LINE_PHOTO_BYTES) return { error: 'That photo is too large.' };
+  try {
+    return await getStore().uploadImage(`lines/${eventId}/${randomUUID()}.${ext}`, new Uint8Array(await file.arrayBuffer()), file.type);
+  } catch (err) {
+    console.error('Line photo upload failed', err);
+    return { error: 'The photo could not be uploaded. Try again, or send your line without a photo.' };
+  }
+}
+
+function lineProblem(text: string, name: string): string | null {
+  if (text.length < 2) return 'Write your line first.';
+  if (!name) return 'Add your name, so everyone knows who wrote it.';
+  return null;
+}
+
+/** The planner adds a line from their dashboard. */
+export async function addLine(eventId: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const event = await ownEvent(eventId);
+  const planner = await requirePlanner();
+  const text = cleanLine(str(form, 'text'));
+  const name = cleanDisplayName(str(form, 'name')).slice(0, 40) || planner.name;
+  const problem = lineProblem(text, name);
+  if (problem) return { error: problem };
+  const photo = await storeLinePhoto(event.id, form);
+  if (photo && typeof photo === 'object') return photo;
+  await getStore().createLine({ eventId: event.id, text, authorName: name, photoUrl: photo, source: 'planner' });
+  revalidatePath(`/dashboard/events/${eventId}`);
+  return { ok: 'Added. It will show on the big screen.' };
+}
+
+export async function setLineHidden(eventId: string, lineId: string, hidden: boolean) {
+  await ownEvent(eventId);
+  await getStore().setLineHidden(eventId, lineId, hidden);
+  revalidatePath(`/dashboard/events/${eventId}`);
+}
+
+export async function deleteLine(eventId: string, lineId: string) {
+  await ownEvent(eventId);
+  const line = await getStore().deleteLine(eventId, lineId);
+  if (line?.photoUrl) await getStore().deleteImage(line.photoUrl).catch(() => {});
+  revalidatePath(`/dashboard/events/${eventId}`);
+}
+
+// A few tries per person per 10 minutes, so nobody can flood the screen.
+const lineTries = new Map<string, number[]>();
+
+/** A guest writes a line from the event's shareable "write a line" page. */
+export async function submitGuestLine(slug: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const store = getStore();
+  const event = await store.getEventBySlug(slug);
+  if (!event || event.deletedAt) return { error: 'This event could not be found.' };
+  if (eventPhase(event) === 'ended') return { error: 'This event has ended, so new lines can’t be added.' };
+
+  const ip = ((await headers()).get('x-forwarded-for') ?? 'unknown').split(',')[0].trim();
+  const key = `${event.id}:${ip}`;
+  const now = Date.now();
+  const recent = (lineTries.get(key) ?? []).filter((t) => now - t < 10 * 60_000);
+  if (recent.length >= 5) return { error: 'You’ve written a few lines already. Please wait a little before writing another.' };
+
+  const text = cleanLine(str(form, 'text'));
+  const name = cleanDisplayName(str(form, 'name')).slice(0, 40);
+  const problem = lineProblem(text, name);
+  if (problem) return { error: problem };
+  if ((await store.countLines(event.id)) >= MAX_LINES_PER_EVENT) return { error: 'This event has all the lines it can take. Thank you!' };
+
+  const photo = await storeLinePhoto(event.id, form);
+  if (photo && typeof photo === 'object') return photo;
+  lineTries.set(key, [...recent, now]);
+  await store.createLine({ eventId: event.id, text, authorName: name, photoUrl: photo, source: 'guest' });
+  return { ok: 'sent' };
 }

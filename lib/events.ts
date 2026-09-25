@@ -15,9 +15,8 @@ import {
 import { getStore } from './store';
 export { collectNarrations } from './narration';
 import { collectNarrations, pickNarration } from './narration';
-import { cleanNarration, senderInitials } from './text';
+import { cleanNarration, senderFirstName, senderInitials } from './text';
 import type { MoneyRow, Planner, SprayEvent, Transfer } from './types';
-import { hypeLinesFor } from './hype';
 import type { ThemeColors } from './themes';
 import { buildReportPdf, reportFileName } from './report-pdf';
 
@@ -372,14 +371,25 @@ ${row(`Paid to ${escapeHtml(event.celebrantName)}`, naira(s.celebrantKobo))}
 
 // ---------- The big screen ----------
 
+/**
+ * A spray as the big screen sees it: who (first name and initials only) and
+ * how big a moment to give it. Never the amount: it isn't even sent.
+ */
 export type ScreenTransfer = {
   id: number;
-  amountKobo: number;
-  message: string | null;
-  /** Just the sender's initials, e.g. "T.M." Never the full name. */
+  /** e.g. "Tolu". */
+  firstName: string | null;
+  /** e.g. "T.M." */
   initials: string | null;
+  /** Big spray (at or over the planner's big-spray amount): gets the full-screen moment. */
+  big: boolean;
+  /** 1 to 4: bigger sprays stay on screen spraying a little longer. */
+  weight: number;
   createdAt: string;
 };
+
+/** A line written by the planner or a guest (see SprayLine). */
+export type ScreenLine = { id: string; text: string; name: string; photo: string | null; createdAt: string };
 
 export type ScreenFeed = {
   event: {
@@ -389,20 +399,24 @@ export type ScreenFeed = {
     theme: string;
     themeColors: ThemeColors | null;
     photos: string[];
-    /** The planner's own hype lines (empty = ours, matched to the amount). */
-    hypeLines: string[];
     phase: 'upcoming' | 'live' | 'ended';
     startsAt: string;
     endsAt: string;
     paused: boolean;
-    bigSprayKobo: number;
     accountNumber: string | null;
     accountBank: string | null;
     accountName: string | null;
   };
-  /** Latest transfers, oldest first. No sender names and no totals, ever. */
+  /** Latest transfers, oldest first. No amounts and no totals, ever. */
   recent: ScreenTransfer[];
+  /** Lines to show, newest first. */
+  lines: ScreenLine[];
 };
+
+function sprayWeight(amountKobo: number): number {
+  const naira = amountKobo / 100;
+  return naira < 2_000 ? 1 : naira < 10_000 ? 2 : naira < 50_000 ? 3 : 4;
+}
 
 /**
  * What the big screen needs. `afterId` is the newest spray the screen has
@@ -415,6 +429,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
   const newer = afterId != null && Number.isFinite(afterId) ? await store.listTransfersAfter(event.id, afterId, 300) : [];
   const byId = new Map([...latest, ...newer].map((t) => [t.id, t]));
   const transfers = [...byId.values()].sort((a, b) => b.id - a.id);
+  const lines = await store.listLines(event.id, { limit: 40 });
   return {
     event: {
       title: event.title,
@@ -423,12 +438,10 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
       theme: event.theme,
       themeColors: event.themeColors ?? null,
       photos: event.photos ?? [],
-      hypeLines: hypeLinesFor(event.hypeLines),
       phase: eventPhase(event),
       startsAt: event.startsAt,
       endsAt: event.endsAt,
       paused: event.paused,
-      bigSprayKobo: event.bigSprayKobo,
       accountNumber: event.setupStatus === 'ready' ? event.accountNumber : null,
       accountBank: event.setupStatus === 'ready' ? event.accountBank : null,
       accountName: event.setupStatus === 'ready' ? event.accountName : null,
@@ -437,11 +450,13 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
       .filter((t) => !t.outsideWindow)
       .map((t) => ({
         id: t.id,
-        amountKobo: t.amountKobo,
-        message: t.hidden ? null : t.message,
+        firstName: senderFirstName(t.senderName),
         initials: senderInitials(t.senderName),
+        big: event.bigSprayKobo > 0 && t.amountKobo >= event.bigSprayKobo,
+        weight: sprayWeight(t.amountKobo),
         createdAt: t.createdAt,
       }))
       .reverse(),
+    lines: lines.map((l) => ({ id: l.id, text: l.text, name: l.authorName, photo: l.photoUrl, createdAt: l.createdAt })),
   };
 }
