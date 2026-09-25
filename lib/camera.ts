@@ -9,13 +9,13 @@ import type { CameraSession, SprayEvent } from './types';
 // they use to find each other.
 
 /** A phone that hasn't checked in for this long is treated as gone. */
-export const CAMERA_FRESH_MS = 30_000;
+export const CAMERA_FRESH_MS = 60_000;
 /** Offers and answers are a few KB; anything much bigger is not a real one. */
 export const MAX_SDP = 30_000;
 export const SESSION_RE = /^[A-Za-z0-9_-]{8,40}$/;
 export const TOKEN_RE = /^[A-Za-z0-9_-]{10,40}$/;
 /** A big screen that hasn't checked in for this long no longer holds the camera. */
-export const SCREEN_FRESH_MS = 30_000;
+export const SCREEN_FRESH_MS = 120_000;
 
 /** The big screen currently holding the camera, if it's still open. */
 export function cameraScreen(event: SprayEvent): string | null {
@@ -23,19 +23,22 @@ export function cameraScreen(event: SprayEvent): string | null {
   return Date.now() - new Date(event.cameraScreenSeenAt).getTime() < SCREEN_FRESH_MS ? event.cameraScreen : null;
 }
 
-/** This screen shows the camera from now on; the phone moves over to it. */
-export async function claimCamera(event: SprayEvent, screenId: string): Promise<void> {
+/**
+ * This screen shows the camera from now on; the phone moves over to it.
+ * `restart`: the screen holding it lost the picture, so ask the phone to reconnect.
+ */
+export async function claimCamera(event: SprayEvent, screenId: string, restart = false): Promise<void> {
   const store = getStore();
   const before = cameraScreen(event);
   await store.updateEvent(event.id, { cameraScreen: screenId, cameraScreenSeenAt: new Date().toISOString() });
-  if (before !== screenId) await store.resetCameraAnswer(event.id).catch(() => {});
+  if (before !== screenId || restart) await store.resetCameraAnswer(event.id).catch(() => {});
 }
 
 /** The screen holding the camera is still open (checked in at most every few seconds). */
 export async function screenSeen(event: SprayEvent, screenId: string): Promise<void> {
   if (event.cameraScreen !== screenId) return;
   const last = event.cameraScreenSeenAt ? new Date(event.cameraScreenSeenAt).getTime() : 0;
-  if (Date.now() - last < 8_000) return;
+  if (Date.now() - last < 15_000) return;
   await getStore().updateEvent(event.id, { cameraScreenSeenAt: new Date().toISOString() });
 }
 
@@ -94,7 +97,7 @@ export async function iceServers(): Promise<IceServer[]> {
     const res = await fetch(`${base}/v1/turn/keys/${encodeURIComponent(keyId)}/credentials/generate-ice-servers`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ttl: 6 * 3600 }),
+      body: JSON.stringify({ ttl: 24 * 3600 }), // a day, so a long event never needs new ones mid-stream
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new Error(`Cloudflare TURN ${res.status}`);
@@ -105,7 +108,7 @@ export async function iceServers(): Promise<IceServer[]> {
       .map((s) => ({ ...s, urls: (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u) => !/:53(\?|$)/.test(u)) }))
       .filter((s) => s.urls.length);
     if (!servers.length) throw new Error('Cloudflare TURN returned no servers');
-    relay = { servers, until: Date.now() + 3 * 3600_000 }; // reuse for 3 of the 6 hours they last
+    relay = { servers, until: Date.now() + 6 * 3600_000 }; // reuse for 6 of the 24 hours they last
     return servers;
   } catch (err) {
     console.error('TURN credentials failed', err);

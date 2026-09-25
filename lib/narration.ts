@@ -58,3 +58,59 @@ export function pickNarration(
   return { raw: candidates[0] ?? null, message: null };
 }
 
+
+const NAME_KEY = /^(sender|originator|payer|remitter|source_?account|debit_?account|from)_?(account_?)?name$/i;
+const NOT_A_NAME = /\b(bank|plc|ltd|limited|transfer|trf|payment|mobile|nip|ussd|pos|ref|reference|account|dashpad|paystack)\b/i;
+
+/** Tidy a possible name; null if it doesn't look like a person's (or a business's) name. */
+function asName(raw: unknown, receivers: string[]): string | null {
+  if (typeof raw !== 'string') return null;
+  const name = raw.replace(/\s+/g, ' ').replace(/^[\s/:.,-]+|[\s/:.,-]+$/g, '').trim();
+  if (name.length < 3 || name.length > 60 || !/[a-z]{2}/i.test(name) || /\d{3,}/.test(name)) return null;
+  const low = name.toLowerCase();
+  if (receivers.some((r) => r && (low === r.toLowerCase() || low.includes(r.toLowerCase()) || r.toLowerCase().includes(low)))) return null;
+  return name;
+}
+
+/**
+ * Who sent the transfer. Paystack usually gives authorization.sender_name, but
+ * some banks (e.g. GTBank) often leave it empty. Then we look for a name in
+ * other fields of the notification, and finally in the transfer description
+ * the bank wrote, e.g. "TRF FRM JOHN DOE TO ...". Never the receiving
+ * account's own name.
+ */
+export function findSenderName(data: unknown, receivers: string[]): string | null {
+  const d = (data ?? {}) as Record<string, any>;
+  const auth = (d.authorization ?? {}) as Record<string, any>;
+  const direct = asName(auth.sender_name, receivers) ?? asName(d.sender_name, receivers) ?? asName(d.metadata?.sender_name, receivers);
+  if (direct) return direct;
+
+  // Any other field that is clearly the sender's name.
+  let found: string | null = null;
+  const seen = new Set<unknown>();
+  const walk = (o: unknown, depth: number) => {
+    if (found || !o || typeof o !== 'object' || depth > 4 || seen.has(o)) return;
+    seen.add(o);
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (found) return;
+      if (NAME_KEY.test(k)) found = asName(v, receivers);
+      else if (v && typeof v === 'object') walk(v, depth + 1);
+    }
+  };
+  walk(d, 0);
+  if (found) return found;
+
+  // For bank transfers, the authorization's account name is the sender's account.
+  if (/dedicated|nuban|bank/i.test(String(d.channel ?? auth.channel ?? ''))) {
+    const acct = asName(auth.account_name, receivers);
+    if (acct && !NOT_A_NAME.test(acct)) return acct;
+  }
+
+  // Last try: the description banks write, e.g. "MOB TRF FRM JOHN DOE TO DASHPAD", "Transfer from Ada Obi".
+  for (const text of collectNarrations(d)) {
+    const m = /\b(?:FRM|FROM)\s*[:/-]?\s*([A-Za-z][A-Za-z .'&-]{2,60}?)(?=\s+(?:TO|VIA|FOR|REF|ON)\b|\s*[/|:,-]|\s*$)/i.exec(text);
+    const name = m ? asName(m[1], receivers) : null;
+    if (name && !NOT_A_NAME.test(name) && name.split(' ').length <= 5) return name;
+  }
+  return null;
+}

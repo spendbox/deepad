@@ -15,7 +15,7 @@ import {
 } from './paystack';
 import { getStore } from './store';
 export { collectNarrations } from './narration';
-import { collectNarrations, pickNarration } from './narration';
+import { collectNarrations, findSenderName, pickNarration } from './narration';
 import { cleanNarration, senderFirstName, senderInitials } from './text';
 import type { MoneyRow, Planner, SprayEvent, Transfer } from './types';
 import type { ThemeColors } from './themes';
@@ -248,11 +248,12 @@ export async function checkPaystackForTransfers(event: SprayEvent, opts: { force
       // For a brand-new payment with no name, give the notification a moment to arrive first,
       // so the screen shows the person's name instead of "A guest".
       const paidAt = new Date(tx.paid_at ?? tx.paidAt ?? 0).getTime();
-      if (!auth.sender_name && Number.isFinite(paidAt) && now - paidAt < NAME_GRACE_MS) continue;
+      const senderName = findSenderName(tx, receiverNames(event));
+      if (!senderName && Number.isFinite(paidAt) && now - paidAt < NAME_GRACE_MS) continue;
       const { created } = await recordTransfer(event, {
         reference: tx.reference,
         amountKobo,
-        senderName: auth.sender_name ?? null,
+        senderName,
         senderBank: auth.sender_bank ?? null,
         narrations: collectNarrations(tx),
         paidAt: tx.paid_at ?? tx.paidAt ?? null,

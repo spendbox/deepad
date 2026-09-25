@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
+import { keepAwake } from '@/lib/wake';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import StageScreen, { type ActiveSprayer, type StageMode, type StageSize } from './StageScreen';
 import { screenIdFor, useLiveCamera } from './useLiveCamera';
@@ -86,7 +87,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           seen.current.add(t.id);
           lastId.current = Math.max(lastId.current, t.id);
         });
-        if (fresh.length) setWaiting((w) => [...w, ...fresh]);
+        // Big sprays skip the queue and show straight away.
+        if (fresh.length) setWaiting((w) => [...fresh.filter((t) => t.big), ...w, ...fresh.filter((t) => !t.big)]);
       } catch {
         fails += 1;
         if (alive) setOnline(false);
@@ -164,22 +166,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     return () => window.removeEventListener('resize', fit);
   }, []);
 
-  // --- Keep the laptop awake while the screen is up. ---
-  useEffect(() => {
-    let lock: { release: () => Promise<void> } | null = null;
-    const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
-    const grab = async () => {
-      try {
-        if (nav.wakeLock && document.visibilityState === 'visible') lock = await nav.wakeLock.request('screen');
-      } catch {}
-    };
-    grab();
-    document.addEventListener('visibilitychange', grab);
-    return () => {
-      document.removeEventListener('visibilitychange', grab);
-      lock?.release().catch(() => {});
-    };
-  }, []);
+  // --- Keep the laptop awake while the screen is up (asking again whenever the system drops it). ---
+  useEffect(() => keepAwake(), []);
 
   // --- Hide the full-screen button when the mouse is still. ---
   useEffect(() => {
