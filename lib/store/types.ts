@@ -13,6 +13,7 @@ import type {
   SprayEvent,
   SprayIntent,
   SprayLine,
+  LineStatus,
   Transfer,
 } from '../types';
 
@@ -39,6 +40,7 @@ export interface Store {
   getEventBySlug(slug: string): Promise<SprayEvent | null>;
   getEventByAccountNumber(accountNumber: string): Promise<SprayEvent | null>;
   getEventByCustomerCode(code: string): Promise<SprayEvent | null>;
+  getEventByLinesToken(token: string): Promise<SprayEvent | null>;
   /** A planner's events, newest first. Deleted ones only with includeDeleted (e.g. for earnings). */
   listEventsByPlanner(plannerId: string, opts?: { includeDeleted?: boolean }): Promise<SprayEvent[]>;
   listEvents(): Promise<SprayEvent[]>;
@@ -73,10 +75,11 @@ export interface Store {
   markIntentPaid(reference: string, transferId: number): Promise<void>;
 
   createLine(l: NewSprayLine): Promise<SprayLine>;
-  /** Newest first. Hidden lines only with includeHidden (the planner's list). */
-  listLines(eventId: string, opts?: { includeHidden?: boolean; limit?: number }): Promise<SprayLine[]>;
+  /** Newest first; only the given statuses if `status` is set. */
+  listLines(eventId: string, opts?: { status?: LineStatus[]; limit?: number }): Promise<SprayLine[]>;
   countLines(eventId: string): Promise<number>;
-  setLineHidden(eventId: string, lineId: string, hidden: boolean): Promise<void>;
+  /** Approve or reject one or many lines at once. */
+  setLinesStatus(eventId: string, lineIds: string[], status: LineStatus): Promise<void>;
   /** Returns the deleted line (so its photo can be removed too), or null. */
   deleteLine(eventId: string, lineId: string): Promise<SprayLine | null>;
 

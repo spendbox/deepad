@@ -16,8 +16,8 @@ export default function WriteLine({ action, celebrantName }: { action: Action; c
         <div className="wl-check" aria-hidden="true">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg>
         </div>
-        <h2>Sent! Watch the big screen</h2>
-        <p className="hint">Your line joins the others and takes its turn on the screen.</p>
+        <h2>Sent! Thank you</h2>
+        <p className="hint">Once the planner approves it, your line takes its turn on the big screen.</p>
         <div className="line-preview">
           <div className="line-preview-head">
             <Avatar name={sent.name} photo={sent.photo} size={40} />

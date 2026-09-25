@@ -162,6 +162,10 @@ create table if not exists spray_lines (
   created_at timestamptz not null default now()
 );
 create index if not exists spray_lines_event_idx on spray_lines (event_id, created_at desc);
+-- Added later: guests' lines wait for the planner's approval ('pending', 'approved', 'rejected').
+alter table spray_lines add column if not exists status text not null default 'approved';
+-- Added later: secret link for the view-only page of all lines.
+alter table spray_events add column if not exists lines_view_token text unique;
 
 alter table planners enable row level security;
 alter table spray_events enable row level security;

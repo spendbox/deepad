@@ -64,7 +64,6 @@
 .m-lines li { display: flex; gap: 10px; align-items: flex-start; }
 .m-lines strong { font-size: 15px; }
 .m-lines p { margin: 2px 0 0; font-weight: 600; font-size: 17px; overflow-wrap: anywhere; }
-.m-write { align-self: center; font-weight: 800; color: var(--s-accent); padding: 12px; min-height: 44px; }
 
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .live-dot, .m-bigspray, .m-sprayers li { animation: none; }

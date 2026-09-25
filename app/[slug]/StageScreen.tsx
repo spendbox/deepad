@@ -35,7 +35,7 @@ export const SPRAY_SLOTS = SLOTS.length;
 // The confetti canvas covers the area around the celebrant only (cheaper than the whole screen).
 const CANVAS = { left: 150, top: 40, width: 1770, height: 712 };
 const TARGET = { x: [1100 - CANVAS.left, 1380 - CANVAS.left] as [number, number], y: [200 - CANVAS.top, 540 - CANVAS.top] as [number, number] };
-const LINE_MS = 7000; // each line stays up this long when there are several
+const LINE_MS = 7000; // each line stays up this long, then the next one (cycling through all approved lines)
 const BS_BACKGROUND = { color: 'var(--s-on-accent)', glow: 'var(--s-accent)', glowX: 1480, glowY: 460, glowRadius: 680 };
 
 export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean };
@@ -64,10 +64,9 @@ type Props = {
   online: boolean;
   photo: string | null;
   lines: ScreenLine[];
-  writeLink: string;
 };
 
-function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lines, writeLink }: Props) {
+function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lines }: Props) {
   const live = e.phase === 'live';
   const cutout = photo ? isCutout(photo) : false;
 
@@ -150,10 +149,13 @@ function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lin
         {live && acct ? (
           <>
             <div className="st-pay-label">Transfer to spray</div>
-            <FitText className="st-acct" text={acct} max={140} />
-            <div className="st-bank-row">
-              <span className="st-bank">{e.accountBank}</span>
+            <div className="st-pay-row">
+              <FitText className="st-acct" text={acct} max={150} />
+              <FitText className="st-bank" text={e.accountBank ?? ''} max={120} />
+            </div>
+            <div className="st-pay-note">
               {e.accountName && <span className="st-acct-name">{e.accountName}</span>}
+              <span>Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</span>
             </div>
           </>
         ) : live ? (
@@ -162,13 +164,6 @@ function StageScreen({ e, theme, acct, sprayers, big, paused, online, photo, lin
           <div className="st-pay-label">Thank you for celebrating with DashPad.</div>
         )}
       </footer>
-      {live && (
-        <aside className="st-side">
-          <strong>Any amount is welcome</strong>
-          <span>Transfers can take up to a minute to show on the screen.</span>
-          <span className="st-write">Write a line: <b>{writeLink}</b></span>
-        </aside>
-      )}
 
       {big && live && <BigSpray key={`b${big.id}`} t={big} e={e} acct={acct} photo={photo} theme={theme} />}
     </div>
@@ -186,14 +181,17 @@ function LineStack({ lines, celebrantName }: { lines: ScreenLine[]; celebrantNam
   linesRef.current = lines;
   const key = lines.map((l) => l.id).join(',');
 
-  // Show a brand-new line straight away; otherwise take turns every few seconds.
+  const known = useRef<Set<string> | null>(null); // every line id seen so far
+
+  // A newly approved line goes straight to the front; otherwise they take turns, over and over.
   useEffect(() => {
     const ls = linesRef.current;
     if (!ls.length) return;
-    setOrder((o) => {
-      const fresh = ls.find((l) => !o.includes(l.id));
-      return o.length === 0 || fresh ? [...o.slice(-20), (fresh ?? ls[0]).id] : o;
-    });
+    const first = known.current === null;
+    const seen = (known.current ??= new Set());
+    const fresh = first ? undefined : ls.find((l) => !seen.has(l.id));
+    ls.forEach((l) => seen.add(l.id));
+    setOrder((o) => (o.length === 0 ? [ls[0].id] : fresh ? [...o.slice(-20), fresh.id] : o));
   }, [key]);
   useEffect(() => {
     if (linesRef.current.length < 2) return;
