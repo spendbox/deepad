@@ -1,19 +1,17 @@
 'use client';
 
-import type { DanceStyle } from '@/lib/dance';
 import './celebrant.css';
 
 const PILE_MAX = 14;
 
 /**
- * The celebrant's cut-out photo, dancing. When a spray lands (`sprayKey`
+ * The celebrant's cut-out photo, standing on the screen. When a spray lands (`sprayKey`
  * changes), naira notes rain down: some are grabbed (they fly into the
  * celebrant's hands, who jumps for joy) and the rest land in a pile at
  * their feet that grows through the night (`pile`).
  */
 export default function Celebrant({
   src,
-  dance,
   width,
   height,
   sprayKey = 0,
@@ -22,7 +20,6 @@ export default function Celebrant({
   className = '',
 }: {
   src: string;
-  dance: DanceStyle;
   width: number;
   height: number;
   /** Changes on every spray, which replays the falling money. 0 = no spray. */
@@ -70,7 +67,7 @@ export default function Celebrant({
   }));
 
   return (
-    <div className={`celeb dance-${dance} ${className}`} style={{ width, height }} aria-hidden="true">
+    <div className={`celeb ${className}`} style={{ width, height }} aria-hidden="true">
       <div className="celeb-pile">
         {piled.map((p, i) => (
           <span key={i} className="celeb-note" style={{ width: noteW, height: noteH, fontSize: noteH * 0.55, left: p.left, bottom: p.bottom, transform: `rotate(${p.rotate}deg)` }}>
@@ -78,7 +75,7 @@ export default function Celebrant({
           </span>
         ))}
       </div>
-      <div className="celeb-dance">
+      <div className="celeb-body">
         <div key={sprayKey} className={`celeb-react${sprayKey ? ' joy' : ''}`}>
           <div className="celeb-flash" />
           {/* eslint-disable-next-line @next/next/no-img-element */}

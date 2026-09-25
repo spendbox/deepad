@@ -223,14 +223,13 @@ export default async function EventPage({
           <h2>Celebrant photos</h2>
           <span className="hint">
             {canRemoveBg
-              ? 'With the background removed, they dance on the big screen and catch the money.'
+              ? 'With the background removed, they stand on the big screen and catch the money.'
               : 'They show on the big screen between sprays.'}
           </span>
         </div>
         <EventPhotos
           eventId={event.id}
           initial={event.photos}
-          dance={event.danceStyle ?? 'groove'}
           canRemoveBg={canRemoveBg}
           bg={screenTheme.bg}
           glow={screenTheme.accent}

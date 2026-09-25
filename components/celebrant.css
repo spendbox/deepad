@@ -1,6 +1,6 @@
-/* The dancing cut-out celebrant (see Celebrant.tsx). */
+/* The cut-out celebrant who catches the money (see Celebrant.tsx). */
 .celeb { position: relative; flex-shrink: 0; overflow: visible; --celeb-glow: var(--s-accent, #f2b437); }
-.celeb-dance, .celeb-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.celeb-body, .celeb-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
 .celeb-img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom center;
   filter: drop-shadow(0 0 22px color-mix(in srgb, var(--celeb-glow) 45%, transparent));
@@ -55,29 +55,7 @@
   100% { opacity: 0; }
 }
 
-/* Dance styles (between sprays) */
-.dance-groove .celeb-dance { animation: dGroove 1.8s ease-in-out infinite; }
-@keyframes dGroove {
-  0%, 100% { transform: rotate(-2.5deg) translateX(-1%); }
-  50% { transform: rotate(2.5deg) translateX(1%); }
-}
-.dance-bounce .celeb-dance { animation: dBounce .6s cubic-bezier(.3, 0, .4, 1) infinite; }
-@keyframes dBounce {
-  0%, 100% { transform: translateY(0) scale(1.02, .98); }
-  50% { transform: translateY(-4%) scale(.99, 1.01); }
-}
-.dance-shimmy .celeb-dance { animation: dShimmy .38s ease-in-out infinite; }
-@keyframes dShimmy {
-  0%, 100% { transform: skewX(-2deg) translateX(-.8%); }
-  50% { transform: skewX(2deg) translateX(.8%); }
-}
-.dance-float .celeb-dance { animation: dFloat 3.2s ease-in-out infinite; }
-@keyframes dFloat {
-  0%, 100% { transform: translateY(0) rotate(-1deg); }
-  50% { transform: translateY(-3%) rotate(1deg); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .celeb-dance, .celeb-react.joy, .celeb-react.joy .celeb-flash { animation: none !important; }
+  .celeb-react.joy, .celeb-react.joy .celeb-flash { animation: none !important; }
   .celeb-falling { display: none; }
 }

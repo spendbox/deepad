@@ -290,7 +290,7 @@
 /* Fun line for a spray without a message */
 .pop-msg.hype, .m-msg.hype { font-style: italic; color: var(--s-accent); border-left-style: dashed; }
 
-/* Dancing cut-out celebrant (components/Celebrant.tsx) */
+/* Cut-out celebrant who catches the money (components/Celebrant.tsx) */
 .panel-main.with-celeb { flex-direction: row; align-items: center; gap: 40px; padding-bottom: 0; }
 .spray-pop.with-celeb .pop-text { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding-bottom: 36px; }
 .invite.with-celeb .invite-text { padding-bottom: 36px; }
@@ -300,4 +300,4 @@
 .takeover.with-celeb .takeover-main { flex: 1; }
 .takeover.with-celeb .takeover-amount { width: 1150px; }
 .takeover-celeb { align-self: flex-end; margin-bottom: -20px; --celeb-glow: var(--s-on-accent); }
-.m-dancer { display: flex; justify-content: center; padding-top: 60px; overflow: hidden; margin-bottom: -8px; }
+.m-celeb { display: flex; justify-content: center; padding-top: 60px; overflow: hidden; margin-bottom: -8px; }

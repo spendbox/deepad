@@ -19,7 +19,6 @@ import { getStore } from '@/lib/store';
 import { cleanDisplayName, cleanMessage } from '@/lib/text';
 import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
 import { photoroomConfigured, removeBackground } from '@/lib/photoroom';
-import { DEFAULT_DANCE, isDanceStyle } from '@/lib/dance';
 import type { Planner, SprayEvent } from '@/lib/types';
 
 type FormState = { error?: string; ok?: string } | null;
@@ -191,7 +190,6 @@ export type NewEventInput = {
   endsAt: string;
   theme: string;
   themeColors?: { primary: string; secondary: string } | null;
-  danceStyle?: string;
   payoutBankCode: string;
   payoutBankName: string;
   payoutAccountNumber: string;
@@ -253,7 +251,6 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     celebrantName,
     recipientLabel,
     ...eventTheme(input.theme, input.themeColors),
-    danceStyle: isDanceStyle(input.danceStyle) ? input.danceStyle : DEFAULT_DANCE,
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
     plannerFeeBps,
@@ -367,7 +364,7 @@ export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: strin
       if (cut.byteLength > MAX_PHOTO_BYTES) throw new Error('cut-out too large');
       bytes = cut;
       type = 'image/png';
-      // Marked, so the big screen shows it as a dancing cut-out.
+      // Marked, so the big screen shows it as a cut-out that catches the money.
       name = `${randomUUID()}-cutout.png`;
     } catch (err) {
       console.error('Background removal failed', err);
@@ -425,8 +422,6 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
     Object.assign(patch, eventTheme(theme, colors));
   }
   if (Number.isFinite(big) && big >= 1000) patch.bigSprayKobo = big * 100;
-  const dance = str(form, 'danceStyle');
-  if (isDanceStyle(dance)) patch.danceStyle = dance;
   const title = cleanDisplayName(str(form, 'title'));
   if (title) patch.title = title;
   const label = cleanDisplayName(str(form, 'recipientLabel'));

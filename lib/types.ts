@@ -1,4 +1,3 @@
-import type { DanceStyle } from './dance';
 import type { EventThemeId, ThemeColors } from './themes';
 
 /** An event planner (or MC) who creates spray events. */
@@ -38,8 +37,6 @@ export type SprayEvent = {
   themeColors: ThemeColors | null;
   /** Photos of the celebrants (public image links), shown on the big screen. */
   photos: string[];
-  /** How the cut-out celebrant dances on the big screen. */
-  danceStyle: DanceStyle;
   /** Fun lines shown for sprays that arrive without a message. Empty = use the defaults. */
   hypeLines: string[];
   startsAt: string;

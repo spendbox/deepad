@@ -556,17 +556,8 @@ details .settings-form { margin-top: 12px; }
 .check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; cursor: pointer; }
 .check-row input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--aubergine); flex-shrink: 0; }
 
-/* Dance style picker */
+/* Spray preview (cut-out celebrant) */
 .dance-picker { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
 @media (min-width: 640px) { .dance-picker { grid-template-columns: 240px minmax(0, 1fr); align-items: start; } }
 .dance-preview { border-radius: 16px; display: flex; justify-content: center; align-items: flex-end; padding: 70px 16px 12px; overflow: hidden; }
 .dance-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.dance-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
-.dance-opt {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px;
-  border-radius: 12px; border: 1.5px solid var(--line); background: #fff; min-height: 56px;
-}
-.dance-opt span { font-size: 13px; color: var(--ink-muted); }
-.dance-opt[aria-pressed='true'] { background: var(--aubergine); border-color: var(--aubergine); color: var(--gold); }
-.dance-opt[aria-pressed='true'] span { color: var(--lilac); }
-.dance-opt:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }

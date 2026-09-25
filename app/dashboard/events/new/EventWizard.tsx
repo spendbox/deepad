@@ -8,9 +8,7 @@ import BankAccountFields, { type BankAccount } from '@/components/BankAccountFie
 import BankCard from '@/components/BankCard';
 import PayoutNote from '@/components/PayoutNote';
 import ThemePicker, { ScreenPreview } from '@/components/ThemePicker';
-import DancePicker from '@/components/DancePicker';
-import { DANCE_STYLES, DEFAULT_DANCE, type DanceStyle } from '@/lib/dance';
-import { isCutout } from '@/lib/photos';
+import SprayPreview from '@/components/SprayPreview';
 import PhotoPicker from '@/components/PhotoPicker';
 import SlugField from '@/components/SlugField';
 import { slugify, slugProblem } from '@/lib/slug';
@@ -44,7 +42,6 @@ type Draft = {
   slug: string;
   slugEdited: boolean;
   photos: string[];
-  danceStyle: DanceStyle;
   recipientLabel: string;
   startsAt: string; // datetime-local value, in the phone's time zone
   endsAt: string;
@@ -75,7 +72,6 @@ function defaultDraft(): Draft {
     slug: '',
     slugEdited: false,
     photos: [],
-    danceStyle: DEFAULT_DANCE,
     recipientLabel: 'the couple',
     startsAt: toLocalInput(start),
     endsAt: toLocalInput(end),
@@ -219,7 +215,6 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
       const res = await createSprayEvent({
         slug,
         photos: d.photos,
-        danceStyle: d.danceStyle,
         eventType: d.eventType,
         celebrantName: d.celebrantName,
         title,
@@ -444,10 +439,8 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
             {step === S.photos && (
               <>
                 <PhotoPicker value={d.photos} onChange={(photos) => set({ photos })} canRemoveBg={canRemoveBg} />
-                <DancePicker
+                <SprayPreview
                   photos={d.photos}
-                  value={d.danceStyle}
-                  onChange={(danceStyle) => set({ danceStyle })}
                   bg={screenTheme.bg}
                   glow={screenTheme.accent}
                 />
@@ -533,9 +526,6 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
                   <dl>
                     <dt>Colours</dt><dd>{themeName}</dd>
                     <dt>Photos</dt><dd>{d.photos.length ? `${d.photos.length} added` : 'None yet'}</dd>
-                    {d.photos.some(isCutout) && (
-                      <><dt>Dance</dt><dd>{DANCE_STYLES.find((x) => x.id === d.danceStyle)?.name}</dd></>
-                    )}
                   </dl>
                 </section>
                 <section className="wz-panel review">

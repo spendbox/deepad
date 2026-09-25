@@ -172,11 +172,10 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
   // Celebrant photos take turns, a new one every few seconds.
   const photo = e.photos.length ? e.photos[ready ? Math.floor(now / PHOTO_MS) % e.photos.length : 0] : null;
-  // Cut-out photos (background removed) dance and catch the money instead.
+  // Cut-out photos (background removed) stand on the screen and catch the money instead.
   const cutouts = e.photos.filter(isCutout);
-  const dancer = cutouts.length ? cutouts[ready ? Math.floor(now / PHOTO_MS) % cutouts.length : 0] : null;
-  const sprayDancer = cutouts.length ? cutouts[popKey % cutouts.length] : null;
-  const dance = e.danceStyle ?? 'groove';
+  const celeb = cutouts.length ? cutouts[ready ? Math.floor(now / PHOTO_MS) % cutouts.length : 0] : null;
+  const sprayCeleb = cutouts.length ? cutouts[popKey % cutouts.length] : null;
   // The pile of notes at their feet grows with every spray shown.
   const pile = Math.max(0, feed.recent.length - queue.length);
   const spraying = !!takeover || (showingSpray && !!current);
@@ -212,9 +211,9 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           {statusBadge}
         </header>
 
-        {dancer ? (
-          <div className="m-dancer">
-            <Celebrant src={spraying ? sprayDancer! : dancer} dance={dance} width={250} height={310} sprayKey={popKey} pile={pile} notes={8} />
+        {celeb ? (
+          <div className="m-celeb">
+            <Celebrant src={spraying ? sprayCeleb! : celeb} width={250} height={310} sprayKey={popKey} pile={pile} notes={8} />
           </div>
         ) : (
           photo && (
@@ -291,7 +290,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         <NotesRain />
 
         {takeover ? (
-          <div className={`takeover${sprayDancer ? ' with-celeb' : ''}`}>
+          <div className={`takeover${sprayCeleb ? ' with-celeb' : ''}`}>
             <div className="takeover-main">
               <div className="takeover-badge">Big spray!</div>
               <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
@@ -300,8 +299,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                 <div className="takeover-msg">{isHype(takeover.t) ? lineFor(takeover.t) : `“${lineFor(takeover.t)}”`}</div>
               )}
             </div>
-            {sprayDancer && (
-              <Celebrant className="takeover-celeb" src={sprayDancer} dance={dance} width={560} height={720} sprayKey={popKey} pile={pile} notes={16} />
+            {sprayCeleb && (
+              <Celebrant className="takeover-celeb" src={sprayCeleb} width={560} height={720} sprayKey={popKey} pile={pile} notes={16} />
             )}
             {acct && (
               <div className="takeover-acct">
@@ -350,7 +349,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
               <>
                 <div className="middle">
                   {showingSpray && current ? (
-                    <div key={popKey} className={`panel-main spray-pop${sprayDancer ? ' with-celeb' : ''}`}>
+                    <div key={popKey} className={`panel-main spray-pop${sprayCeleb ? ' with-celeb' : ''}`}>
                       <Burst count={16} />
                       <div className="pop-text">
                         <div className="pop-kicker">New spray!</div>
@@ -362,12 +361,12 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                           </div>
                         )}
                       </div>
-                      {sprayDancer && (
-                        <Celebrant className="panel-celeb" src={sprayDancer} dance={dance} width={400} height={500} sprayKey={popKey} pile={pile} />
+                      {sprayCeleb && (
+                        <Celebrant className="panel-celeb" src={sprayCeleb} width={400} height={500} sprayKey={popKey} pile={pile} />
                       )}
                     </div>
                   ) : (
-                    <div className={`invite panel-main${photo ? ' with-photo' : ''}${dancer ? ' with-celeb' : ''}`}>
+                    <div className={`invite panel-main${photo ? ' with-photo' : ''}${celeb ? ' with-celeb' : ''}`}>
                       <div className="invite-text">
                         <div className="invite-big">Spray {e.celebrantName}!</div>
                         <div className="invite-sub">
@@ -375,8 +374,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                           may show up here.
                         </div>
                       </div>
-                      {dancer ? (
-                        <Celebrant className="panel-celeb" src={dancer} dance={dance} width={400} height={500} pile={pile} />
+                      {celeb ? (
+                        <Celebrant className="panel-celeb" src={celeb} width={400} height={500} pile={pile} />
                       ) : (
                         photo && (
                           // eslint-disable-next-line @next/next/no-img-element

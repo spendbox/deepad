@@ -98,7 +98,7 @@ export default function PhotoPicker({
           <span>
             <strong>Remove backgrounds</strong>
             <span className="hint" style={{ display: 'block' }}>
-              Cuts out the people so they can dance on the big screen and catch the money. Use clear photos where
+              Cuts out the people so they stand on the big screen and catch the money. Use clear photos where
               everyone is fully in the picture.
             </span>
           </span>
