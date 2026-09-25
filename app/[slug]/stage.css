@@ -84,8 +84,8 @@
 /* The account number */
 /* How to spray: one clean card along the bottom */
 .st-pay {
-  position: absolute; left: 60px; right: 60px; bottom: 30px; height: 276px; z-index: 5;
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 0 52px 26px;
+  position: absolute; left: 60px; right: 60px; bottom: 22px; height: 312px; z-index: 5;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 44px 52px 22px;
   border-radius: 36px; background: var(--s-panel);
   border: 2px solid color-mix(in srgb, var(--s-accent) 22%, transparent);
   box-shadow: 0 30px 60px -38px rgba(0, 0, 0, .55);
@@ -98,7 +98,7 @@
   background: var(--s-accent); color: var(--s-on-accent); font-weight: 800; font-size: 28px; white-space: nowrap;
   box-shadow: 0 12px 24px -14px rgba(0, 0, 0, .5);
 }
-.st-pay-main { display: grid; grid-template-columns: max-content 2px minmax(0, 1fr); align-items: stretch; column-gap: 64px; }
+.st-pay-main { display: grid; grid-template-columns: minmax(0, 1fr) 2px fit-content(760px); align-items: stretch; column-gap: 56px; }
 .st-pay-field { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; }
 .st-pay-divider { align-self: stretch; margin: 6px 0; background: color-mix(in srgb, var(--s-muted) 28%, transparent); border-radius: 2px; }
 .st-pay-label {
@@ -107,13 +107,16 @@
 .st-acct { font-weight: 800; line-height: .95; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--s-text); }
 .st-bank { font-weight: 800; line-height: .95; letter-spacing: -0.025em; color: var(--s-accent); }
 .st-pay-foot {
-  display: flex; justify-content: space-between; align-items: center; gap: 32px; min-width: 0;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 48px; min-width: 0;
   padding-top: 14px; border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
-  font-family: var(--body); font-size: 21px; color: var(--s-muted); white-space: nowrap;
 }
-.st-acct-name { font-weight: 700; color: var(--s-text); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.st-pay-k { font-weight: 600; color: var(--s-muted); margin-right: 8px; }
-.st-pay-note { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.st-acct-name { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.st-acct-name-v { font-weight: 800; letter-spacing: -0.005em; line-height: 1.1; color: var(--s-text); }
+.st-pay-note {
+  display: flex; align-items: flex-start; gap: 10px; flex: 0 0 auto; max-width: 560px; padding-bottom: 4px;
+  font-family: var(--body); font-size: 19px; line-height: 1.35; color: var(--s-muted);
+}
+.st-pay-note svg { flex-shrink: 0; margin-top: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .ln-bubble { animation: none; }
@@ -127,3 +130,32 @@
 .st-arena.packed .sp-tag:not(.big) .sp-name { font-size: 26px; }
 .st-arena.packed .sp-tag:not(.big) .avatar { transform: scale(.8); margin: -6px; }
 .st-arena.packed .ln-text { font-size: 28px; }
+/* The bank sits on the right, hugging its own name, so the account number has room to breathe */
+.st-pay-field.right { align-items: flex-end; text-align: right; }
+.st-pay-note { justify-content: flex-end; text-align: right; }
+
+/* ---------- Live camera: the video fills the screen, everything else floats over it ---------- */
+.st-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000;
+  opacity: 0; transition: opacity .9s ease;
+}
+.st-video.portrait { object-fit: contain; }
+.st-video.on { opacity: 1; }
+/* Soft dark fades at the top and bottom, so the title and the transfer card always read well */
+.st-scrim {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .9s ease;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, .6) 0, rgba(0, 0, 0, 0) 220px),
+    linear-gradient(to top, rgba(0, 0, 0, .55) 0, rgba(0, 0, 0, 0) 420px);
+}
+.st-scrim.on { opacity: 1; }
+.st-photo, .st-monogram { transition: opacity .9s ease; }
+.st.video .st-photo, .st.video .st-monogram { opacity: 0; }
+.st.video .st-top { color: #fff; }
+.st.video .st-event, .st.video .st-closes { color: rgba(255, 255, 255, .85); }
+.st-status.cam { padding: 6px 18px 6px 14px; border-radius: 999px; background: #e0245e; color: #fff; }
+.st-status.cam .st-dot { background: #fff; animation: camBlink 1.4s ease-in-out infinite; }
+@keyframes camBlink { 50% { opacity: .3; } }
+.st.video .sp-tag, .st.video .ln-bubble { box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .75); }
+.st.video .st-pay { box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .8); }
+.st.video .st-notice { padding: 44px 48px; border-radius: 36px; background: var(--s-panel); }

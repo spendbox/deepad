@@ -14,6 +14,7 @@ import type {
   SprayLine,
   LineStatus,
   Transfer,
+  CameraSession,
 } from '../types';
 import { computeStats, type Store } from './types';
 
@@ -28,13 +29,15 @@ type Data = {
   logs: PaymentLog[];
   intents: SprayIntent[];
   lines: SprayLine[];
+  cameras: CameraSession[];
   nextTransferId: number;
 };
 
 const g = globalThis as unknown as { __dashpadMemory?: Data };
 function data(): Data {
-  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], intents: [], lines: [], nextTransferId: 1 };
+  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], intents: [], lines: [], cameras: [], nextTransferId: 1 };
   g.__dashpadMemory.lines ??= [];
+  g.__dashpadMemory.cameras ??= [];
   return g.__dashpadMemory;
 }
 
@@ -110,6 +113,9 @@ export class MemoryStore implements Store {
   }
   async getEventByLinesToken(token: string) {
     return data().events.find((e) => e.linesViewToken === token) ?? null;
+  }
+  async getEventByCameraToken(token: string) {
+    return data().events.find((e) => e.cameraToken === token) ?? null;
   }
   async listEventsByPlanner(plannerId: string, opts: { includeDeleted?: boolean } = {}) {
     return data()
@@ -219,6 +225,30 @@ export class MemoryStore implements Store {
     const d = data();
     const i = d.lines.findIndex((x) => x.id === lineId && x.eventId === eventId);
     return i < 0 ? null : d.lines.splice(i, 1)[0];
+  }
+
+  async getCamera(eventId: string) {
+    return data().cameras.find((c) => c.eventId === eventId) ?? null;
+  }
+  async startCamera(eventId: string, sessionId: string, offer: string) {
+    const d = data();
+    d.cameras = d.cameras.filter((c) => c.eventId !== eventId);
+    d.cameras.push({ eventId, sessionId, offer, answer: null, updatedAt: now() });
+  }
+  async answerCamera(eventId: string, sessionId: string, answer: string) {
+    const c = data().cameras.find((x) => x.eventId === eventId && x.sessionId === sessionId && !x.answer);
+    if (!c) return false;
+    c.answer = answer;
+    return true;
+  }
+  async touchCamera(eventId: string, sessionId: string) {
+    const c = data().cameras.find((x) => x.eventId === eventId && x.sessionId === sessionId);
+    if (c) c.updatedAt = now();
+    return !!c;
+  }
+  async stopCamera(eventId: string, sessionId: string) {
+    const d = data();
+    d.cameras = d.cameras.filter((c) => !(c.eventId === eventId && c.sessionId === sessionId));
   }
 
   async logPayment(l: NewPaymentLog) {

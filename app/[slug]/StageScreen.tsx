@@ -18,7 +18,7 @@ import type { ScreenTheme } from '@/lib/themes';
 
 export const SPRAY_SLOTS = 12; // people spraying at once; the rest wait their turn
 
-const ARENA = { x0: 50, y0: 118, x1: 1870, y1: 738 };
+const ARENA = { x0: 50, y0: 118, x1: 1870, y1: 714 };
 const CELEBRANT_ZONE = { x0: 770, y0: 60, x1: 1150, y1: 760 }; // nothing floats over (or above) the celebrant
 const CANVAS = { left: 0, top: 60, width: 1920, height: 700 };
 const TARGET = { x: [850 - CANVAS.left, 1070 - CANVAS.left] as [number, number], y: [220 - CANVAS.top, 560 - CANVAS.top] as [number, number] };
@@ -85,9 +85,12 @@ type Props = {
   online: boolean;
   photo: string | null;
   lines: ScreenLine[];
+  /** Live video of the celebrant (a phone or a plugged-in camera), when one is on. */
+  video: MediaStream | null;
 };
 
-function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }: Props) {
+function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video }: Props) {
+  const [videoOn, setVideoOn] = useState(false);
   const live = e.phase === 'live';
   const cutout = photo ? isCutout(photo) : false;
   const arena = useMemo(() => new Arena(ARENA, [CELEBRANT_ZONE]), []);
@@ -97,15 +100,18 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
 
   const status = !online ? (
     <span className="st-status offline" role="status">Reconnecting… transfers still work</span>
+  ) : live && videoOn && !paused ? (
+    <span className="st-status cam"><span className="st-dot" />Live camera</span>
   ) : live ? (
     <span className="st-status"><span className="st-dot" />{paused ? 'Paused' : 'Live'}</span>
   ) : null;
 
   return (
-    <div className="st">
+    <div className={`st${videoOn ? ' video' : ''}`}>
+      {video && <LiveVideo stream={video} onShowing={setVideoOn} />}
       <header className="st-top">
         <div className="st-top-left">
-          <Logo size={30} tone={theme.light ? 'light' : 'dark'} />
+          <Logo size={30} tone={theme.light && !videoOn ? 'light' : 'dark'} />
           <span className="st-event">{e.title}</span>
         </div>
         <div className="st-top-right">
@@ -124,7 +130,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
 
       {live ? (
         <>
-          {!spraying && !lines.length && <div className="st-hello">Spray {e.celebrantName}!</div>}
+          {!spraying && !lines.length && !videoOn && <div className="st-hello">Spray {e.celebrantName}!</div>}
           <SprayCanvas
             source={() => arena.emitters().map((m) => ({ ...m, x: m.x - CANVAS.left, y: m.y - CANVAS.top }))}
             active={spraying}
@@ -133,7 +139,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
             height={CANVAS.height}
             style={{ left: CANVAS.left, top: CANVAS.top, zIndex: 4 }}
           />
-          <div className={`st-arena${crowd >= 8 ? ' packed' : crowd >= 5 ? ' crowd' : ''}`} aria-live="polite">
+          <div className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`} aria-live="polite">
             {sprayers.map((s) => (
               <ArenaBody
                 key={`s${s.t.id}`}
@@ -151,7 +157,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
                 </div>
               </ArenaBody>
             ))}
-            <LineCycler lines={lines} arena={arena} max={crowd >= 8 ? 1 : crowd >= 5 ? 2 : MAX_LINES} />
+            <LineCycler lines={lines} arena={arena} max={crowd >= 7 ? 1 : crowd >= 4 ? 2 : MAX_LINES} />
           </div>
         </>
       ) : (
@@ -176,23 +182,24 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines }:
             <div className="st-pay-main">
               <div className="st-pay-field">
                 <div className="st-pay-label">Account number</div>
-                <FitText className="st-acct" text={acct} max={128} />
+                <FitText className="st-acct" text={acct} max={118} />
               </div>
               <div className="st-pay-divider" aria-hidden="true" />
-              <div className="st-pay-field">
+              <div className="st-pay-field right">
                 <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={112} />
+                <FitText className="st-bank" text={e.accountBank ?? ''} max={104} />
               </div>
             </div>
             <div className="st-pay-foot">
               {e.accountName ? (
-                <span className="st-acct-name">
-                  <span className="st-pay-k">Account name</span> {e.accountName}
-                </span>
+                <div className="st-acct-name">
+                  <div className="st-pay-label">Account name</div>
+                  <FitText className="st-acct-name-v" text={e.accountName} max={40} />
+                </div>
               ) : <span />}
               <span className="st-pay-note">
                 <ClockIcon />
-                Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.
+                <span>Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</span>
               </span>
             </div>
           </>
@@ -219,6 +226,66 @@ function ClockIcon() {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
       <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
     </svg>
+  );
+}
+
+/**
+ * The live camera, filling the screen behind everything. It only counts as
+ * "on" while pictures are really arriving: if the phone freezes or drops,
+ * the celebrant's photo comes back instead of a stuck or black picture.
+ */
+function LiveVideo({ stream, onShowing }: { stream: MediaStream; onShowing: (on: boolean) => void }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [portrait, setPortrait] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.srcObject = stream;
+    el.play().catch(() => {});
+    const track = stream.getVideoTracks()[0];
+    let t: ReturnType<typeof setTimeout> | undefined;
+    // A short freeze keeps the picture; a longer one brings the photo back.
+    const onMute = () => { clearTimeout(t); t = setTimeout(() => setMuted(true), 1500); };
+    const onUnmute = () => { clearTimeout(t); setMuted(false); };
+    const onEnded = () => { clearTimeout(t); setMuted(true); };
+    track?.addEventListener('mute', onMute);
+    track?.addEventListener('unmute', onUnmute);
+    track?.addEventListener('ended', onEnded);
+    return () => {
+      clearTimeout(t);
+      track?.removeEventListener('mute', onMute);
+      track?.removeEventListener('unmute', onUnmute);
+      track?.removeEventListener('ended', onEnded);
+      setPlaying(false);
+      setMuted(false);
+    };
+  }, [stream]);
+
+  const showing = playing && !muted;
+  useEffect(() => {
+    onShowing(showing);
+  }, [showing, onShowing]);
+  useEffect(() => () => onShowing(false), [onShowing]);
+
+  return (
+    <>
+      <video
+        ref={ref}
+        className={`st-video${showing ? ' on' : ''}${portrait ? ' portrait' : ''}`}
+        autoPlay
+        playsInline
+        muted
+        onPlaying={() => setPlaying(true)}
+        onResize={(ev) => {
+          const v = ev.currentTarget;
+          setPortrait(v.videoHeight > v.videoWidth);
+        }}
+      />
+      <div className={`st-scrim${showing ? ' on' : ''}`} aria-hidden="true" />
+    </>
   );
 }
 

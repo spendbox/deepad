@@ -8,7 +8,7 @@ export const SLUG_MAX = 40;
 const RESERVED = new Set([
   'dashboard', 'login', 'logout', 'signup', 'admin', 'api', 'e', 'forgot-password', 'reset-password',
   'about', 'pricing', 'terms', 'privacy', 'help', 'support', 'contact', 'blog', 'dashpad', 'www',
-  'static', 'public', 'images', 'assets', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'events', 'event',
+  'static', 'public', 'images', 'assets', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'events', 'event', 'camera', 'lines',
 ]);
 
 /** "Tolu & Dayo’s Wedding!" -> "tolu-and-dayos-wedding" */

@@ -21,6 +21,8 @@ import DashShell from '../../DashShell';
 import PhasePill from '../../PhasePill';
 import ReportButton from './ReportButton';
 import LinesCard from './LinesCard';
+import CameraCard from './CameraCard';
+import { screenKey } from '@/lib/camera';
 import EventTabs from './EventTabs';
 import PauseToggle from './PauseToggle';
 import SplitDialog from './SplitDialog';
@@ -59,6 +61,8 @@ export default async function EventPage({
     Date.now(),
   );
   const link = `${await siteUrl()}/${event.slug}`;
+  // The big screen opened from here carries its key, so it can receive a phone camera.
+  const screenUrl = `/${event.slug}?screen=${screenKey(event.id)}`;
   const canRemoveBg = cutoutsConfigured();
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
@@ -116,7 +120,7 @@ export default async function EventPage({
                   <div className="actions">
                     <CopyButton text={link} label="Copy link" dark />
                     <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-gold btn-sm">Share on WhatsApp</a>
-                    <a href={`/${event.slug}`} target="_blank" rel="noreferrer" className="btn btn-sm btn-ghost-light">Open big screen ↗</a>
+                    <a href={screenUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-ghost-light">Open big screen ↗</a>
                   </div>
                 </section>
 
@@ -151,6 +155,8 @@ export default async function EventPage({
                   )}
                   <PayoutNote />
                 </SectionCard>
+
+                {phase !== 'ended' && <CameraCard eventId={event.id} screenUrl={screenUrl} celebrantName={event.celebrantName} />}
 
                 <div className="tiles">
                   <div className="tile gold"><div className="v">{naira(s.totalKobo)}</div><div className="k">Sprayed</div></div>

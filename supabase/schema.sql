@@ -172,6 +172,17 @@ update spray_lines set status = 'pending' where source = 'guest' and reviewed_at
 -- Added later: secret link for the view-only page of all lines.
 alter table spray_events add column if not exists lines_view_token text unique;
 
+-- Live camera: a phone streams video straight to the big screen. This table only
+-- holds the short "handshake" between the two (no video is ever stored).
+alter table spray_events add column if not exists camera_token text unique;
+create table if not exists camera_sessions (
+  event_id uuid primary key references spray_events(id) on delete cascade,
+  session_id text not null,
+  offer text not null,
+  answer text,
+  updated_at timestamptz not null default now()
+);
+
 alter table planners enable row level security;
 alter table spray_events enable row level security;
 alter table transfers enable row level security;
@@ -179,3 +190,4 @@ alter table password_resets enable row level security;
 alter table payment_logs enable row level security;
 alter table spray_intents enable row level security;
 alter table spray_lines enable row level security;
+alter table camera_sessions enable row level security;

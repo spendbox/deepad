@@ -9,6 +9,7 @@ import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import StageScreen, { SPRAY_SLOTS, type ActiveSprayer } from './StageScreen';
+import { useLiveCamera } from './useLiveCamera';
 import './stage.css';
 
 const POLL_MS = 2000;
@@ -41,6 +42,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const [compact, setCompact] = useState(false);
   const [ready, setReady] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [camMenu, setCamMenu] = useState(false);
 
   // --- Ask the server for new transfers and lines. Keeps retrying if the internet drops. ---
   useEffect(() => {
@@ -154,6 +156,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   }, []);
 
   const e = feed.event;
+  // Live video of the celebrant: only on the big screen, never on guests' phones.
+  const cam = useLiveCamera(code, feed.camera, ready && !compact && e.phase !== 'ended');
   const colorsKey = JSON.stringify(e.themeColors ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const theme = useMemo(() => resolveTheme(e.theme, e.themeColors), [e.theme, colorsKey]);
@@ -177,7 +181,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const fullScreenButton = (
     <button
       type="button"
-      className={`fs-btn${showControls ? '' : ' hidden'}`}
+      className="fs-btn"
       onClick={() => {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         else document.documentElement.requestFullscreen().catch(() => {});
@@ -306,9 +310,54 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           online={online}
           photo={photo}
           lines={feed.lines}
+          video={cam.stream}
         />
       </div>
-      {fullScreenButton}
+      <div className={`scr-controls${showControls || camMenu ? '' : ' hidden'}`}>
+        {camMenu && (
+          <div className="cam-menu" role="menu">
+            <div className="cam-menu-h">Show live video from</div>
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={!cam.localId}
+              className={!cam.localId ? 'on' : ''}
+              onClick={() => { cam.chooseLocal(null); setCamMenu(false); }}
+            >
+              <strong>A phone</strong>
+              <span>
+                {cam.canUsePhone
+                  ? cam.source === 'phone' ? 'Showing now' : 'Open the camera link on a phone and tap Go live'
+                  : 'Open this screen with “Open big screen” in your dashboard to use a phone'}
+              </span>
+            </button>
+            {cam.devices.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={cam.localId === d.id}
+                className={cam.localId === d.id ? 'on' : ''}
+                onClick={() => { cam.chooseLocal(d.id); setCamMenu(false); }}
+              >
+                <strong>{d.label}</strong>
+                <span>{cam.localId === d.id ? (cam.source === 'local' ? 'Showing now' : 'Starting…') : 'Plugged into this computer'}</span>
+              </button>
+            ))}
+            {!cam.devices.length && <p className="cam-menu-note">No camera plugged into this computer.</p>}
+            {cam.localError && <p className="cam-menu-note err">{cam.localError}</p>}
+          </div>
+        )}
+        <button
+          type="button"
+          className={`fs-btn${cam.source ? ' live' : ''}`}
+          aria-expanded={camMenu}
+          onClick={() => { if (!camMenu) cam.refreshDevices(); setCamMenu(!camMenu); }}
+        >
+          {cam.source ? '● Camera' : 'Camera'}
+        </button>
+        {fullScreenButton}
+      </div>
     </div>
   );
 }

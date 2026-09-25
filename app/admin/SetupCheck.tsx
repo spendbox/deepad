@@ -1,4 +1,5 @@
 import { emailConfigured } from '@/lib/email';
+import { relayConfigured } from '@/lib/camera';
 import { cutoutStatus } from '@/lib/cutouts';
 import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
 import { siteUrl } from '@/lib/site';
@@ -57,6 +58,13 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
     {
       ...cutoutStatus(),
       title: 'Background removal for photos',
+    },
+    {
+      ok: true, // optional: the live camera works on most networks without it
+      title: 'Live camera relay (Cloudflare)',
+      detail: relayConfigured()
+        ? 'Set up. Phone cameras can reach the big screen even on strict venue Wi-Fi.'
+        : 'Optional, not set up. Phone cameras work on most networks; for venues whose Wi-Fi blocks them, add CLOUDFLARE_TURN_KEY_ID and CLOUDFLARE_TURN_KEY_API_TOKEN (free Cloudflare account).',
     },
     {
       ok: !!process.env.CRON_SECRET,

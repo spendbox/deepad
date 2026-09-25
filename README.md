@@ -47,6 +47,11 @@ description. Senders stay anonymous on screen.
   celebrant photos get their background removed on upload.
   The cut-out celebrant then stands on the big screen, and every spray throws **confetti**
   onto them (more confetti for bigger sprays).
+- **Live camera**: the planner sends a private camera link to whoever is filming; they tap **Go live** on
+  their phone and the big screen switches to the live video, with lines and sprayers floating over it.
+  A camera plugged into the big-screen computer works too (the **Camera** button on the screen). The video
+  goes straight from the phone to the screen (WebRTC); only the short handshake passes through DashPad.
+  Optional free relay for strict networks: `CLOUDFLARE_TURN_KEY_ID` + `CLOUDFLARE_TURN_KEY_API_TOKEN`.
 - The admin page has a **Setup check** and a **Payment notifications** log for fixing problems.
 - Planners can delete events. Events that received money are hidden, not erased, so records stay complete.
 
