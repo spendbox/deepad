@@ -163,7 +163,12 @@ create table if not exists spray_lines (
 );
 create index if not exists spray_lines_event_idx on spray_lines (event_id, created_at desc);
 -- Added later: guests' lines wait for the planner's approval ('pending', 'approved', 'rejected').
-alter table spray_lines add column if not exists status text not null default 'approved';
+alter table spray_lines add column if not exists status text not null default 'pending';
+alter table spray_lines alter column status set default 'pending';
+-- When the planner last approved or rejected the line (null = never reviewed).
+alter table spray_lines add column if not exists reviewed_at timestamptz;
+-- Fix: guests' lines that were marked approved without the planner ever reviewing them go back to waiting.
+update spray_lines set status = 'pending' where source = 'guest' and reviewed_at is null and status <> 'pending';
 -- Added later: secret link for the view-only page of all lines.
 alter table spray_events add column if not exists lines_view_token text unique;
 

@@ -11,7 +11,7 @@ import { cutoutsConfigured } from '@/lib/cutouts';
 import { requirePlanner } from '@/lib/session';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
-import { retrySetup, setPaused } from '../../../actions';
+import { retrySetup } from '../../../actions';
 import AutoRefresh from '../../AutoRefresh';
 import EarningsChart from '../../earnings/EarningsChart';
 import AllSpraysDialog from './AllSpraysDialog';
@@ -21,6 +21,10 @@ import DashShell from '../../DashShell';
 import PhasePill from '../../PhasePill';
 import ReportButton from './ReportButton';
 import LinesCard from './LinesCard';
+import EventTabs from './EventTabs';
+import PauseToggle from './PauseToggle';
+import SplitDialog from './SplitDialog';
+import SectionCard from '@/components/SectionCard';
 import { DetailsForm, LinkForm, ThemeForm } from './SettingsForm';
 
 export const dynamic = 'force-dynamic';
@@ -88,196 +92,173 @@ export default async function EventPage({
         </div>
       )}
 
-      <div className="stack" style={{ gap: 6 }}>
-        <div className="row-between">
+      <header className="ev-hero">
+        <div className="ev-hero-text">
+          <div className="ev-hero-top">
+            <PhasePill phase={phase} />
+            <span className="hint">{formatWhen(event.startsAt)} → {formatWhen(event.endsAt)}</span>
+          </div>
           <h1>{event.title}</h1>
-          <PhasePill phase={phase} />
         </div>
-        <span className="hint">
-          {formatWhen(event.startsAt)} → {formatWhen(event.endsAt)} · Your cut {percent(event.plannerFeeBps)}
-        </span>
-      </div>
+        {phase !== 'ended' && <PauseToggle eventId={event.id} paused={event.paused} />}
+      </header>
 
-      <section className="share-box" aria-label="Your event link">
-        <span style={{ color: 'var(--lilac)', fontSize: 14 }}>Your event link: open it on the big screen</span>
-        <span className="share-link">{link}</span>
-        <div className="actions">
-          <CopyButton text={link} label="Copy link" dark />
-          <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-gold btn-sm">Share on WhatsApp</a>
-          <a href={`/${event.slug}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{ background: 'transparent', color: 'var(--ivory)', borderColor: 'var(--ivory)' }}>
-            Open big screen ↗
-          </a>
-        </div>
-      </section>
+      <EventTabs
+        tabs={[
+          {
+            id: 'overview',
+            label: 'Overview',
+            content: (
+              <>
+                <section className="share-box" aria-label="Your event link">
+                  <span style={{ color: 'var(--lilac)', fontSize: 14 }}>Your event link: open it on the big screen</span>
+                  <span className="share-link">{link}</span>
+                  <div className="actions">
+                    <CopyButton text={link} label="Copy link" dark />
+                    <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-gold btn-sm">Share on WhatsApp</a>
+                    <a href={`/${event.slug}`} target="_blank" rel="noreferrer" className="btn btn-sm btn-ghost-light">Open big screen ↗</a>
+                  </div>
+                </section>
 
-      <section className="card" aria-label="Event account number">
-        <span className="hint">Guests transfer to</span>
-        {event.setupStatus === 'ready' && event.accountNumber ? (
-          <>
-            <div className="row-between">
-              <span className="acct-big">{groupAccountNumber(event.accountNumber)}</span>
-              <CopyButton text={event.accountNumber} />
-            </div>
-            <span className="bank-strong">{event.accountBank}</span>
-            <span style={{ fontWeight: 600 }}>{event.accountName}</span>
-            {phase === 'ended' && <span className="hint">This account is closed. New transfers are not accepted.</span>}
-          </>
-        ) : event.setupStatus === 'failed' ? (
-          <>
-            <div className="banner error">
-              We couldn’t create the account number yet: {event.setupError ?? 'unknown error'}
-            </div>
-            <form action={retrySetup.bind(null, event.id)}>
-              <button type="submit" className="btn btn-dark">Try again</button>
-            </form>
-          </>
-        ) : (
-          <div className="banner warn">{event.setupError ?? 'Your account number is being set up. Check back in a moment.'}</div>
-        )}
-        <span className="hint">
-          Money goes to {event.payoutAccountName} ({event.payoutBankName} · {event.payoutAccountNumber}).
-        </span>
-        <PayoutNote />
-      </section>
+                <SectionCard icon="money" title="Guests transfer to" action={
+                  <SplitDialog
+                    plannerFeeBps={event.plannerFeeBps}
+                    platformFeeBps={event.platformFeeBps}
+                    celebrantName={event.celebrantName}
+                    celebrantAccount={`${event.payoutAccountName} · ${event.payoutBankName} · ${event.payoutAccountNumber}`}
+                    plannerAccount={planner.accountNumber ? `${planner.accountName ?? planner.name} · ${planner.bankName ?? ''} · ${planner.accountNumber}` : null}
+                  />
+                }>
+                  {event.setupStatus === 'ready' && event.accountNumber ? (
+                    <div className="acct-box">
+                      <div className="row-between">
+                        <span className="acct-big">{groupAccountNumber(event.accountNumber)}</span>
+                        <CopyButton text={event.accountNumber} />
+                      </div>
+                      <span className="bank-strong">{event.accountBank}</span>
+                      <span style={{ fontWeight: 600 }}>{event.accountName}</span>
+                      {phase === 'ended' && <span className="hint">This account is closed. New transfers are not accepted.</span>}
+                    </div>
+                  ) : event.setupStatus === 'failed' ? (
+                    <>
+                      <div className="banner error">We couldn’t create the account number yet: {event.setupError ?? 'unknown error'}</div>
+                      <form action={retrySetup.bind(null, event.id)}>
+                        <button type="submit" className="btn btn-dark">Try again</button>
+                      </form>
+                    </>
+                  ) : (
+                    <div className="banner warn">{event.setupError ?? 'Your account number is being set up. Check back in a moment.'}</div>
+                  )}
+                  <PayoutNote />
+                </SectionCard>
 
-      <div className="tiles">
-        <div className="tile gold"><div className="v">{naira(s.totalKobo)}</div><div className="k">Sprayed</div></div>
-        <div className="tile"><div className="v">{s.count}</div><div className="k">Sprays</div></div>
-        <div className="tile"><div className="v">{naira(s.plannerKobo)}</div><div className="k">You earn</div></div>
-        <div className="tile"><div className="v">{naira(s.celebrantKobo)}</div><div className="k">{event.celebrantName} gets</div></div>
-      </div>
+                <div className="tiles">
+                  <div className="tile gold"><div className="v">{naira(s.totalKobo)}</div><div className="k">Sprayed</div></div>
+                  <div className="tile"><div className="v">{s.count}</div><div className="k">Sprays</div></div>
+                  <div className="tile"><div className="v">{naira(s.plannerKobo)}</div><div className="k">You earn ({percent(event.plannerFeeBps)})</div></div>
+                  <div className="tile"><div className="v">{naira(s.celebrantKobo)}</div><div className="k">{event.celebrantName} gets</div></div>
+                </div>
 
-      {phase !== 'upcoming' && timeline.buckets.length > 1 && event.plannerFeeBps > 0 && (
-        <EarningsChart
-          bars={timeline.buckets.map((b) => ({ label: b.label, tip: b.tip, kobo: b.kobo, sprays: b.sprays }))}
-          title="Your earnings through the event"
-          per={timeline.slotLabel === 'hour' ? 'hour' : `${timeline.slotLabel.split(' ')[0]} min`}
-        />
-      )}
+                {phase !== 'upcoming' && timeline.buckets.length > 1 && event.plannerFeeBps > 0 && (
+                  <EarningsChart
+                    bars={timeline.buckets.map((b) => ({ label: b.label, tip: b.tip, kobo: b.kobo, sprays: b.sprays }))}
+                    title="Your earnings through the event"
+                    per={timeline.slotLabel === 'hour' ? 'hour' : `${timeline.slotLabel.split(' ')[0]} min`}
+                  />
+                )}
 
-      {phase !== 'ended' && (
-        <section className="card">
-          <div className="row-between">
-            <div>
-              <h2>Big screen</h2>
-              <span className="hint">
-                {event.paused
-                  ? 'Paused: sprays wait in line and show when you resume.'
-                  : 'Showing sprays as they arrive.'}
-              </span>
-            </div>
-            <form action={setPaused.bind(null, event.id, !event.paused)}>
-              <button type="submit" className={`btn ${event.paused ? 'btn-dark' : ''}`}>
-                {event.paused ? 'Resume' : 'Pause for speeches'}
-              </button>
-            </form>
-          </div>
-        </section>
-      )}
+                <SectionCard
+                  icon="people"
+                  title="Who sprayed"
+                  hint="The big screen shows only first names and initials, never amounts."
+                  action={<a href={`/dashboard/events/${event.id}/report`} className="btn btn-sm">PDF report</a>}
+                >
+                  {transfers.length === 0 ? (
+                    <p className="empty" style={{ margin: 0 }}>No sprays yet. They’ll appear here the moment they land (it can take up to a minute).</p>
+                  ) : (
+                    <>
+                      <div className="feed">{transfers.slice(0, 10).map(sprayRow)}</div>
+                      {transfers.length > 10 && (
+                        <AllSpraysDialog count={transfers.length}>
+                          <div className="feed">{transfers.map(sprayRow)}</div>
+                        </AllSpraysDialog>
+                      )}
+                    </>
+                  )}
+                </SectionCard>
 
-      <section className="card">
-        <div className="row-between">
-          <div>
-            <h2>Who sprayed</h2>
-            <span className="hint">The big screen shows only first names and initials, never amounts</span>
-          </div>
-          <a href={`/dashboard/events/${event.id}/report`} className="btn btn-sm">Download PDF report</a>
-        </div>
-        {transfers.length === 0 ? (
-          <p className="empty">No sprays yet. They’ll appear here the moment they land (it can take up to a minute).</p>
-        ) : (
-          <>
-            <div className="feed">{transfers.slice(0, 10).map(sprayRow)}</div>
-            {transfers.length > 10 && (
-              <AllSpraysDialog count={transfers.length}>
-                <div className="feed">{transfers.map(sprayRow)}</div>
-              </AllSpraysDialog>
-            )}
-          </>
-        )}
-      </section>
+                {phase === 'ended' && (
+                  <SectionCard
+                    icon="report"
+                    title="Event report"
+                    hint={event.reportSentAt ? `Emailed to ${planner.email}.` : `We’ll email the full list of who sprayed to ${planner.email}.`}
+                  >
+                    <ReportButton eventId={event.id} />
+                  </SectionCard>
+                )}
+              </>
+            ),
+          },
+          {
+            id: 'lines',
+            label: 'Lines',
+            badge: lines.filter((l) => l.status === 'pending').length,
+            content: (
+              <LinesCard
+                eventId={event.id}
+                initialLines={lines}
+                writeLink={`${link}/write`}
+                plannerName={planner.name}
+                celebrantName={event.celebrantName}
+                ended={phase === 'ended'}
+              />
+            ),
+          },
+          {
+            id: 'settings',
+            label: 'Settings',
+            content: (
+              <>
+                <SectionCard
+                  icon="photo"
+                  title="Celebrant photos"
+                  hint={canRemoveBg ? 'With the background removed, they stand on the big screen and the confetti lands on them.' : 'They show on the big screen.'}
+                >
+                  <EventPhotos eventId={event.id} initial={event.photos} canRemoveBg={canRemoveBg} />
+                </SectionCard>
 
-      {phase === 'ended' && (
-        <section className="card">
-          <h2>Event report</h2>
-          <span className="hint">
-            {event.reportSentAt
-              ? `Emailed to ${planner.email}.`
-              : `We’ll email the full list of who sprayed to ${planner.email}.`}
-          </span>
-          <ReportButton eventId={event.id} />
-        </section>
-      )}
+                <SectionCard icon="details" title="Event details" hint="What the big screen says, and when spraying closes.">
+                  <DetailsForm
+                    eventId={event.id}
+                    ended={phase === 'ended'}
+                    values={{
+                      slug: event.slug,
+                      title: event.title,
+                      recipientLabel: event.recipientLabel,
+                      theme: event.theme,
+                      themeColors: event.themeColors ?? null,
+                      bigSprayNaira: event.bigSprayKobo / 100,
+                      endsAt: event.endsAt,
+                    }}
+                  />
+                </SectionCard>
 
-      <LinesCard
-        eventId={event.id}
-        initialLines={lines}
-        writeLink={`${link}/write`}
-        plannerName={planner.name}
-        celebrantName={event.celebrantName}
-        ended={phase === 'ended'}
+                <SectionCard icon="palette" title="Screen colours" hint="Pick a theme or your own colours. We keep the text easy to read.">
+                  <ThemeForm eventId={event.id} values={{ theme: event.theme, themeColors: event.themeColors ?? null, recipientLabel: event.recipientLabel }} />
+                </SectionCard>
+
+                <SectionCard icon="link" title="Event link" hint="The address you share and open on the big screen.">
+                  <LinkForm eventId={event.id} slug={event.slug} link={link} canChange={phase === 'upcoming'} />
+                </SectionCard>
+
+                <SectionCard icon="trash" title="Delete event" tone="danger" hint="Remove this event from your dashboard.">
+                  <DeleteEvent eventId={event.id} hasMoney={transfers.length > 0} live={phase === 'live'} />
+                </SectionCard>
+              </>
+            ),
+          },
+        ]}
       />
-
-      <section className="card settings-card">
-        <div className="settings-head">
-          <h2>Celebrant photos</h2>
-          <span className="hint">
-            {canRemoveBg
-              ? 'With the background removed, they stand on the big screen and the confetti lands on them.'
-              : 'They show on the big screen between sprays.'}
-          </span>
-        </div>
-        <EventPhotos
-          eventId={event.id}
-          initial={event.photos}
-          canRemoveBg={canRemoveBg}
-        />
-      </section>
-
-      <section className="card settings-card">
-        <div className="settings-head">
-          <h2>Event details</h2>
-          <span className="hint">What the big screen says, and when spraying closes.</span>
-        </div>
-        <DetailsForm
-          eventId={event.id}
-          ended={phase === 'ended'}
-          values={{
-            slug: event.slug,
-            title: event.title,
-            recipientLabel: event.recipientLabel,
-            theme: event.theme,
-            themeColors: event.themeColors ?? null,
-            bigSprayNaira: event.bigSprayKobo / 100,
-            endsAt: event.endsAt,
-          }}
-        />
-      </section>
-
-      <section className="card settings-card">
-        <div className="settings-head">
-          <h2>Screen colours</h2>
-          <span className="hint">Pick a theme or your own colours. We keep the text easy to read.</span>
-        </div>
-        <ThemeForm
-          eventId={event.id}
-          values={{ theme: event.theme, themeColors: event.themeColors ?? null, recipientLabel: event.recipientLabel }}
-        />
-      </section>
-
-      <section className="card settings-card">
-        <div className="settings-head">
-          <h2>Event link</h2>
-          <span className="hint">The address you share and open on the big screen.</span>
-        </div>
-        <LinkForm eventId={event.id} slug={event.slug} link={link} canChange={phase === 'upcoming'} />
-      </section>
-
-
-      <details className="card">
-        <summary>Delete event</summary>
-        <DeleteEvent eventId={event.id} hasMoney={transfers.length > 0} live={phase === 'live'} />
-      </details>
 
       <p><Link href="/dashboard">← All events</Link></p>
     </DashShell>

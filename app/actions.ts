@@ -18,7 +18,7 @@ import { getStore } from '@/lib/store';
 import { cleanDisplayName, cleanLine } from '@/lib/text';
 import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
 import { cutoutsConfigured, removeBackground } from '@/lib/cutouts';
-import type { Planner, SprayEvent } from '@/lib/types';
+import type { Planner, SprayEvent, SprayLine } from '@/lib/types';
 
 type FormState = { error?: string; ok?: string } | null;
 
@@ -545,12 +545,24 @@ export async function addLine(eventId: string, _prev: FormState, form: FormData)
   return { ok: 'Added. It will show on the big screen.' };
 }
 
-/** Approve or reject lines, one or many at once. Only approved lines reach the big screen. */
-export async function setLinesStatus(eventId: string, lineIds: string[], status: 'approved' | 'rejected' | 'pending') {
+/**
+ * Approve or reject lines, one or many at once. Only approved lines reach the
+ * big screen. Returns the lines as saved, so the page shows what really happened.
+ */
+export async function setLinesStatus(
+  eventId: string,
+  lineIds: string[],
+  status: 'approved' | 'rejected' | 'pending',
+): Promise<{ lines: SprayLine[] } | { error: string }> {
   await ownEvent(eventId);
-  if (!['approved', 'rejected', 'pending'].includes(status)) return;
-  await getStore().setLinesStatus(eventId, lineIds.slice(0, 1000), status);
-  revalidatePath(`/dashboard/events/${eventId}`);
+  if (!['approved', 'rejected', 'pending'].includes(status)) return { error: 'Unknown choice.' };
+  try {
+    await getStore().setLinesStatus(eventId, lineIds.slice(0, 1000), status);
+    return { lines: await getStore().listLines(eventId, { limit: 1000 }) };
+  } catch (err) {
+    console.error('setLinesStatus failed', err);
+    return { error: 'That didn’t save. Check your internet and try again.' };
+  }
 }
 
 /** The secret view-only link for all lines (made the first time it's asked for; `reset` makes a new one). */
