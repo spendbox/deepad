@@ -364,7 +364,7 @@ export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: strin
       if (cut.byteLength > MAX_PHOTO_BYTES) throw new Error('cut-out too large');
       bytes = cut;
       type = 'image/png';
-      // Marked, so the big screen shows it as a cut-out that catches the money.
+      // Marked, so the big screen shows it without a frame.
       name = `${randomUUID()}-cutout.png`;
     } catch (err) {
       console.error('Background removal failed', err);

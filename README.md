@@ -38,7 +38,8 @@ description. Senders stay anonymous on screen.
 - Planners pick a ready-made screen theme or their **own two colours**; DashPad automatically adjusts
   them so all text on the big screen stays readable (WCAG contrast).
 - With Photoroom set up (`PHOTOROOM_API_KEY`), celebrant photos get their background removed on upload.
-  The cut-out celebrant then stands on the big screen and **catches the money** on every spray: notes rain down, some are grabbed, the rest pile up at their feet.
+  The cut-out celebrant then stands on the big screen, and every spray throws **confetti**
+  onto them (more confetti for bigger sprays).
 - The admin page has a **Setup check** and a **Payment notifications** log for fixing problems.
 - Planners can delete events. Events that received money are hidden, not erased, so records stay complete.
 

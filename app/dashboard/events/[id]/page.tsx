@@ -9,7 +9,6 @@ import { checkPaystackForTransfers, closeEvent, summarise } from '@/lib/events';
 import { groupAccountNumber, naira, percent } from '@/lib/money';
 import { photoroomConfigured } from '@/lib/photoroom';
 import { requirePlanner } from '@/lib/session';
-import { resolveTheme } from '@/lib/themes';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import { retrySetup, setPaused, setTransferHidden } from '../../../actions';
@@ -56,7 +55,6 @@ export default async function EventPage({
   );
   const link = `${await siteUrl()}/${event.slug}`;
   const canRemoveBg = photoroomConfigured();
-  const screenTheme = resolveTheme(event.theme, event.themeColors);
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });
@@ -223,7 +221,7 @@ export default async function EventPage({
           <h2>Celebrant photos</h2>
           <span className="hint">
             {canRemoveBg
-              ? 'With the background removed, they stand on the big screen and catch the money.'
+              ? 'With the background removed, they stand on the big screen and the confetti lands on them.'
               : 'They show on the big screen between sprays.'}
           </span>
         </div>
@@ -231,8 +229,6 @@ export default async function EventPage({
           eventId={event.id}
           initial={event.photos}
           canRemoveBg={canRemoveBg}
-          bg={screenTheme.bg}
-          glow={screenTheme.accent}
         />
       </section>
 

@@ -382,7 +382,7 @@ export type ScreenFeed = {
     theme: string;
     themeColors: ThemeColors | null;
     photos: string[];
-    /** Shown when a spray has no message. */
+    /** The planner's own hype lines (empty = ours, matched to the amount). */
     hypeLines: string[];
     phase: 'upcoming' | 'live' | 'ended';
     startsAt: string;
@@ -416,7 +416,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
       theme: event.theme,
       themeColors: event.themeColors ?? null,
       photos: event.photos ?? [],
-      hypeLines: hypeLinesFor(event.hypeLines, event.celebrantName),
+      hypeLines: hypeLinesFor(event.hypeLines),
       phase: eventPhase(event),
       startsAt: event.startsAt,
       endsAt: event.endsAt,

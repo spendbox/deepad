@@ -1,0 +1,16 @@
+/* The hype line dances: a little tilt-and-bob, with letters bouncing in a wave. */
+.hype-text { display: inline-flex; white-space: nowrap; transform-origin: 0% 100%; animation: hypeWiggle 1.2s ease-in-out infinite; }
+.hype-ch { display: inline-block; animation: hypeBob 1s ease-in-out infinite; }
+@keyframes hypeWiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(2.5deg) scale(1.04); }
+  75% { transform: rotate(-2deg) scale(1.02); }
+}
+@keyframes hypeBob {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-.14em); }
+  60% { transform: translateY(.03em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hype-text, .hype-ch { animation: none; }
+}

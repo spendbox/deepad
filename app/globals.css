@@ -555,9 +555,3 @@ details .settings-form { margin-top: 12px; }
 .link-locked-url { font-weight: 700; color: var(--aubergine); overflow-wrap: anywhere; }
 .check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; cursor: pointer; }
 .check-row input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--aubergine); flex-shrink: 0; }
-
-/* Spray preview (cut-out celebrant) */
-.dance-picker { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
-@media (min-width: 640px) { .dance-picker { grid-template-columns: 240px minmax(0, 1fr); align-items: start; } }
-.dance-preview { border-radius: 16px; display: flex; justify-content: center; align-items: flex-end; padding: 70px 16px 12px; overflow: hidden; }
-.dance-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }

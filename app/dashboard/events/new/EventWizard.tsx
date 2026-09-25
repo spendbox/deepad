@@ -8,7 +8,6 @@ import BankAccountFields, { type BankAccount } from '@/components/BankAccountFie
 import BankCard from '@/components/BankCard';
 import PayoutNote from '@/components/PayoutNote';
 import ThemePicker, { ScreenPreview } from '@/components/ThemePicker';
-import SprayPreview from '@/components/SprayPreview';
 import PhotoPicker from '@/components/PhotoPicker';
 import SlugField from '@/components/SlugField';
 import { slugify, slugProblem } from '@/lib/slug';
@@ -437,14 +436,7 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
             )}
 
             {step === S.photos && (
-              <>
-                <PhotoPicker value={d.photos} onChange={(photos) => set({ photos })} canRemoveBg={canRemoveBg} />
-                <SprayPreview
-                  photos={d.photos}
-                  bg={screenTheme.bg}
-                  glow={screenTheme.accent}
-                />
-              </>
+              <PhotoPicker value={d.photos} onChange={(photos) => set({ photos })} canRemoveBg={canRemoveBg} />
             )}
 
             {step === S.payout && (
