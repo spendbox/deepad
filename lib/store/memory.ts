@@ -4,12 +4,14 @@ import type {
   NewPlanner,
   NewSprayEvent,
   NewSprayIntent,
+  NewSprayLine,
   NewTransfer,
   PasswordReset,
   PaymentLog,
   Planner,
   SprayEvent,
   SprayIntent,
+  SprayLine,
   Transfer,
 } from '../types';
 import { computeStats, type Store } from './types';
@@ -24,12 +26,14 @@ type Data = {
   resets: PasswordReset[];
   logs: PaymentLog[];
   intents: SprayIntent[];
+  lines: SprayLine[];
   nextTransferId: number;
 };
 
 const g = globalThis as unknown as { __dashpadMemory?: Data };
 function data(): Data {
-  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], intents: [], nextTransferId: 1 };
+  g.__dashpadMemory ??= { planners: [], events: [], transfers: [], resets: [], logs: [], intents: [], lines: [], nextTransferId: 1 };
+  g.__dashpadMemory.lines ??= [];
   return g.__dashpadMemory;
 }
 
@@ -183,6 +187,30 @@ export class MemoryStore implements Store {
   async markIntentPaid(reference: string, transferId: number) {
     const i = data().intents.find((x) => x.reference === reference);
     if (i) Object.assign(i, { status: 'paid', transferId });
+  }
+
+  async createLine(l: NewSprayLine) {
+    const line: SprayLine = { ...l, id: randomUUID(), hidden: false, createdAt: now() };
+    data().lines.push(line);
+    return line;
+  }
+  async listLines(eventId: string, opts: { includeHidden?: boolean; limit?: number } = {}) {
+    return data()
+      .lines.filter((l) => l.eventId === eventId && (opts.includeHidden || !l.hidden))
+      .sort(byNewest)
+      .slice(0, opts.limit ?? 500);
+  }
+  async countLines(eventId: string) {
+    return data().lines.filter((l) => l.eventId === eventId).length;
+  }
+  async setLineHidden(eventId: string, lineId: string, hidden: boolean) {
+    const l = data().lines.find((x) => x.id === lineId && x.eventId === eventId);
+    if (l) l.hidden = hidden;
+  }
+  async deleteLine(eventId: string, lineId: string) {
+    const d = data();
+    const i = d.lines.findIndex((x) => x.id === lineId && x.eventId === eventId);
+    return i < 0 ? null : d.lines.splice(i, 1)[0];
   }
 
   async logPayment(l: NewPaymentLog) {

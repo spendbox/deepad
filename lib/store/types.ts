@@ -5,12 +5,14 @@ import type {
   NewSprayEvent,
   NewPaymentLog,
   NewSprayIntent,
+  NewSprayLine,
   NewTransfer,
   PasswordReset,
   PaymentLog,
   Planner,
   SprayEvent,
   SprayIntent,
+  SprayLine,
   Transfer,
 } from '../types';
 
@@ -69,6 +71,14 @@ export interface Store {
   createIntent(i: NewSprayIntent): Promise<SprayIntent>;
   getIntent(reference: string): Promise<SprayIntent | null>;
   markIntentPaid(reference: string, transferId: number): Promise<void>;
+
+  createLine(l: NewSprayLine): Promise<SprayLine>;
+  /** Newest first. Hidden lines only with includeHidden (the planner's list). */
+  listLines(eventId: string, opts?: { includeHidden?: boolean; limit?: number }): Promise<SprayLine[]>;
+  countLines(eventId: string): Promise<number>;
+  setLineHidden(eventId: string, lineId: string, hidden: boolean): Promise<void>;
+  /** Returns the deleted line (so its photo can be removed too), or null. */
+  deleteLine(eventId: string, lineId: string): Promise<SprayLine | null>;
 
   logPayment(l: NewPaymentLog): Promise<void>;
   listPaymentLogs(limit?: number): Promise<PaymentLog[]>;

@@ -151,3 +151,22 @@ export type SprayIntent = {
 };
 
 export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transferId'>;
+
+/**
+ * A line shown on the big screen: a short wish for the celebrant, written by
+ * the planner in their dashboard or by a guest on the event's "write a line"
+ * page. Only these lines ever appear on screen (bank descriptions don't).
+ */
+export type SprayLine = {
+  id: string;
+  eventId: string;
+  text: string;
+  authorName: string;
+  /** Optional photo of the writer; otherwise the screen shows their first letter. */
+  photoUrl: string | null;
+  source: 'planner' | 'guest';
+  hidden: boolean;
+  createdAt: string;
+};
+
+export type NewSprayLine = Omit<SprayLine, 'id' | 'createdAt' | 'hidden'>;

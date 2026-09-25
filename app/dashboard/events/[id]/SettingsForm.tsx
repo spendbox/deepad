@@ -5,10 +5,9 @@ import { RECIPIENT_CHOICES } from '@/lib/event-info';
 import SlugField from '@/components/SlugField';
 import ThemePicker from '@/components/ThemePicker';
 import type { ThemeColors } from '@/lib/themes';
-import { DEFAULT_HYPE_LINES } from '@/lib/hype';
 import { saveEventSettings } from '../../../actions';
 
-type Values = { slug: string; hypeLines: string[]; title: string; recipientLabel: string; theme: string; themeColors: ThemeColors | null; bigSprayNaira: number; endsAt: string };
+type Values = { slug: string; title: string; recipientLabel: string; theme: string; themeColors: ThemeColors | null; bigSprayNaira: number; endsAt: string };
 
 function toLocalInput(iso: string): string {
   const d = new Date(iso);
@@ -90,31 +89,6 @@ export function ThemeForm({ eventId, values }: { eventId: string; values: Pick<V
       <div className="settings-foot">
         <Result state={state} />
         <button type="submit" className="btn btn-dark" disabled={pending || !changed}>{pending ? 'Saving…' : 'Save colours'}</button>
-      </div>
-    </form>
-  );
-}
-
-/** Fun lines for sprays without a message. */
-export function HypeForm({ eventId, hypeLines }: { eventId: string; hypeLines: string[] }) {
-  const [state, action, pending] = useSettings(eventId);
-  return (
-    <form action={action} className="settings-form">
-      <textarea
-        id="s-hype"
-        name="hypeLines"
-        aria-label="Lines for sprays without a message"
-        className="input"
-        style={{ height: 'auto', minHeight: 180, padding: 12, lineHeight: 1.5 }}
-        defaultValue={hypeLines.join('\n')}
-        placeholder={DEFAULT_HYPE_LINES.join('\n')}
-      />
-      <span className="hint">
-        One per line. Leave empty to use ours (shown in grey). Write {'{name}'} for the celebrant’s name.
-      </span>
-      <div className="settings-foot">
-        <Result state={state} />
-        <button type="submit" className="btn btn-dark" disabled={pending}>{pending ? 'Saving…' : 'Save lines'}</button>
       </div>
     </form>
   );

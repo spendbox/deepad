@@ -1,51 +1,49 @@
 'use client';
 
-import Logo from '@/components/Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Avatar from '@/components/Avatar';
 import CopyButton from '@/components/CopyButton';
-import { ConfettiBurst } from '@/components/Confetti';
-import HypeText from '@/components/HypeText';
-import { groupAccountNumber, naira } from '@/lib/money';
-import { hypeFor } from '@/lib/hype';
+import Logo from '@/components/Logo';
+import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
+import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
-import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
-import StageScreen from './StageScreen';
+import StageScreen, { SPRAY_SLOTS, type ActiveSprayer } from './StageScreen';
 import './stage.css';
 
 const POLL_MS = 2000;
-const SPRAY_HOLD_MS = 8000; // a spray's celebration stays up this long, then the screen invites more
 const TAKEOVER_MS = 15000; // big sprays hold the screen this long
 const PHOTO_MS = 7000; // each celebrant photo shows this long
+const JOIN_GAP_MS = 600; // new sprayers step in one after another, not all at once
+const LEAVE_MS = 700; // time for a name tag to fade away
+const STAY_MS = [0, 9000, 12000, 15000, 18000]; // how long someone sprays, by spray size (weight 1-4)
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
-type Props = { code: string; initialFeed: ScreenFeed };
+type Props = { code: string; initialFeed: ScreenFeed; writeLink: string };
+type Sprayer = ActiveSprayer & { until: number; leftAt?: number };
 
 function dayAndClock(iso: string) {
   return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function LiveScreen({ code, initialFeed }: Props) {
+export default function LiveScreen({ code, initialFeed, writeLink }: Props) {
   const [feed, setFeed] = useState(initialFeed);
   const [online, setOnline] = useState(true);
   const seen = useRef(new Set(initialFeed.recent.map((t) => t.id)));
   // The newest spray already known. Each poll asks for everything after it, so none are ever skipped.
   const lastId = useRef(initialFeed.recent.reduce((m, t) => Math.max(m, t.id), 0));
-  const [queue, setQueue] = useState<ScreenTransfer[]>([]);
-  const [current, setCurrent] = useState<ScreenTransfer | null>(null);
-  const [shownAt, setShownAt] = useState(0);
-  const [takeover, setTakeover] = useState<{ t: ScreenTransfer; at: number } | null>(null);
-  const [popKey, setPopKey] = useState(0);
-  // Sprays already shown, oldest first (the TV shows the newest and a few drifting back).
-  const [history, setHistory] = useState<ScreenTransfer[]>([]);
+  const [waiting, setWaiting] = useState<ScreenTransfer[]>([]);
+  const [sprayers, setSprayers] = useState<Sprayer[]>([]);
+  const [big, setBig] = useState<{ t: ScreenTransfer; at: number } | null>(null);
+  const lastJoin = useRef(0);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
   const [compact, setCompact] = useState(false);
   const [ready, setReady] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
-  // --- Ask the server for new transfers. Keeps retrying if the internet drops. ---
+  // --- Ask the server for new transfers and lines. Keeps retrying if the internet drops. ---
   useEffect(() => {
     let alive = true;
     let fails = 0;
@@ -59,16 +57,13 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         fails = 0;
         setOnline(true);
         setFeed(data);
-        // Every new spray joins the queue in the order it arrived, even if many came at once.
+        // Everyone new joins the line in the order they paid, even if many came at once.
         const fresh = data.recent.filter((t) => !seen.current.has(t.id)).sort((a, b) => a.id - b.id);
         fresh.forEach((t) => {
           seen.current.add(t.id);
           lastId.current = Math.max(lastId.current, t.id);
         });
-        if (fresh.length) setQueue((q) => [...q, ...fresh]);
-        // Pick up changes to what's showing (e.g. the planner hid a message).
-        setCurrent((c) => (c ? data.recent.find((t) => t.id === c.id) ?? c : c));
-        setHistory((h) => h.map((x) => data.recent.find((t) => t.id === x.id) ?? x));
+        if (fresh.length) setWaiting((w) => [...w, ...fresh]);
       } catch {
         fails += 1;
         if (alive) setOnline(false);
@@ -87,28 +82,43 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     return () => clearInterval(id);
   }, []);
 
-  // --- Show queued transfers one at a time (faster when catching up). ---
+  // --- Who is spraying: people step in, spray for a while, then make room. ---
   const paused = feed.event.paused;
+  const live = feed.event.phase === 'live';
   useEffect(() => {
-    if (takeover) {
-      if (now - takeover.at >= TAKEOVER_MS) {
-        setTakeover(null);
-        setShownAt(Date.now());
+    // Name tags whose time is up fade away, then leave.
+    if (sprayers.some((s) => (!s.leaving && now >= s.until) || (s.leaving && now - (s.leftAt ?? now) >= LEAVE_MS))) {
+      setSprayers((list) =>
+        list
+          .filter((s) => !(s.leaving && now - (s.leftAt ?? now) >= LEAVE_MS))
+          .map((s) => (!s.leaving && now >= s.until ? { ...s, leaving: true, leftAt: now } : s)),
+      );
+    }
+    if (big) {
+      if (now - big.at >= TAKEOVER_MS) {
+        setBig(null);
+        // After their big moment, they keep spraying with everyone else.
+        setWaiting((w) => [{ ...big.t, big: false }, ...w]);
       }
       return;
     }
-    if (!queue.length || paused) return;
-    // Each spray gets its moment; when many arrive together they play a little faster.
-    const gap = queue.length > 10 ? 1800 : queue.length > 3 ? 2600 : 4500;
-    if (shownAt && now - shownAt < gap) return;
-    const [next, ...rest] = queue;
-    setQueue(rest);
-    setCurrent(next);
-    setHistory((h) => [...h.slice(-9), next]);
-    setShownAt(Date.now());
-    setPopKey((k) => k + 1);
-    if (feed.event.bigSprayKobo > 0 && next.amountKobo >= feed.event.bigSprayKobo) setTakeover({ t: next, at: Date.now() });
-  }, [now, queue, paused, takeover, shownAt, feed.event.bigSprayKobo]);
+    if (!live || paused || !waiting.length || now - lastJoin.current < JOIN_GAP_MS) return;
+    const [next, ...rest] = waiting;
+    if (next.big) {
+      setWaiting(rest);
+      setBig({ t: next, at: now });
+      lastJoin.current = now;
+      return;
+    }
+    const used = new Set(sprayers.map((s) => s.slot));
+    const slot = Array.from({ length: SPRAY_SLOTS }, (_, i) => i).find((i) => !used.has(i));
+    if (slot === undefined) return; // everyone waits for a free spot
+    // A crowd waiting? Everyone sprays a little shorter so all get a turn.
+    const stay = Math.max(6000, (STAY_MS[next.weight] ?? 9000) * (rest.length > 4 ? 0.5 : 1));
+    setWaiting(rest);
+    setSprayers((list) => [...list, { t: next, slot, leaving: false, until: now + stay }]);
+    lastJoin.current = now;
+  }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Fit the 1920x1080 design to any TV or projector. ---
   useEffect(() => {
@@ -163,24 +173,19 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const theme = useMemo(() => resolveTheme(e.theme, e.themeColors), [e.theme, colorsKey]);
   const themeVars = toThemeVars(theme) as React.CSSProperties;
-
-  const showingSpray = !!current && (queue.length > 0 || (shownAt > 0 && now - shownAt < SPRAY_HOLD_MS));
-  const hypeOf = (t: ScreenTransfer) => hypeFor(t.amountKobo, t.id, e.hypeLines ?? [], e.celebrantName);
-
-  // Guests' messages only (no amounts), newest first, once their spray has popped up.
-  const messages = feed.recent
-    .filter((t) => t.message && !queue.some((q) => q.id === t.id))
-    .slice(-5)
-    .reverse();
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
   // Celebrant photos take turns, a new one every few seconds; cut-outs (background removed) first.
   const cutouts = e.photos.filter(isCutout);
   const pool = cutouts.length ? cutouts : e.photos;
   const photo = pool.length ? pool[ready ? Math.floor(now / PHOTO_MS) % pool.length : 0] : null;
+  // Only a new list when someone arrives or leaves, so the screen redraws only then.
+  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}`).join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const shownSprayers = useMemo<ActiveSprayer[]>(() => sprayers.map(({ t, slot, leaving }) => ({ t, slot, leaving })), [sprayerKey]);
 
   const statusBadge = !online ? (
     <div className="badge offline" role="status">Reconnecting… transfers still work</div>
-  ) : e.phase === 'live' ? (
+  ) : live ? (
     <div className="badge"><span className="live-dot" />{paused ? 'Paused' : 'Live'}</div>
   ) : null;
 
@@ -199,6 +204,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
   // ---------- Phone layout (someone opened the link on their phone) ----------
   if (compact) {
+    const active = sprayers.filter((s) => !s.leaving);
     return (
       <div className="m-screen" style={themeVars}>
         <header className="m-top">
@@ -239,43 +245,53 @@ export default function LiveScreen({ code, initialFeed }: Props) {
               <section className="m-pay"><div className="m-bank">Account number coming soon</div></section>
             )}
 
-            {takeover || (showingSpray && current) ? (
-              <section key={popKey} className={`m-card m-spray${takeover ? ' m-bigspray' : ''}`}>
-                <ConfettiBurst
-                  burstKey={popKey}
-                  amountKobo={(takeover?.t ?? current!).amountKobo}
-                  origin={M_ORIGIN}
-                  landX={M_LAND_X}
-                  peakY={M_PEAK_Y}
-                  landY={M_LAND_Y}
-                  size={0.6}
-                  maxPieces={120}
-                />
-                <div className="m-badge"><HypeText text={hypeOf(takeover?.t ?? current!)} /></div>
-                <div className="m-amount">{naira((takeover?.t ?? current!).amountKobo)}</div>
-                <div className="m-to">from {(takeover?.t ?? current!).initials ?? 'a guest'}</div>
-                {(takeover?.t ?? current!).message && <div className="m-msg">“{(takeover?.t ?? current!).message}”</div>}
-              </section>
-            ) : (
-              <section className="m-card">
-                <div className="m-big">Spray {e.celebrantName}!</div>
-                <div className="m-muted">Transfer any amount to the account above. Add a message in the transfer description.</div>
+            {big && (
+              <section key={big.t.id} className="m-card m-bigspray" role="status">
+                <div className="m-badge">Big spray!</div>
+                <div className="m-big-who">
+                  <Avatar name={big.t.firstName ?? 'Guest'} size={56} letters={(big.t.initials ?? '?').replace(/\./g, '')} />
+                  <span>{big.t.firstName ?? 'A guest'}</span>
+                </div>
+                <div className="m-muted">is spraying {e.celebrantName}!</div>
               </section>
             )}
 
-            {messages.length > 0 && (
+            <section className="m-card">
+              <div className="m-to">Spraying now</div>
+              {active.length ? (
+                <ul className="m-sprayers">
+                  {active.map((s) => (
+                    <li key={s.t.id}>
+                      <Avatar name={s.t.firstName ?? 'Guest'} size={32} letters={(s.t.initials ?? '?').replace(/\./g, '')} />
+                      {s.t.firstName ?? 'A guest'}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="m-muted">Be the first to spray {e.celebrantName}! Transfer any amount to the account above.</div>
+              )}
+            </section>
+
+            {feed.lines.length > 0 && (
               <section className="m-card">
-                <div className="m-to">Latest messages</div>
-                <ul className="m-messages">
-                  {messages.map((t) => (
-                    <li key={t.id}>“{t.message}”</li>
+                <div className="m-to">Lines for {e.celebrantName}</div>
+                <ul className="m-lines">
+                  {feed.lines.slice(0, 6).map((l) => (
+                    <li key={l.id}>
+                      <Avatar name={l.name} photo={l.photo} size={36} />
+                      <div>
+                        <strong>{l.name}</strong>
+                        <p>“{l.text}”</p>
+                      </div>
+                    </li>
                   ))}
                 </ul>
               </section>
             )}
+            <a href={`/${code}/write`} className="m-write">Write a line for {e.celebrantName} →</a>
           </>
         )}
-        <p className="m-foot">It can take up to a minute for a transfer to show. Only confirmed transfers appear, and senders stay anonymous.</p>
+        <p className="m-foot">Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</p>
       </div>
     );
   }
@@ -288,21 +304,16 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           e={e}
           theme={theme}
           acct={acct}
-          history={history}
-          popKey={popKey}
-          takeover={takeover?.t ?? null}
+          sprayers={shownSprayers}
+          big={big?.t ?? null}
           paused={paused}
           online={online}
           photo={photo}
+          lines={feed.lines}
+          writeLink={writeLink}
         />
       </div>
       {fullScreenButton}
     </div>
   );
 }
-
-// Confetti on the phone: from the amount, across the spray card.
-const M_ORIGIN = { x: 70, y: 90 };
-const M_LAND_X: [number, number] = [10, 360];
-const M_PEAK_Y: [number, number] = [-20, 40];
-const M_LAND_Y: [number, number] = [160, 280];

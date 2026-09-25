@@ -3,7 +3,7 @@
 
 .st { position: absolute; inset: 0; overflow: hidden; background: var(--s-bg); color: var(--s-text); font-family: var(--display); }
 
-.st-top { position: absolute; top: 44px; left: 96px; right: 96px; display: flex; justify-content: space-between; align-items: center; gap: 32px; font-size: 28px; z-index: 3; }
+.st-top { position: absolute; top: 48px; left: 80px; right: 80px; display: flex; justify-content: space-between; align-items: center; gap: 32px; font-size: 28px; z-index: 5; }
 .st-top-left { display: flex; align-items: center; gap: 24px; min-width: 0; }
 .st-event { font-weight: 600; color: var(--s-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-top-right { display: flex; align-items: center; gap: 28px; flex-shrink: 0; }
@@ -17,88 +17,96 @@
 }
 .st-closes { font-weight: 500; color: var(--s-muted); }
 
-.st-headline { position: absolute; left: 92px; top: 100px; width: 1020px; z-index: 3; }
-.st-h1 { font-weight: 800; line-height: 1.05; letter-spacing: -0.035em; padding-bottom: 8px; }
+/* Lines, taking turns: the current one in front, older ones drifting back */
+.st-lines { position: absolute; left: 0; top: 110px; width: 900px; height: 380px; overflow: hidden; z-index: 1; }
+.ln-item {
+  position: absolute; left: 80px; top: 150px; width: 700px; height: 220px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px;
+  transform-origin: 700px -180px;
+  transition: transform 1.2s cubic-bezier(.2, .8, .2, 1), opacity 1.2s ease;
+}
+.ln-item.age-0 { transform: perspective(1000px) translateZ(0); opacity: 1; animation: lnEnter 1.2s cubic-bezier(.2, .8, .2, 1) backwards; }
+.ln-item.age-1 { transform: perspective(1000px) translateZ(-700px); opacity: .45; }
+.ln-item.age-2 { transform: perspective(1000px) translateZ(-1500px); opacity: .18; }
+@keyframes lnEnter { from { transform: perspective(1000px) translateZ(300px); opacity: 0; } }
+.ln-head { display: flex; align-items: center; gap: 16px; }
+.ln-name { font-weight: 700; font-size: 34px; }
+.ln-text {
+  font-weight: 700; font-size: 52px; line-height: 1.1; letter-spacing: -0.02em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.st-hello { position: absolute; left: 80px; bottom: 30px; width: 800px; font-weight: 800; font-size: 104px; line-height: 1; letter-spacing: -0.035em; }
+
+/* Before and after the event */
+.st-notice { position: absolute; left: 80px; top: 230px; width: 820px; display: flex; flex-direction: column; gap: 22px; z-index: 3; }
+.st-notice-big { font-weight: 800; font-size: 96px; line-height: 1; letter-spacing: -0.03em; }
+.st-notice-sub { font-family: var(--body); font-size: 34px; line-height: 1.35; color: var(--s-muted); }
 
 /* The celebrant */
 .st-photo { position: absolute; z-index: 2; display: block; }
-.st-photo.cutout { left: 1220px; top: 96px; width: 560px; height: 674px; object-fit: contain; object-position: 50% 100%; }
-.st-photo:not(.cutout) { left: 1270px; top: 150px; width: 520px; height: 590px; object-fit: cover; border-radius: 40px; }
+.st-photo.cutout { left: 970px; top: 70px; width: 540px; height: 682px; object-fit: contain; object-position: 50% 100%; }
+.st-photo:not(.cutout) { left: 990px; top: 130px; width: 500px; height: 580px; object-fit: cover; border-radius: 40px; }
 .st-monogram {
-  position: absolute; left: 1270px; top: 180px; width: 500px; height: 500px; border-radius: 50%; z-index: 2;
-  display: grid; place-items: center; font-weight: 800; font-size: 150px; letter-spacing: -0.03em;
+  position: absolute; left: 1010px; top: 170px; width: 460px; height: 460px; border-radius: 50%; z-index: 2;
+  display: grid; place-items: center; font-weight: 800; font-size: 140px; letter-spacing: -0.03em;
   color: var(--s-accent); background: color-mix(in srgb, var(--s-accent) 14%, transparent);
 }
 
-/* Sprays: newest in front, older messages drifting back towards the celebrant */
-.st-stack { position: absolute; left: 0; top: 0; width: 1920px; height: 770px; overflow: hidden; z-index: 1; }
-.st-item {
-  position: absolute; left: 96px; top: 520px; width: 1040px; height: 200px;
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px;
-  transform-origin: 1420px -300px;
-  transition: transform 1.2s cubic-bezier(.2, .8, .2, 1), opacity 1.2s ease, filter 1.2s ease;
+/* Everyone spraying right now: name tags around the celebrant */
+.st-sprayers { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.sp-tag {
+  position: absolute; display: flex; align-items: center; gap: 14px; padding: 8px 26px 8px 8px; border-radius: 999px;
+  background: var(--s-panel); box-shadow: 0 10px 26px -14px rgba(0, 0, 0, .45);
+  transform: translate(-50%, -50%); white-space: nowrap;
+  animation: spIn .55s cubic-bezier(.34, 1.56, .64, 1) both, spBob 2.4s ease-in-out .6s infinite;
 }
-.st-item.newest { animation: stEnter 1.2s cubic-bezier(.2, .8, .2, 1) backwards; }
-@keyframes stEnter { from { transform: perspective(1000px) translateZ(300px); opacity: 0; filter: blur(8px); } }
-.st-amount { font-weight: 800; font-size: 112px; line-height: .9; letter-spacing: -0.035em; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity .5s ease; }
-.st-said {
-  font-family: var(--body); font-weight: 600; font-size: 30px; line-height: 1.25; color: var(--s-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1040px;
-  transform-origin: 0% 100%; transition: transform 1s cubic-bezier(.2, .8, .2, 1), color 1s ease;
-}
-.st-said.big { transform: scale(1.9); max-width: 540px; color: var(--s-text); }
-.st-first { position: absolute; left: 96px; top: 620px; font-weight: 800; font-size: 84px; line-height: 1; letter-spacing: -0.03em; color: var(--s-muted); }
-
-/* Hype line: springs in above the newest spray, dances, then floats away */
-.st-hype { position: absolute; left: 86px; top: 452px; z-index: 3; pointer-events: none; animation: stHypeOut .7s 5.2s ease forwards; }
-.st-hype-in {
-  display: flex; align-items: center; gap: 12px; transform-origin: 0% 100%;
-  font-weight: 800; font-size: 56px; line-height: 1.1; letter-spacing: -0.02em; color: var(--s-accent);
-  animation: hypePop .55s .42s cubic-bezier(.34, 1.7, .6, 1) both;
-}
-@keyframes hypePop { from { transform: rotate(-6deg) scale(.3); opacity: 0; } to { transform: rotate(-6deg) scale(1); opacity: 1; } }
-@keyframes stHypeOut { to { transform: translateY(-28px); opacity: 0; } }
-
-/* Before and after the event */
-.st-notice { position: absolute; left: 96px; top: 520px; width: 1040px; display: flex; flex-direction: column; gap: 18px; z-index: 3; }
-.st-notice-big { font-weight: 800; font-size: 64px; line-height: 1.05; letter-spacing: -0.02em; }
-.st-notice-sub { font-family: var(--body); font-size: 34px; line-height: 1.3; color: var(--s-muted); }
+.sp-tag.leaving { animation: spOut .6s ease forwards; }
+.sp-name { font-weight: 800; font-size: 34px; letter-spacing: -0.01em; }
+@keyframes spIn { from { transform: translate(-50%, -50%) scale(.4); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+@keyframes spBob { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, calc(-50% - 6px)); } }
+@keyframes spOut { to { transform: translate(-50%, -50%) scale(.6); opacity: 0; } }
 
 /* The account number */
-.st-rule { position: absolute; left: 96px; right: 96px; top: 790px; height: 2px; background: color-mix(in srgb, var(--s-muted) 30%, transparent); z-index: 3; }
-.st-pay { position: absolute; left: 96px; right: 96px; bottom: 50px; display: flex; flex-direction: column; gap: 16px; z-index: 3; }
-.st-pay-label { font-family: var(--body); font-size: 24px; font-weight: 500; color: var(--s-muted); }
-.st-pay-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 80px; }
-.st-acct { flex: 1; min-width: 0; font-weight: 800; line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.st-bank-col { width: 640px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-.st-bank { width: 100%; text-align: right; font-weight: 800; line-height: .95; letter-spacing: -0.03em; color: var(--s-accent); }
-.st-acct-name { max-width: 100%; font-family: var(--body); font-size: 26px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-rule { position: absolute; left: 80px; right: 80px; top: 752px; height: 2px; background: color-mix(in srgb, var(--s-muted) 30%, transparent); z-index: 3; }
+.st-pay { position: absolute; left: 80px; bottom: 40px; width: 1180px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+.st-pay-label { font-family: var(--body); font-size: 26px; font-weight: 600; color: var(--s-muted); }
+.st-acct { font-weight: 800; line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.st-bank-row { display: flex; align-items: baseline; gap: 24px; min-width: 0; margin-top: 6px; }
+.st-bank { font-weight: 800; font-size: 68px; line-height: .95; letter-spacing: -0.02em; color: var(--s-accent); white-space: nowrap; }
+.st-acct-name { font-family: var(--body); font-size: 26px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-side { position: absolute; right: 80px; bottom: 48px; width: 500px; display: flex; flex-direction: column; gap: 12px; z-index: 3; }
+.st-side strong { font-weight: 800; font-size: 40px; line-height: 1.05; letter-spacing: -0.01em; }
+.st-side span { font-family: var(--body); font-size: 25px; line-height: 1.3; color: var(--s-muted); }
+.st-side .st-write b { color: var(--s-text); overflow-wrap: anywhere; }
 
-/* Big spray: takes over the screen, opening from the newest spray */
+/* Big spray: takes over the screen for 15 seconds */
 .bs {
-  position: absolute; inset: 0; z-index: 5; overflow: hidden; color: var(--s-accent);
+  position: absolute; inset: 0; z-index: 6; overflow: hidden; color: var(--s-accent);
   background: var(--s-on-accent); /* the glow is painted by the confetti canvas */
   /* The circle reveal lets go once open ("backwards"): a clip left in place would slow every frame. */
-  animation: bsIn .9s cubic-bezier(.7, 0, .2, 1) backwards, bsOut .7s 14.3s ease forwards; /* 15 seconds on screen */
+  animation: bsIn .9s cubic-bezier(.7, 0, .2, 1) backwards, bsOut .7s 14.3s ease forwards;
 }
-@keyframes bsIn { from { clip-path: circle(0px at 230px 620px); } to { clip-path: circle(2300px at 230px 620px); } }
+@keyframes bsIn { from { clip-path: circle(0px at 1240px 420px); } to { clip-path: circle(2300px at 1240px 420px); } }
 @keyframes bsOut { to { opacity: 0; } }
 .bs .st-event { color: var(--s-accent); }
-.bs .st-dot { background: var(--s-accent); }
-.bs-monogram { background: color-mix(in srgb, var(--s-accent) 16%, transparent); }
-.bs-hype { position: absolute; left: 92px; top: 250px; z-index: 3; }
-.bs-hype .st-hype-in { font-size: 64px; animation-delay: 1.3s; }
-.bs-main { position: absolute; left: 96px; top: 350px; width: 1040px; display: flex; flex-direction: column; gap: 24px; z-index: 3; }
-.bs-amount { font-weight: 800; line-height: .95; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; padding-bottom: 6px; }
-.bs-said { font-family: var(--body); font-weight: 600; font-size: 40px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bs-rule { position: absolute; left: 96px; right: 96px; top: 850px; height: 1px; background: color-mix(in srgb, var(--s-accent) 30%, transparent); z-index: 3; }
-.bs-pay { position: absolute; left: 96px; right: 96px; bottom: 50px; display: flex; flex-direction: column; gap: 12px; z-index: 3; }
-.bs-pay-label { font-family: var(--body); font-size: 24px; font-weight: 500; }
-.bs-pay-row { display: flex; align-items: baseline; gap: 48px; white-space: nowrap; }
+.bs-photo.cutout { left: 1192px; top: 72px; width: 576px; height: 720px; }
+.bs-monogram { background: color-mix(in srgb, var(--s-accent) 16%, transparent); left: 1250px; }
+.bs-kicker { position: absolute; left: 90px; top: 220px; z-index: 3; font-weight: 800; font-size: 68px; transform: rotate(-6deg); transform-origin: 0 100%; animation: bsKick .6s .9s cubic-bezier(.34, 1.7, .6, 1) backwards; }
+@keyframes bsKick { from { transform: rotate(-6deg) scale(.3); opacity: 0; } }
+.bs-main { position: absolute; left: 88px; top: 330px; width: 1080px; display: flex; flex-direction: column; gap: 30px; z-index: 3; }
+.bs-who { display: flex; align-items: center; gap: 32px; }
+.bs-avatar { box-shadow: 0 0 0 6px var(--s-on-accent), 0 0 0 10px var(--s-accent); }
+.bs-name { flex: 1; min-width: 0; font-weight: 800; line-height: .95; letter-spacing: -0.045em; padding-bottom: 8px; }
+.bs-sub { font-family: var(--body); font-weight: 700; font-size: 56px; line-height: 1.1; }
+.bs-rule { position: absolute; left: 88px; right: 88px; top: 880px; height: 1px; background: color-mix(in srgb, var(--s-accent) 30%, transparent); z-index: 3; }
+.bs-pay { position: absolute; left: 88px; right: 88px; bottom: 48px; display: flex; flex-direction: column; gap: 12px; z-index: 3; }
+.bs-pay-label { font-family: var(--body); font-size: 26px; font-weight: 500; }
+.bs-pay-row { display: flex; align-items: baseline; gap: 40px; white-space: nowrap; }
 .bs-acct { font-weight: 800; font-size: 96px; line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .bs-bank { font-weight: 800; font-size: 64px; line-height: .9; letter-spacing: -0.02em; }
 
 @media (prefers-reduced-motion: reduce) {
-  .st-dot, .st-item.newest, .st-hype, .st-hype-in, .bs { animation: none; }
-  .st-item, .st-said, .st-amount { transition: none; }
+  .st-dot, .ln-item.age-0, .sp-tag, .bs, .bs-kicker { animation: none; }
+  .sp-tag.leaving { opacity: 0; }
+  .ln-item { transition: none; }
 }

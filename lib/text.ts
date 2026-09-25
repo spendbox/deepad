@@ -181,3 +181,27 @@ export function senderInitials(name: string | null | undefined): string | null {
   const last = words.length > 1 ? words[words.length - 1][0].toUpperCase() : '';
   return last ? `${first}.${last}.` : `${first}.`;
 }
+
+/** "OLUWASEUN ADEBAYO" → "Oluwaseun": the sender's first name, as the big screen shows it. */
+export function senderFirstName(name: string | null | undefined): string | null {
+  const first = (name ?? '')
+    .normalize('NFKD')
+    .replace(/[^A-Za-z\s'-]/g, ' ')
+    .trim()
+    .split(/\s+/)[0];
+  if (!first) return null;
+  const pretty = first.toLowerCase().replace(/(^|[-'])([a-z])/g, (_m, sep: string, c: string) => sep + c.toUpperCase());
+  return pretty.slice(0, 20);
+}
+
+export const MAX_LINE_LENGTH = 120;
+
+/** A line for the big screen: tidy spacing, no rude words, not too long. */
+export function cleanLine(text: string | null | undefined): string {
+  const tidy = (text ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_LINE_LENGTH);
+  return filterProfanity(tidy);
+}

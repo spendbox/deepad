@@ -151,27 +151,6 @@ test('the best description is picked from Paystack’s notification', () => {
   assert.equal(none.raw, 'SPENDBOX/DASHPA');
 });
 
-test('hype lines match the amount, or use the planner\'s own', async () => {
-  const { hypeFor, hypeLinesFor, HYPE_TIERS } = await import('../lib/hype.ts');
-  const big = hypeFor(100_000_00, 1, [], 'Kemi');
-  assert.ok(HYPE_TIERS[0].lines.includes(big));
-  const small = hypeFor(500_00, 2, [], 'Kemi');
-  assert.ok(HYPE_TIERS[3].lines.map((l) => l.replaceAll('{name}', 'Kemi')).includes(small));
-  assert.equal(hypeFor(500_00, 5, [], 'Kemi'), hypeFor(500_00, 5, [], 'Kemi'));
-  const own = hypeLinesFor(['  Spray {name}! ', '']);
-  assert.deepEqual(own, ['Spray {name}!']);
-  assert.equal(hypeFor(1_000_00, 3, own, 'Kemi'), 'Spray Kemi!');
-});
-
-test('more money, more confetti', async () => {
-  const { confettiVolume } = await import('../lib/confetti.ts');
-  const total = (k: number) => confettiVolume(k).waves * confettiVolume(k).perWave;
-  assert.ok(total(500_00) < total(5_000_00) && total(5_000_00) < total(50_000_00) && total(50_000_00) < total(1_000_000_00));
-  const small = confettiVolume(500_00);
-  const big = confettiVolume(100_000_00);
-  assert.ok(big.waves * big.perWave > small.waves * small.perWave * 4);
-});
-
 test('earnings are grouped into Nigerian days, weeks and months', async () => {
   const { bucketize, rangeWindow } = await import('../lib/earnings.ts');
   const now = Date.parse('2026-09-24T12:00:00Z');
@@ -222,4 +201,14 @@ test('the screen shows only the sender\'s initials', async () => {
   assert.equal(senderInitials('Kemi'), 'K.');
   assert.equal(senderInitials('  '), null);
   assert.equal(senderInitials(null), null);
+});
+
+test('first names and lines for the big screen', async () => {
+  const { senderFirstName, cleanLine, MAX_LINE_LENGTH } = await import('../lib/text.ts');
+  assert.equal(senderFirstName('OLUWASEUN ADEBAYO'), 'Oluwaseun');
+  assert.equal(senderFirstName('mary-jane okafor'), 'Mary-Jane');
+  assert.equal(senderFirstName('   '), null);
+  assert.equal(cleanLine('  Happy   birthday\n my sister!  '), 'Happy birthday my sister!');
+  assert.ok(cleanLine('x'.repeat(300)).length <= MAX_LINE_LENGTH);
+  assert.ok(!cleanLine('you are a bastard').includes('bastard'));
 });

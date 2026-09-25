@@ -555,3 +555,31 @@ details .settings-form { margin-top: 12px; }
 .link-locked-url { font-weight: 700; color: var(--aubergine); overflow-wrap: anywhere; }
 .check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; cursor: pointer; }
 .check-row input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--aubergine); flex-shrink: 0; }
+
+/* People: photo or first letter in a circle */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%;
+  color: #fff; font-family: var(--display); font-weight: 800; line-height: 1; overflow: hidden;
+}
+
+/* Write a line (dashboard and guest page) */
+.line-form { display: flex; flex-direction: column; gap: 16px; }
+.line-text { height: auto; min-height: 96px; padding: 12px; line-height: 1.45; resize: vertical; }
+.line-photo-row { display: flex; align-items: center; gap: 12px; }
+.line-preview { border: 1px dashed var(--line); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; background: var(--wash); }
+.line-preview-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); }
+.line-preview-head { display: flex; align-items: center; gap: 10px; font-size: 17px; }
+.line-preview-text { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
+
+/* The planner's list of lines */
+.lines-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.lines-list li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
+.lines-list li:first-child { border-top: 0; }
+.lines-list .line-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lines-list .line-body p { margin: 0; overflow-wrap: anywhere; }
+.lines-list .hidden-line p { text-decoration: line-through; color: var(--ink-muted); }
+.lines-list li { flex-wrap: wrap; }
+.lines-list .line-actions { display: flex; gap: 6px; flex-shrink: 0; }
+@media (max-width: 560px) { .lines-list .line-actions { width: 100%; padding-left: 52px; } }
+.share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.share-url { font-weight: 700; overflow-wrap: anywhere; padding: 10px 12px; border-radius: 12px; background: var(--wash); border: 1px solid var(--line); flex: 1; min-width: 200px; }

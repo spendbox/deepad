@@ -5,12 +5,14 @@ import type {
   NewPlanner,
   NewSprayEvent,
   NewSprayIntent,
+  NewSprayLine,
   NewTransfer,
   PasswordReset,
   PaymentLog,
   Planner,
   SprayEvent,
   SprayIntent,
+  SprayLine,
   Transfer,
 } from '../types';
 import { computeStats, type Store } from './types';
@@ -284,6 +286,29 @@ export class SupabaseStore implements Store {
   }
 
   // ----- Payment notification log -----
+  // ----- Lines on the big screen -----
+  async createLine(l: NewSprayLine) {
+    return fromRow<SprayLine>(check(await this.db.from('spray_lines').insert(toRow(l)).select('*').single()) ?? {});
+  }
+  async listLines(eventId: string, opts: { includeHidden?: boolean; limit?: number } = {}) {
+    let q = this.db.from('spray_lines').select('*').eq('event_id', eventId);
+    if (!opts.includeHidden) q = q.eq('hidden', false);
+    const rows = check(await q.order('created_at', { ascending: false }).limit(opts.limit ?? 500));
+    return (rows ?? []).map((r: Row) => fromRow<SprayLine>(r));
+  }
+  async countLines(eventId: string) {
+    const res = await this.db.from('spray_lines').select('id', { count: 'exact', head: true }).eq('event_id', eventId);
+    if (res.error) throw new Error(res.error.message);
+    return res.count ?? 0;
+  }
+  async setLineHidden(eventId: string, lineId: string, hidden: boolean) {
+    check(await this.db.from('spray_lines').update({ hidden }).eq('id', lineId).eq('event_id', eventId));
+  }
+  async deleteLine(eventId: string, lineId: string) {
+    const rows = check(await this.db.from('spray_lines').delete().eq('id', lineId).eq('event_id', eventId).select('*'));
+    return rows?.[0] ? fromRow<SprayLine>(rows[0]) : null;
+  }
+
   async logPayment(l: NewPaymentLog) {
     const res = await this.db.from('payment_logs').insert(toRow(l));
     // Logging must never stop a payment from being recorded.
@@ -304,6 +329,7 @@ export class SupabaseStore implements Store {
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome, raw'],
+      ['spray_lines', 'id, text, author_name, photo_url, hidden'],
     ];
     const problems: string[] = [];
     for (const [table, cols] of probes) {
