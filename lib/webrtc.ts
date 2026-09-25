@@ -18,7 +18,7 @@ export async function fetchIce(url: string): Promise<{ iceServers: IceServers; r
  * Wait until the browser has found its connection routes, so the whole
  * offer/answer can be sent in one go. Gives up after `ms` and uses what it has.
  */
-export function iceGathered(pc: RTCPeerConnection, ms = 3500): Promise<void> {
+export function iceGathered(pc: RTCPeerConnection, ms = 2500): Promise<void> {
   if (pc.iceGatheringState === 'complete') return Promise.resolve();
   return new Promise((resolve) => {
     const done = () => {

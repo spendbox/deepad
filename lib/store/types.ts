@@ -69,6 +69,8 @@ export interface Store {
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
   /** Fill in a description that arrived after the payment was first recorded. */
   setTransferMessage(transferId: number, message: string | null, rawNarration: string | null): Promise<void>;
+  /** Fill in the sender's name and bank when they arrive after the payment was first recorded. */
+  setTransferSender(transferId: number, senderName: string, senderBank: string | null): Promise<void>;
   /** Totals of transfers that counted (inside the event window). */
   eventStats(eventId: string): Promise<EventStats>;
 
@@ -94,6 +96,8 @@ export interface Store {
   /** The phone is still there. False if another camera has taken over. */
   touchCamera(eventId: string, sessionId: string): Promise<boolean>;
   stopCamera(eventId: string, sessionId: string): Promise<void>;
+  /** The video moved to another big screen: forget the old screen's answer so the phone reconnects to the new one. */
+  resetCameraAnswer(eventId: string): Promise<void>;
 
   logPayment(l: NewPaymentLog): Promise<void>;
   listPaymentLogs(limit?: number): Promise<PaymentLog[]>;

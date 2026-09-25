@@ -64,8 +64,9 @@ export default function CameraCard({ eventId, screenUrl, celebrantName }: { even
         </div>
       </div>
       <p className="hint" style={{ margin: '12px 0 0' }}>
-        Open the big screen with this button so it can receive the phone’s video:{' '}
-        <a href={screenUrl} target="_blank" rel="noreferrer">Open big screen ↗</a>
+        A big screen opened with this button shows the phone’s video by itself:{' '}
+        <a href={screenUrl} target="_blank" rel="noreferrer">Open big screen ↗</a>. Using another computer? Move its mouse and click{' '}
+        <b>Show camera on this screen</b>; the video moves there and stops on the others. Phones and tablets never show it.
       </p>
     </SectionCard>
   );

@@ -1,31 +1,35 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Avatar from '@/components/Avatar';
-import CopyButton from '@/components/CopyButton';
-import Logo from '@/components/Logo';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
-import StageScreen, { SPRAY_SLOTS, type ActiveSprayer, type StageSize } from './StageScreen';
-import { useLiveCamera } from './useLiveCamera';
+import StageScreen, { type ActiveSprayer, type StageMode, type StageSize } from './StageScreen';
+import { screenIdFor, useLiveCamera } from './useLiveCamera';
 import './stage.css';
 
 const POLL_MS = 2000;
-const BIG_STAY_MS = 15000; // a big sprayer's name stays up this long, bigger and glowing
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const JOIN_GAP_MS = 600; // new sprayers step in one after another, not all at once
 const LEAVE_MS = 700; // time for a name tag to fade away
-const STAY_MS = [0, 9000, 12000, 15000, 18000]; // how long someone sprays, by spray size (weight 1-4)
-const STAGE_W = 1920;
-const STAGE_H = 1080;
+const PIECE_MS = 1000; // each sprayer throws one piece of confetti a second (one per ₦200 sprayed)
+const MIN_STAY_MS = 8000; // even a small spray stays long enough to read the name
+const TAG_MS = 12000; // the big name tag, before it becomes a small bubble that keeps spraying
+const BIG_TAG_MS = 15000; // a big sprayer's tag stays up this long, bigger and glowing
+const RAIN_MS = 7000; // confetti and money rain over the whole screen after each spray…
+const BIG_RAIN_MS = 15000; // …and longer after a big one
+// How many name tags and small bubbles fit at once, before others wait (tags) or bow out (bubbles).
+const LIMITS: Record<StageMode, { tags: number; minis: number }> = { tv: { tags: 8, minis: 14 }, phone: { tags: 3, minis: 5 } };
+// Design sizes the layout is drawn at, then scaled (and stretched to the screen's shape).
+const BASE: Record<StageMode, { w: number; h: number }> = { tv: { w: 1920, h: 1080 }, phone: { w: 540, h: 960 } };
 
 type Props = { code: string; initialFeed: ScreenFeed };
-type Sprayer = ActiveSprayer & { until: number; leftAt?: number };
+type Sprayer = ActiveSprayer & { until: number; tagUntil: number; leftAt?: number };
 
-function dayAndClock(iso: string) {
-  return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+/** How long someone keeps spraying: one piece a second, one piece per ₦200 (at most 30 minutes). */
+function stayMs(t: ScreenTransfer) {
+  return Math.max(MIN_STAY_MS, (t.pieces || 1) * PIECE_MS);
 }
 
 export default function LiveScreen({ code, initialFeed }: Props) {
@@ -36,14 +40,30 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const lastId = useRef(initialFeed.recent.reduce((m, t) => Math.max(m, t.id), 0));
   const [waiting, setWaiting] = useState<ScreenTransfer[]>([]);
   const [sprayers, setSprayers] = useState<Sprayer[]>([]);
+  // People whose spray is still going (e.g. after the screen was reloaded) carry on as small bubbles.
+  useEffect(() => {
+    const at = Date.now();
+    const still = initialFeed.recent
+      .filter((t) => new Date(t.createdAt).getTime() + stayMs(t) > at + 5000)
+      .slice(-LIMITS.tv.minis)
+      .map((t, i) => ({ t, slot: i, leaving: false, mini: true, tagUntil: at, until: new Date(t.createdAt).getTime() + stayMs(t) }));
+    if (still.length) setSprayers(still);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [rainUntil, setRainUntil] = useState(0);
   const lastJoin = useRef(0);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
-  const [size, setSize] = useState<StageSize>({ w: STAGE_W, h: STAGE_H });
+  const [size, setSize] = useState<StageSize>(BASE.tv);
   const [compact, setCompact] = useState(false);
   const [ready, setReady] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [camMenu, setCamMenu] = useState(false);
+  const [sid, setSid] = useState<string | null>(null);
+  const sidRef = useRef<string | null>(null);
+  useEffect(() => {
+    sidRef.current = screenIdFor(code);
+    setSid(sidRef.current);
+  }, [code]);
 
   // --- Ask the server for new transfers and lines. Keeps retrying if the internet drops. ---
   useEffect(() => {
@@ -52,7 +72,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/screen/${encodeURIComponent(code)}?after=${lastId.current}`, { cache: 'no-store' });
+        const sidQ = sidRef.current ? `&sid=${sidRef.current}` : '';
+        const res = await fetch(`/api/screen/${encodeURIComponent(code)}?after=${lastId.current}${sidQ}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as ScreenFeed;
         if (!alive) return;
@@ -87,40 +108,55 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // --- Who is spraying: people step in, spray for a while, then make room. ---
   const paused = feed.event.paused;
   const live = feed.event.phase === 'live';
+  const mode: StageMode = compact ? 'phone' : 'tv';
   useEffect(() => {
-    // Name tags whose time is up fade away, then leave.
-    if (sprayers.some((s) => (!s.leaving && now >= s.until) || (s.leaving && now - (s.leftAt ?? now) >= LEAVE_MS))) {
-      setSprayers((list) =>
-        list
-          .filter((s) => !(s.leaving && now - (s.leftAt ?? now) >= LEAVE_MS))
-          .map((s) => (!s.leaving && now >= s.until ? { ...s, leaving: true, leftAt: now } : s)),
-      );
+    const limits = LIMITS[mode];
+    let list = sprayers.filter((s) => !(s.leaving && now - (s.leftAt ?? now) >= LEAVE_MS)); // faded out: gone
+    let minis = list.filter((s) => s.mini && !s.leaving).length;
+    list = list.map((s) => {
+      if (s.leaving) return s;
+      if (now >= s.until) return { ...s, leaving: true, leftAt: now }; // spray used up
+      if (!s.mini && now >= s.tagUntil) {
+        // The big tag makes way for others; the person keeps spraying as a small bubble (if there's room).
+        if (minis < limits.minis) {
+          minis += 1;
+          return { ...s, mini: true };
+        }
+        return { ...s, leaving: true, leftAt: now };
+      }
+      return s;
+    });
+    if (live && !paused && waiting.length && now - lastJoin.current >= JOIN_GAP_MS) {
+      const [next, ...rest] = waiting;
+      const tags = list.filter((s) => !s.mini && !s.leaving).length;
+      if (tags < limits.tags || next.big) {
+        const until = now + stayMs(next);
+        // A crowd waiting? Tags make way sooner so everyone gets a turn.
+        const tagMs = next.big ? BIG_TAG_MS : Math.max(6000, TAG_MS * (rest.length > 4 ? 0.5 : 1));
+        list = [...list, { t: next, slot: list.length, leaving: false, mini: false, tagUntil: Math.min(until, now + tagMs), until }];
+        setWaiting(rest);
+        lastJoin.current = now;
+        setRainUntil((r) => Math.max(r, now + (next.big ? BIG_RAIN_MS : RAIN_MS)));
+      }
     }
-    if (!live || paused || !waiting.length || now - lastJoin.current < JOIN_GAP_MS) return;
-    const [next, ...rest] = waiting;
-    const used = new Set(sprayers.map((s) => s.slot));
-    const slot = Array.from({ length: SPRAY_SLOTS }, (_, i) => i).find((i) => !used.has(i));
-    if (slot === undefined && !next.big) return; // everyone waits for a free spot (big sprayers go straight in)
-    // A crowd waiting? Everyone sprays a little shorter so all get a turn.
-    const stay = next.big ? BIG_STAY_MS : Math.max(6000, (STAY_MS[next.weight] ?? 9000) * (rest.length > 4 ? 0.5 : 1));
-    setWaiting(rest);
-    setSprayers((list) => [...list, { t: next, slot: slot ?? -1, leaving: false, until: now + stay }]);
-    lastJoin.current = now;
+    if (list.length !== sprayers.length || list.some((s, i) => s !== sprayers[i])) setSprayers(list);
   }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Fit the 1920x1080 design to any TV or projector. ---
+  // --- Fit the design to any screen: a TV or projector, or a phone. ---
   useEffect(() => {
     const fit = () => {
-      // Designed at 1920x1080, then stretched to the screen's own shape so it fills it edge to edge (no black bands).
-      const k = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+      // Phones and narrow windows get the same stage, laid out for a phone, instead of a tiny TV picture.
+      const small = window.innerWidth < 900 || window.innerHeight > window.innerWidth;
+      const base = BASE[small ? 'phone' : 'tv'];
+      // Drawn at the design size, then stretched to the screen's own shape so it fills it edge to edge.
+      const k = Math.min(window.innerWidth / base.w, window.innerHeight / base.h);
       setScale(k);
       setSize((old) => {
         const w = Math.round(window.innerWidth / k);
         const h = Math.round(window.innerHeight / k);
         return old.w === w && old.h === h ? old : { w, h };
       });
-      // Phones and narrow windows get a layout made for them instead of a tiny TV picture.
-      setCompact(window.innerWidth < 900 || window.innerHeight > window.innerWidth);
+      setCompact(small);
       setReady(true);
     };
     fit();
@@ -165,12 +201,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
 
   const e = feed.event;
   // Live video of the celebrant: only on the big screen, never on guests' phones.
-  const cam = useLiveCamera(code, feed.camera, ready && !compact && e.phase !== 'ended');
-  const camNotice = cam.phoneNeedsKey
-    ? 'A phone camera is trying to go live. To show it, open this screen with the “Open big screen” button in your DashPad dashboard.'
-    : cam.source
-      ? null
-      : cam.phoneProblem;
+  const cam = useLiveCamera(code, sid, feed.camera, ready && !compact && e.phase !== 'ended');
+  const camNotice = cam.source ? null : cam.phoneProblem;
   const colorsKey = JSON.stringify(e.themeColors ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const theme = useMemo(() => resolveTheme(e.theme, e.themeColors), [e.theme, colorsKey]);
@@ -181,15 +213,9 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const pool = cutouts.length ? cutouts : e.photos;
   const photo = pool.length ? pool[ready ? Math.floor(now / PHOTO_MS) % pool.length : 0] : null;
   // Only a new list when someone arrives or leaves, so the screen redraws only then.
-  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}`).join(',');
+  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}${s.mini ? 'm' : ''}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const shownSprayers = useMemo<ActiveSprayer[]>(() => sprayers.map(({ t, slot, leaving }) => ({ t, slot, leaving })), [sprayerKey]);
-
-  const statusBadge = !online ? (
-    <div className="badge offline" role="status">Reconnecting… transfers still work</div>
-  ) : live ? (
-    <div className="badge"><span className="live-dot" />{paused ? 'Paused' : 'Live'}</div>
-  ) : null;
+  const shownSprayers = useMemo<ActiveSprayer[]>(() => sprayers.map(({ t, slot, leaving, mini }) => ({ t, slot, leaving, mini })), [sprayerKey]);
 
   const fullScreenButton = (
     <button
@@ -204,115 +230,10 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     </button>
   );
 
-  // ---------- Phone layout (someone opened the link on their phone) ----------
-  if (compact) {
-    const active = sprayers.filter((s) => !s.leaving);
-    const big = active.find((s) => s.t.big);
-    return (
-      <div className="m-screen" style={themeVars}>
-        <header className="m-top">
-          <div style={{ minWidth: 0 }}>
-            <div className="top-brand"><Logo size={22} tone={theme.light ? 'light' : 'dark'} /></div>
-            <h1 className="m-title">{e.title}</h1>
-          </div>
-          {statusBadge}
-        </header>
-
-        {photo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`m-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
-        )}
-
-        {e.phase === 'upcoming' ? (
-          <section className="m-card m-center">
-            <div className="m-big">Spraying opens soon</div>
-            <div>{dayAndClock(e.startsAt)}</div>
-            <div className="m-muted">The account number will appear here when spraying starts.</div>
-          </section>
-        ) : e.phase === 'ended' ? (
-          <section className="m-card m-center">
-            <div className="m-big">Thank you for spraying {e.celebrantName}!</div>
-            <div className="m-muted">Spraying has closed. Please don’t send more transfers.</div>
-          </section>
-        ) : (
-          <>
-            {acct ? (
-              <section className="m-pay">
-                <div className="m-pay-label">Transfer to spray</div>
-                <div className="m-acct">{acct}</div>
-                <div className="m-bank">{e.accountBank}</div>
-                <div className="m-acct-name">{e.accountName}</div>
-                <CopyButton text={e.accountNumber!} label="Copy account number" />
-              </section>
-            ) : (
-              <section className="m-pay"><div className="m-bank">Account number coming soon</div></section>
-            )}
-
-            {big && (
-              <section key={big.t.id} className="m-card m-bigspray" role="status">
-                <div className="m-badge">Big spray!</div>
-                <div className="m-big-who">
-                  <Avatar name={big.t.firstName ?? 'Guest'} size={56} letters={(big.t.initials ?? '?').replace(/\./g, '')} />
-                  <span>{big.t.firstName ?? 'A guest'}</span>
-                </div>
-                <div className="m-muted">is spraying {e.celebrantName}!</div>
-              </section>
-            )}
-
-            <section className="m-card">
-              <div className="m-to">Spraying now</div>
-              {active.length ? (
-                <ul className="m-sprayers">
-                  {active.map((s) => (
-                    <li key={s.t.id}>
-                      <Avatar name={s.t.firstName ?? 'Guest'} size={32} letters={(s.t.initials ?? '?').replace(/\./g, '')} />
-                      {s.t.firstName ?? 'A guest'}
-                    </li>
-                  ))}
-                </ul>
-              ) : feed.recent.length ? (
-                <>
-                  <div className="m-muted">Recently sprayed:</div>
-                  <ul className="m-sprayers recent">
-                    {feed.recent.slice(-6).reverse().map((t) => (
-                      <li key={t.id}>
-                        <Avatar name={t.firstName ?? 'Guest'} size={32} letters={(t.initials ?? '?').replace(/\./g, '')} />
-                        {t.firstName ?? 'A guest'}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <div className="m-muted">Be the first to spray {e.celebrantName}! Transfer any amount to the account above.</div>
-              )}
-            </section>
-
-            {feed.lines.length > 0 && (
-              <section className="m-card">
-                <div className="m-to">Lines for {e.celebrantName}</div>
-                <ul className="m-lines">
-                  {feed.lines.slice(0, 6).map((l) => (
-                    <li key={l.id}>
-                      <Avatar name={l.name} photo={l.photo} size={36} />
-                      <div>
-                        <strong>{l.name}</strong>
-                        <p>“{l.text}”</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </>
-        )}
-        <p className="m-foot">Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</p>
-      </div>
-    );
-  }
-
-  // ---------- Big screen layout (TV or projector) ----------
+  // ---------- The big screen (the same stage on a TV, a laptop or a phone) ----------
+  const controlsOn = showControls || camMenu || !!camNotice;
   return (
-    <div className="screen-root" style={themeVars}>
+    <div className={`screen-root${controlsOn ? '' : ' idle'}`} style={themeVars}>
       <div className="stage" style={{ width: size.w, height: size.h, transform: `translate(-50%, -50%) scale(${scale})` }}>
         <StageScreen
           e={e}
@@ -323,12 +244,22 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           online={online}
           photo={photo}
           lines={feed.lines}
-          video={cam.stream}
+          video={compact ? null : cam.stream}
           size={size}
+          mode={mode}
+          rainUntil={rainUntil}
+          accountNumber={e.accountNumber}
         />
       </div>
-      <div className={`scr-controls${showControls || camMenu || camNotice ? '' : ' hidden'}`}>
+      {/* Only on a computer, and only while the mouse moves: never seen on the projected picture. */}
+      {!compact && (
+      <div className={`scr-controls${controlsOn ? '' : ' hidden'}`}>
         {camNotice && !camMenu && <div className="cam-notice" role="status">{camNotice}</div>}
+        {cam.canTakeOver && !camMenu && (
+          <button type="button" className="fs-btn take" disabled={cam.claiming} onClick={cam.takeOver}>
+            {cam.claiming ? 'Switching…' : 'Show camera on this screen'}
+          </button>
+        )}
         {camMenu && (
           <div className="cam-menu" role="menu">
             <div className="cam-menu-h">Show live video from</div>
@@ -341,9 +272,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
             >
               <strong>A phone</strong>
               <span>
-                {cam.canUsePhone
-                  ? cam.source === 'phone' ? 'Showing now' : 'Open the camera link on a phone and tap Go live'
-                  : 'Open this screen with “Open big screen” in your dashboard to use a phone'}
+                {cam.source === 'phone'
+                  ? 'Showing now'
+                  : cam.canTakeOver
+                    ? 'A phone is live on another screen. Use “Show camera on this screen”.'
+                    : 'Open the camera link on a phone and tap Go live'}
               </span>
             </button>
             {cam.devices.map((d) => (
@@ -373,6 +306,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         </button>
         {fullScreenButton}
       </div>
+      )}
     </div>
   );
 }

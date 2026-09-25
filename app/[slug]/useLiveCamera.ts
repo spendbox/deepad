@@ -2,22 +2,39 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ScreenFeed } from '@/lib/events';
-import { fetchIce, iceGathered } from '@/lib/webrtc';
+import { fetchIce, iceGathered, newSessionId } from '@/lib/webrtc';
 
 const DROP_GRACE_MS = 5000; // a short blip keeps the video; longer and the photo comes back
 const LOCAL_KEY = 'dp-camera-device';
 
 export type CameraDevice = { id: string; label: string };
 
+/** This open big screen's own id (kept if the page is reloaded in the same tab). */
+export function screenIdFor(code: string): string {
+  const k = `dp-screen-id:${code}`;
+  try {
+    const old = sessionStorage.getItem(k);
+    if (old) return old;
+    const id = newSessionId();
+    sessionStorage.setItem(k, id);
+    return id;
+  } catch {
+    return newSessionId();
+  }
+}
+
 /**
  * Live video for the big screen, from either:
  *  - a camera plugged into this computer (chosen from the "Camera" menu), or
  *  - a phone that opened the event's camera link and tapped "Go live".
- * A plugged-in camera wins if both are on. Only a screen opened from the
- * planner's dashboard (with its ?screen= key) receives the phone's video.
+ * A plugged-in camera wins if both are on. One open big screen at a time shows
+ * the phone's video: the one opened from the dashboard takes it by itself, and
+ * any other computer's screen can take it over with "Show camera on this screen".
+ * Phones and tablets never receive it.
  */
-export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enabled: boolean) {
+export function useLiveCamera(code: string, sid: string | null, camera: ScreenFeed['camera'], enabled: boolean) {
   const [key, setKey] = useState<string | null>(null);
+  const [touch, setTouch] = useState(true);
   const [phoneStream, setPhoneStream] = useState<MediaStream | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [localId, setLocalId] = useState<string | null>(null);
@@ -29,6 +46,8 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
 
   useEffect(() => {
     setKey(new URLSearchParams(window.location.search).get('screen'));
+    // Tablets and phones (touch screens) don't show the camera: only computers driving a TV or projector do.
+    setTouch(!!window.matchMedia?.('(pointer: coarse)').matches && !window.matchMedia?.('(any-pointer: fine)').matches);
     try {
       setLocalId(localStorage.getItem(`${LOCAL_KEY}:${code}`));
     } catch {}
@@ -45,7 +64,7 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
     async (session: string) => {
       hangUp();
       current.current = session;
-      const q = `key=${encodeURIComponent(key ?? '')}`;
+      const q = `sid=${encodeURIComponent(sid ?? '')}`;
       try {
         const res = await fetch(`/api/screen/${encodeURIComponent(code)}/camera?${q}&session=${session}`, { cache: 'no-store' });
         const { offer } = (await res.json()) as { offer: string | null };
@@ -80,7 +99,7 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
         const sent = await fetch(`/api/screen/${encodeURIComponent(code)}/camera?${q}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session, answer: peer.localDescription?.sdp }),
+          body: JSON.stringify({ sid, session, answer: peer.localDescription?.sdp }),
         });
         const { ok } = (await sent.json()) as { ok?: boolean };
         if (!ok && pc.current === peer) hangUp(); // another screen got there first
@@ -89,27 +108,61 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
         if (current.current === session) hangUp();
       }
     },
-    [code, key, hangUp],
+    [code, sid, hangUp],
   );
+
+  const eligible = enabled && !touch && !!sid;
+  const claim = useCallback(
+    async (auto = false) => {
+      if (!sid) return false;
+      try {
+        const res = await fetch(`/api/screen/${encodeURIComponent(code)}/camera?key=${encodeURIComponent(key ?? '')}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sid, claim: true, auto }),
+        });
+        return !!((await res.json()) as { ok?: boolean }).ok;
+      } catch {
+        return false;
+      }
+    },
+    [code, sid, key],
+  );
+  const [claiming, setClaiming] = useState(false);
+  const autoTried = useRef<string | null>(null);
 
   const session = camera?.session ?? null;
   const answered = camera?.answered ?? false;
+  const mine = camera?.mine ?? false;
+  const free = camera?.free ?? false;
   useEffect(() => {
-    if (!enabled || !key || localId) {
+    if (!eligible || localId || !session) {
+      // No phone camera (it stopped or went quiet), or a plugged-in one is used: back to the photo.
       if (pc.current) hangUp();
       current.current = null;
       return;
     }
-    if (!session) {
-      // The phone stopped (or went quiet): back to the photo.
-      if (pc.current) hangUp();
+    if (!mine) {
+      if (pc.current) hangUp(); // another screen has taken the camera
       current.current = null;
+      // The dashboard's screen takes a free camera by itself (once per phone session).
+      if (free && key && autoTried.current !== session) {
+        autoTried.current = session;
+        claim(true);
+      }
       return;
     }
     if (session === current.current) return;
-    if (answered) return; // someone else's session, already taken
+    if (answered) return; // answered by this screen before a reload: the phone reconnects by itself
     answer(session);
-  }, [enabled, key, localId, session, answered, answer, hangUp]);
+  }, [eligible, localId, session, answered, mine, free, key, answer, hangUp, claim]);
+
+  /** "Show camera on this screen": this screen takes the video; the others stop showing it. */
+  const takeOver = useCallback(async () => {
+    setClaiming(true);
+    await claim(false);
+    setClaiming(false);
+  }, [claim]);
 
   useEffect(() => () => pc.current?.close(), []);
 
@@ -170,15 +223,14 @@ export function useLiveCamera(code: string, camera: ScreenFeed['camera'], enable
     [code],
   );
 
-  // A phone is trying to go live, but this screen wasn't opened from the dashboard, so it can't accept it.
-  const phoneNeedsKey = enabled && !key && !localId && !!camera && !camera.answered;
-
   return {
     stream: localStream ?? phoneStream,
-    phoneNeedsKey,
+    /** A phone is live (or trying) but shows on another screen, or none yet: offer to show it here. */
+    canTakeOver: eligible && !localId && !!camera && !mine,
+    takeOver,
+    claiming,
     phoneProblem: localId ? null : phoneProblem,
     source: localStream ? ('local' as const) : phoneStream ? ('phone' as const) : null,
-    canUsePhone: !!key,
     devices,
     localId,
     localError,

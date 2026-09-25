@@ -37,6 +37,9 @@ export type SprayEvent = {
   linesViewToken?: string | null;
   /** Secret for the "connect a camera" link (a phone that streams video to the big screen). */
   cameraToken?: string | null;
+  /** Which open big screen shows the live camera (a random id per screen), and when it last checked in. */
+  cameraScreen?: string | null;
+  cameraScreenSeenAt?: string | null;
   /** The planner's own colours (used when theme is 'custom'). */
   themeColors: ThemeColors | null;
   /** Photos of the celebrants (public image links), shown on the big screen. */

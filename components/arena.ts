@@ -141,7 +141,7 @@ export class Arena {
 
     // Settle: a few passes of edges → celebrant → each other, so one push can
     // never shove something into a wall, the celebrant or a neighbour.
-    for (let pass = 0; pass < 4; pass++) {
+    for (let pass = 0; pass < 10; pass++) {
       for (const b of list) {
         this.clampToWalls(b);
         for (const r of this.obstacles) this.pushOutOf(b, r);

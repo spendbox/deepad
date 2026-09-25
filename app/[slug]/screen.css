@@ -97,3 +97,5 @@
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .live-dot, .m-bigspray, .m-sprayers li { animation: none; }
 }
+/* When the mouse is still, the buttons fade away and so does the pointer: nothing extra on the projected picture */
+.screen-root.idle { cursor: none; }
