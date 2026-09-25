@@ -178,6 +178,8 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
   const spraying = sprayers.some((s) => !s.leaving);
   const crowd = sprayers.filter((s) => !s.leaving && !s.mini).length + Math.floor(sprayers.filter((s) => !s.leaving && s.mini).length / 2);
   const maxLines = phone ? 1 : crowd >= 7 ? 1 : crowd >= 4 ? 2 : MAX_LINES;
+  // Names shrink a little as the screen fills (2 or fewer: full size), never below about three-quarters.
+  const tagZoom = Math.max(phone ? 0.78 : 0.72, 1 - Math.max(0, crowd - 2) * (phone ? 0.07 : 0.05));
 
   const status = !online ? (
     <span className="st-status offline" role="status">Reconnecting… transfers still work</span>
@@ -228,7 +230,11 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
             height={canvas.height}
             style={{ left: canvas.left, top: canvas.top, zIndex: 4 }}
           />
-          <div className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`} aria-live="polite">
+          <div
+            className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`}
+            style={{ '--tz': tagZoom.toFixed(2) } as React.CSSProperties}
+            aria-live="polite"
+          >
             {sprayers.map((s) => (
               <ArenaBody
                 key={`s${s.t.id}`}
@@ -243,7 +249,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                   {s.t.big && !s.mini && <span className="sp-badge">Big spray!</span>}
                   <Avatar
                     name={s.t.firstName ?? 'Guest'}
-                    size={s.mini ? (phone ? 26 : 40) : s.t.big ? (phone ? 48 : 84) : phone ? 34 : 56}
+                    size={s.mini ? (phone ? 30 : 48) : s.t.big ? (phone ? 60 : 104) : phone ? 42 : 68}
                     letters={bubble(s.t)}
                   />
                   <span className="sp-name">{s.t.firstName ?? 'A guest'}</span>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { collectNarrations, recordTransfer } from '@/lib/events';
+import { collectNarrations, receiverNames, recordTransfer } from '@/lib/events';
+import { findSenderName } from '@/lib/narration';
 import { isValidPaystackSignature } from '@/lib/paystack-signature';
 import { getStore } from '@/lib/store';
 import type { NewPaymentLog } from '@/lib/types';
@@ -103,7 +104,8 @@ export async function POST(req: Request) {
     const { transfer, created } = await recordTransfer(event, {
       reference,
       amountKobo,
-      senderName: auth.sender_name ?? null,
+      // Some banks (e.g. GTBank) leave sender_name empty: look in the rest of the notification too.
+      senderName: findSenderName(data, receiverNames(event)),
       senderBank: auth.sender_bank ?? null,
       narrations,
       paidAt: data.paid_at ?? null,

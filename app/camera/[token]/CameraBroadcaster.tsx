@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Logo from '@/components/Logo';
+import { canKeepAwake, keepAwake } from '@/lib/wake';
 import { askMotionPermission, correction, FrameRotator, screenAngle, watchHold } from '@/lib/rotator';
 import { fetchIce, iceGathered, newSessionId, sharpFromTheStart } from '@/lib/webrtc';
 
@@ -36,7 +37,6 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
   const session = useRef<string | null>(null);
   const wantLive = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const lock = useRef<{ release: () => Promise<void> } | null>(null);
   // Keeping the big screen's picture upright however the phone is held.
   const rotator = useRef<FrameRotator | null>(null);
   const hold = useRef(-1); // which way the phone is held; -1 until the motion sensor has said
@@ -295,16 +295,9 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
     startCamera(next);
   };
 
-  // Keep the phone awake while live; after the phone was locked, bring the camera back.
-  useEffect(() => {
-    const live = state === 'live' || state === 'connecting' || state === 'waiting';
-    const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
-    if (live && nav.wakeLock && !lock.current) nav.wakeLock.request('screen').then((l) => (lock.current = l)).catch(() => {});
-    if (!live && lock.current) {
-      lock.current.release().catch(() => {});
-      lock.current = null;
-    }
-  }, [state]);
+  // Keep the phone awake while live (asking again whenever the phone drops it), so the camera never stops.
+  const liveish = state === 'live' || state === 'connecting' || state === 'waiting';
+  useEffect(() => (liveish ? keepAwake() : undefined), [liveish]);
 
   useEffect(() => {
     const onVisible = async () => {
@@ -389,6 +382,9 @@ export default function CameraBroadcaster({ token, title, celebrantName, ended }
       {on && (
         <>
           {(held >= 0 ? held % 180 === 0 : portrait) && <div className="cam-tip">Turn your phone sideways for the best picture.</div>}
+          {!canKeepAwake() && (
+            <div className="cam-tip">Keep this phone’s screen on while filming: set its Auto-Lock (screen timeout) to Never.</div>
+          )}
           {turnedNote && (
             <div className="cam-tip" role="status">
               Big screen picture turned {extraTurn ? `${extraTurn}°` : 'back to normal'}. Tap again if it’s still not upright.

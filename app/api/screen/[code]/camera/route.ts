@@ -34,15 +34,27 @@ export async function GET(req: Request, ctx: Ctx) {
  */
 export async function POST(req: Request, ctx: Ctx) {
   const event = await load(ctx);
-  const body = (await req.json().catch(() => null)) as { sid?: string; claim?: boolean; auto?: boolean; session?: string; answer?: string } | null;
+  const body = (await req.json().catch(() => null)) as {
+    sid?: string;
+    claim?: boolean;
+    auto?: boolean;
+    keep?: boolean;
+    restart?: boolean;
+    session?: string;
+    answer?: string;
+  } | null;
   if (!event || !body?.sid || !SESSION_RE.test(body.sid)) return NextResponse.json({ error: 'Bad request' }, { status: 400 });
 
   if (body.claim) {
-    // Taking it by itself (without a button press) only for the dashboard's screen, and only if no open screen has it.
-    if (body.auto && (!isScreenKey(event.id, new URL(req.url).searchParams.get('key')) || cameraScreen(event))) {
+    const holder = cameraScreen(event);
+    // Taking it by itself (without a button press): only when no open screen has it, and only the
+    // dashboard's screen, or a screen that is showing the camera right now and just missed a check-in.
+    if (body.auto && (holder || (!body.keep && !isScreenKey(event.id, new URL(req.url).searchParams.get('key'))))) {
       return NextResponse.json({ ok: false }, { headers: noStore });
     }
-    await claimCamera(event, body.sid);
+    // Restarting is only for the screen that holds the camera.
+    if (body.restart && holder !== body.sid) return NextResponse.json({ ok: false }, { headers: noStore });
+    await claimCamera(event, body.sid, !!body.restart);
     return NextResponse.json({ ok: true }, { headers: noStore });
   }
 

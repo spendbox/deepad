@@ -113,13 +113,13 @@ export function useLiveCamera(code: string, sid: string | null, camera: ScreenFe
 
   const eligible = enabled && !touch && !!sid;
   const claim = useCallback(
-    async (auto = false) => {
+    async (auto = false, opts: { keep?: boolean; restart?: boolean } = {}) => {
       if (!sid) return false;
       try {
         const res = await fetch(`/api/screen/${encodeURIComponent(code)}/camera?key=${encodeURIComponent(key ?? '')}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sid, claim: true, auto }),
+          body: JSON.stringify({ sid, claim: true, auto, ...opts }),
         });
         return !!((await res.json()) as { ok?: boolean }).ok;
       } catch {
@@ -143,6 +143,12 @@ export function useLiveCamera(code: string, sid: string | null, camera: ScreenFe
       return;
     }
     if (!mine) {
+      // Showing it, and nobody else has taken it (this screen just missed a check-in, e.g. a Wi-Fi blip):
+      // keep the picture and quietly hold on to the camera.
+      if (free && pc.current && current.current === session) {
+        claim(true, { keep: true });
+        return;
+      }
       if (pc.current) hangUp(); // another screen has taken the camera
       current.current = null;
       // The dashboard's screen takes a free camera by itself (once per phone session).
@@ -156,6 +162,29 @@ export function useLiveCamera(code: string, sid: string | null, camera: ScreenFe
     if (answered) return; // answered by this screen before a reload: the phone reconnects by itself
     answer(session);
   }, [eligible, localId, session, answered, mine, free, key, answer, hangUp, claim]);
+
+  // Safety net: this screen holds the camera and the phone is live, but no picture has been
+  // coming for a while (the connection quietly died). Ask the phone to reconnect.
+  const watch = useRef<{ since: number; asked: number }>({ since: 0, asked: 0 });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const w = watch.current;
+      const track = phoneStream?.getVideoTracks()[0];
+      const noPicture = !track || track.muted || track.readyState === 'ended';
+      const stuck = eligible && !localId && mine && answered && noPicture;
+      if (!stuck) {
+        w.since = 0;
+        return;
+      }
+      const now = Date.now();
+      w.since ||= now;
+      if (now - w.since > 12_000 && now - w.asked > 30_000) {
+        w.asked = now;
+        claim(false, { restart: true });
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, [eligible, localId, mine, answered, phoneStream, claim]);
 
   /** "Show camera on this screen": this screen takes the video; the others stop showing it. */
   const takeOver = useCallback(async () => {
