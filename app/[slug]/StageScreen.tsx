@@ -27,7 +27,7 @@ export type StageMode = 'tv' | 'phone';
 
 /** Room kept at the bottom for the transfer card (smaller while live video plays, so it hides less of it). */
 function cardSpace(mode: StageMode, video: boolean) {
-  if (mode === 'phone') return 338;
+  if (mode === 'phone') return 274;
   return video ? 244 : 366;
 }
 
@@ -150,13 +150,16 @@ type Props = {
   video: MediaStream | null;
   size: StageSize;
   mode: StageMode;
-  /** Confetti and money rain over the whole screen until this time (ms). */
+  /** Confetti and money rain over the whole screen until this time (ms)… */
   rainUntil: number;
+  /** …heavier until this time, after someone new starts spraying (heavier still, and more money, for a big spray). */
+  burstUntil: number;
+  burstBig: boolean;
   /** The full account number, for the phone's copy button. */
   accountNumber?: string | null;
 };
 
-function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video, size, mode, rainUntil, accountNumber }: Props) {
+function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video, size, mode, rainUntil, burstUntil, burstBig, accountNumber }: Props) {
   const [videoOn, setVideoOn] = useState(false);
   const live = e.phase === 'live';
   const phone = mode === 'phone';
@@ -221,7 +224,16 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
       {live ? (
         <>
           {!spraying && !lines.length && !videoOn && !phone && <div className="st-hello">Spray {e.celebrantName}!</div>}
-          <Rain until={rainUntil} width={Math.round(size.w)} height={Math.round(size.h)} perSecond={phone ? 40 : 24} style={{ left: 0, top: 0, zIndex: 4 }} />
+          <Rain
+            until={Math.max(rainUntil, burstUntil)}
+            burstUntil={burstUntil}
+            burst={burstBig ? 3 : 2.2}
+            burstMoney={burstBig ? 0.55 : 0.35}
+            width={Math.round(size.w)}
+            height={Math.round(size.h)}
+            perSecond={phone ? 24 : 14}
+            style={{ left: 0, top: 0, zIndex: 4 }}
+          />
           <SprayCanvas
             source={() => arena.emitters().map((m) => ({ ...m, x: m.x - canvas.left, y: m.y - canvas.top }))}
             active={spraying}

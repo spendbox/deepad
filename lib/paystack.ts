@@ -146,6 +146,11 @@ export async function listCustomerTransactions(customerId: number, fromIso: stri
   return call<PaystackTransaction[]>('GET', `/transaction?${q}`);
 }
 
+/** One payment, as Paystack has it now (sometimes more complete than the first notification). */
+export async function getTransaction(id: number | string): Promise<PaystackTransaction> {
+  return call<PaystackTransaction>('GET', `/transaction/${encodeURIComponent(String(id))}`);
+}
+
 export type OneTimeAccount = { accountNumber: string; bankName: string; accountName: string; expiresAt: string };
 
 /**

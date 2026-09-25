@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react';
 import { CONFETTI_COLORS } from './Confetti';
 
 // Confetti and naira notes raining down over the whole screen while people are
-// spraying. The amount of rain is the same however many people spray (it
-// never gets heavier or slower with a crowd); each new spray keeps it going a
-// little longer. Drawn on one <canvas>, with the notes drawn once up front and
+// spraying. The steady rain is the same however many people spray (it never
+// gets heavier or slower with a crowd); each new sprayer sets off a burst on
+// top of it for a few seconds. Drawn on one <canvas>, with the notes drawn once up front and
 // reused, so it stays smooth.
 
 type Drop = {
@@ -55,18 +55,25 @@ function reducedMotion() {
 }
 
 /**
- * Rains while `until` (a time in ms) is in the future. `perSecond` pieces a
- * second, of which `money` (0 to 1) are notes. Sizes are in the canvas's pixels.
+ * Rains while `until` (a time in ms) is in the future: `perSecond` pieces a
+ * second, of which `money` (0 to 1) are notes; `burst` times as many (with
+ * `burstMoney` notes) until `burstUntil`. Sizes are in the canvas's pixels.
  */
 export default function Rain({
   until,
+  burstUntil = 0,
+  burst = 2,
+  burstMoney = 0.35,
   width,
   height,
-  perSecond = 22,
-  money = 0.3,
+  perSecond = 14,
+  money = 0.25,
   style,
 }: {
   until: number;
+  burstUntil?: number;
+  burst?: number;
+  burstMoney?: number;
   width: number;
   height: number;
   perSecond?: number;
@@ -76,8 +83,8 @@ export default function Rain({
   const ref = useRef<HTMLCanvasElement>(null);
   const untilRef = useRef(until);
   untilRef.current = until;
-  const moneyRef = useRef(money);
-  moneyRef.current = money;
+  const burstRef = useRef({ until: burstUntil, k: burst, money: burstMoney, base: money });
+  burstRef.current = { until: burstUntil, k: burst, money: burstMoney, base: money };
   const kick = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -94,8 +101,8 @@ export default function Rain({
     let last = 0;
     let owed = 0;
 
-    const add = () => {
-      const isNote = Math.random() < moneyRef.current;
+    const add = (moneyShare: number) => {
+      const isNote = Math.random() < moneyShare;
       const ribbon = Math.random() < 0.6;
       const w = isNote ? 88 * (0.75 + Math.random() * 0.35) : ribbon ? 16 + Math.random() * 10 : 10 + Math.random() * 5;
       drops.push({
@@ -120,10 +127,13 @@ export default function Rain({
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - (last || now)) / 1000);
       last = now;
-      if (Date.now() < untilRef.current) {
-        owed += perSecond * (width / 1920) * dt;
+      const wall = Date.now();
+      if (wall < untilRef.current) {
+        const b = burstRef.current;
+        const bursting = wall < b.until;
+        owed += perSecond * (bursting ? b.k : 1) * (width / 1920) * dt;
         while (owed >= 1) {
-          add();
+          add(bursting ? b.money : b.base);
           owed -= 1;
         }
       }
@@ -174,7 +184,7 @@ export default function Rain({
 
   useEffect(() => {
     if (until > Date.now()) kick.current();
-  }, [until]);
+  }, [until, burstUntil]);
 
   return <canvas ref={ref} className="cf-canvas" width={width} height={height} style={style} aria-hidden="true" />;
 }
