@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { uploadCelebrantPhoto } from '@/app/actions';
 import { isCutout } from '@/lib/photos';
 
@@ -17,19 +17,46 @@ function shrink(bitmap: ImageBitmap, maxSide = 1600): Promise<Blob | null> {
 }
 
 type Job = { id: number; status: string };
+const PREF_KEY = 'dashpad:remove-bg';
 
-export default function PhotoPicker({ value, onChange }: { value: string[]; onChange: (urls: string[]) => void }) {
+export default function PhotoPicker({
+  value,
+  onChange,
+  canRemoveBg = false,
+}: {
+  value: string[];
+  onChange: (urls: string[]) => void;
+  /** Background removal (Photoroom) is set up. */
+  canRemoveBg?: boolean;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [removeBg, setRemoveBg] = useState(true);
+  const cutting = canRemoveBg && removeBg;
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(PREF_KEY) === '0') setRemoveBg(false);
+    } catch {}
+  }, []);
+
+  function toggle(on: boolean) {
+    setRemoveBg(on);
+    try {
+      localStorage.setItem(PREF_KEY, on ? '1' : '0');
+    } catch {}
+  }
 
   async function add(files: FileList | null) {
     if (!files?.length) return;
     setError(null);
+    setNote(null);
     const room = MAX_PHOTOS - value.length - jobs.length;
     const picked = Array.from(files).slice(0, Math.max(0, room));
     if (files.length > room) setError(`You can add up to ${MAX_PHOTOS} photos.`);
-    const mine = picked.map((_, i) => ({ id: Date.now() + i, status: 'Uploading…' }));
+    const mine = picked.map((_, i) => ({ id: Date.now() + i, status: cutting ? 'Removing background…' : 'Uploading…' }));
     setJobs((js) => [...js, ...mine]);
     let urls = [...value];
     for (const [i, file] of picked.entries()) {
@@ -46,9 +73,11 @@ export default function PhotoPicker({ value, onChange }: { value: string[]; onCh
         const form = new FormData();
         const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
         form.append('photo', new File([blob], `photo.${ext}`, { type: blob.type || 'image/jpeg' }));
+        if (cutting) form.append('removeBg', '1');
         const res = await uploadCelebrantPhoto(form);
         if ('error' in res) setError(res.error);
         else {
+          if (res.note) setNote(res.note);
           urls = [...urls, res.url];
           onChange(urls);
         }
@@ -63,6 +92,18 @@ export default function PhotoPicker({ value, onChange }: { value: string[]; onCh
 
   return (
     <div className="stack" style={{ gap: 14 }}>
+      {canRemoveBg && (
+        <label className="switch-row">
+          <input type="checkbox" className="switch" checked={removeBg} onChange={(e) => toggle(e.target.checked)} />
+          <span>
+            <strong>Remove backgrounds</strong>
+            <span className="hint" style={{ display: 'block' }}>
+              Cuts out the people so they can dance on the big screen and catch the money. Use clear photos where
+              everyone is fully in the picture.
+            </span>
+          </span>
+        </label>
+      )}
       <div className="photo-grid">
         {value.map((url, i) => (
           <div key={url} className={`photo-tile${isCutout(url) ? ' cutout' : ''}`}>
@@ -87,6 +128,7 @@ export default function PhotoPicker({ value, onChange }: { value: string[]; onCh
         )}
       </div>
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => add(e.target.files)} />
+      {note && <p className="hint" role="status">{note}</p>}
       {error && <p className="error-text" role="alert">{error}</p>}
     </div>
   );

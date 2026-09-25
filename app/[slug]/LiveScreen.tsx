@@ -2,6 +2,7 @@
 
 import Logo from '@/components/Logo';
 import { useEffect, useRef, useState } from 'react';
+import Celebrant from '@/components/Celebrant';
 import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import { groupAccountNumber, naira } from '@/lib/money';
@@ -171,6 +172,14 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const acct = e.accountNumber ? groupAccountNumber(e.accountNumber) : null;
   // Celebrant photos take turns, a new one every few seconds.
   const photo = e.photos.length ? e.photos[ready ? Math.floor(now / PHOTO_MS) % e.photos.length : 0] : null;
+  // Cut-out photos (background removed) dance and catch the money instead.
+  const cutouts = e.photos.filter(isCutout);
+  const dancer = cutouts.length ? cutouts[ready ? Math.floor(now / PHOTO_MS) % cutouts.length : 0] : null;
+  const sprayDancer = cutouts.length ? cutouts[popKey % cutouts.length] : null;
+  const dance = e.danceStyle ?? 'groove';
+  // The pile of notes at their feet grows with every spray shown.
+  const pile = Math.max(0, feed.recent.length - queue.length);
+  const spraying = !!takeover || (showingSpray && !!current);
 
   const statusBadge = !online ? (
     <div className="badge offline" role="status">Reconnecting… transfers still work</div>
@@ -203,9 +212,15 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           {statusBadge}
         </header>
 
-        {photo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`m-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
+        {dancer ? (
+          <div className="m-dancer">
+            <Celebrant src={spraying ? sprayDancer! : dancer} dance={dance} width={250} height={310} sprayKey={popKey} pile={pile} notes={8} />
+          </div>
+        ) : (
+          photo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={photo} src={photo} alt={`Photo of ${e.celebrantName}`} className={`m-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
+          )
         )}
 
         {e.phase === 'upcoming' ? (
@@ -276,12 +291,17 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         <NotesRain />
 
         {takeover ? (
-          <div className="takeover">
-            <div className="takeover-badge">Big spray!</div>
-            <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
-            <div className="takeover-to">sent to {e.recipientLabel}</div>
-            {lineFor(takeover.t) && (
-              <div className="takeover-msg">{isHype(takeover.t) ? lineFor(takeover.t) : `“${lineFor(takeover.t)}”`}</div>
+          <div className={`takeover${sprayDancer ? ' with-celeb' : ''}`}>
+            <div className="takeover-main">
+              <div className="takeover-badge">Big spray!</div>
+              <FitText className="takeover-amount" text={naira(takeover.t.amountKobo)} max={300} />
+              <div className="takeover-to">sent to {e.recipientLabel}</div>
+              {lineFor(takeover.t) && (
+                <div className="takeover-msg">{isHype(takeover.t) ? lineFor(takeover.t) : `“${lineFor(takeover.t)}”`}</div>
+              )}
+            </div>
+            {sprayDancer && (
+              <Celebrant className="takeover-celeb" src={sprayDancer} dance={dance} width={560} height={720} sprayKey={popKey} pile={pile} notes={16} />
             )}
             {acct && (
               <div className="takeover-acct">
@@ -330,19 +350,24 @@ export default function LiveScreen({ code, initialFeed }: Props) {
               <>
                 <div className="middle">
                   {showingSpray && current ? (
-                    <div key={popKey} className="panel-main spray-pop">
+                    <div key={popKey} className={`panel-main spray-pop${sprayDancer ? ' with-celeb' : ''}`}>
                       <Burst count={16} />
-                      <div className="pop-kicker">New spray!</div>
-                      <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
-                      <div className="pop-to">sent to {e.recipientLabel}</div>
-                      {lineFor(current) && (
-                        <div className={`pop-msg${isHype(current) ? ' hype' : ''}`}>
-                          {isHype(current) ? lineFor(current) : `“${lineFor(current)}”`}
-                        </div>
+                      <div className="pop-text">
+                        <div className="pop-kicker">New spray!</div>
+                        <FitText className="pop-amount" text={naira(current.amountKobo)} max={190} />
+                        <div className="pop-to">sent to {e.recipientLabel}</div>
+                        {lineFor(current) && (
+                          <div className={`pop-msg${isHype(current) ? ' hype' : ''}`}>
+                            {isHype(current) ? lineFor(current) : `“${lineFor(current)}”`}
+                          </div>
+                        )}
+                      </div>
+                      {sprayDancer && (
+                        <Celebrant className="panel-celeb" src={sprayDancer} dance={dance} width={400} height={500} sprayKey={popKey} pile={pile} />
                       )}
                     </div>
                   ) : (
-                    <div className={`invite panel-main${photo ? ' with-photo' : ''}`}>
+                    <div className={`invite panel-main${photo ? ' with-photo' : ''}${dancer ? ' with-celeb' : ''}`}>
                       <div className="invite-text">
                         <div className="invite-big">Spray {e.celebrantName}!</div>
                         <div className="invite-sub">
@@ -350,9 +375,13 @@ export default function LiveScreen({ code, initialFeed }: Props) {
                           may show up here.
                         </div>
                       </div>
-                      {photo && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo} src={photo} alt="" className={`invite-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
+                      {dancer ? (
+                        <Celebrant className="panel-celeb" src={dancer} dance={dance} width={400} height={500} pile={pile} />
+                      ) : (
+                        photo && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={photo} src={photo} alt="" className={`invite-photo fade-in${isCutout(photo) ? ' cutout' : ''}`} />
+                        )
                       )}
                     </div>
                   )}

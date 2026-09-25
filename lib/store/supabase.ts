@@ -14,6 +14,7 @@ import type {
   Transfer,
 } from '../types';
 import { computeStats, type Store } from './types';
+import { DEFAULT_DANCE, isDanceStyle } from '../dance';
 
 // Talks to Supabase with the secret service-role key. Server only: the key
 // must never reach a browser. Column names are the snake_case form of our
@@ -43,6 +44,7 @@ const toEvent = (r: Row | null) => {
   const e = fromRow<SprayEvent>(r ?? {}, EVENT_NUMS);
   e.photos = Array.isArray(e.photos) ? e.photos : [];
   e.hypeLines = Array.isArray(e.hypeLines) ? e.hypeLines : [];
+  e.danceStyle = isDanceStyle(e.danceStyle) ? e.danceStyle : DEFAULT_DANCE;
   return e;
 };
 const toReset = (r: Row | null) => fromRow<PasswordReset>(r ?? {});
@@ -299,7 +301,7 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, dance_style'],
       ['spray_intents', 'reference, message'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
       ['password_resets', 'id'],

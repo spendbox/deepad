@@ -1,4 +1,5 @@
 import { emailConfigured } from '@/lib/email';
+import { photoroomConfigured, photoroomIsSandbox } from '@/lib/photoroom';
 import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
@@ -52,6 +53,15 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
       ok: emailConfigured(),
       title: 'Email (Resend)',
       detail: emailConfigured() ? 'Set up.' : 'RESEND_API_KEY and EMAIL_FROM are missing: reports and password resets can’t be sent.',
+    },
+    {
+      ok: photoroomConfigured() && !photoroomIsSandbox(),
+      title: 'Background removal (Photoroom)',
+      detail: !photoroomConfigured()
+        ? 'Optional. Add PHOTOROOM_API_KEY in Vercel so celebrant photos can be cut out and dance on the big screen.'
+        : photoroomIsSandbox()
+          ? 'SANDBOX key in use: free for testing, but cut-outs have a Photoroom watermark. Use the live key for real events.'
+          : 'Set up.',
     },
     {
       ok: !!process.env.CRON_SECRET,

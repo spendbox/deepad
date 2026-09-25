@@ -18,6 +18,8 @@ import { MAX_HYPE_LENGTH, MAX_HYPE_LINES } from '@/lib/hype';
 import { getStore } from '@/lib/store';
 import { cleanDisplayName, cleanMessage } from '@/lib/text';
 import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
+import { photoroomConfigured, removeBackground } from '@/lib/photoroom';
+import { DEFAULT_DANCE, isDanceStyle } from '@/lib/dance';
 import type { Planner, SprayEvent } from '@/lib/types';
 
 type FormState = { error?: string; ok?: string } | null;
@@ -189,6 +191,7 @@ export type NewEventInput = {
   endsAt: string;
   theme: string;
   themeColors?: { primary: string; secondary: string } | null;
+  danceStyle?: string;
   payoutBankCode: string;
   payoutBankName: string;
   payoutAccountNumber: string;
@@ -250,6 +253,7 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     celebrantName,
     recipientLabel,
     ...eventTheme(input.theme, input.themeColors),
+    danceStyle: isDanceStyle(input.danceStyle) ? input.danceStyle : DEFAULT_DANCE,
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
     plannerFeeBps,
@@ -340,19 +344,39 @@ function ownPhotos(urls: unknown, plannerId: string): string[] {
     .slice(0, MAX_PHOTOS);
 }
 
-/** Upload one photo (already shrunk on the phone). Returns its public link. */
-export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: string } | { error: string }> {
+/**
+ * Upload one photo (already shrunk on the phone). With `removeBg`, Photoroom
+ * cuts out the people first; if that fails, the original photo is kept.
+ * Returns its public link.
+ */
+export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: string; note?: string } | { error: string }> {
   const planner = await requirePlanner();
   const file = form.get('photo');
   if (!(file instanceof File)) return { error: 'Please choose a photo.' };
   const ext = PHOTO_TYPES[file.type];
   if (!ext) return { error: 'Please use a JPG, PNG or WebP photo.' };
   if (file.size > MAX_PHOTO_BYTES) return { error: 'That photo is too large (max 5 MB).' };
+
+  let bytes: Uint8Array = new Uint8Array(await file.arrayBuffer());
+  let type = file.type;
+  let name = `${randomUUID()}.${ext}`;
+  let note: string | undefined;
+  if (form.get('removeBg') === '1' && photoroomConfigured()) {
+    try {
+      const cut = await removeBackground(file);
+      if (cut.byteLength > MAX_PHOTO_BYTES) throw new Error('cut-out too large');
+      bytes = cut;
+      type = 'image/png';
+      // Marked, so the big screen shows it as a dancing cut-out.
+      name = `${randomUUID()}-cutout.png`;
+    } catch (err) {
+      console.error('Background removal failed', err);
+      note = 'We couldn’t remove the background from this photo, so we kept it as it is.';
+    }
+  }
   try {
-    // Photos with the background removed are marked, so the big screen shows them without a frame.
-    const cutout = form.get('cutout') === '1' && (ext === 'png' || ext === 'webp');
-    const url = await getStore().uploadImage(`${planner.id}/${randomUUID()}${cutout ? '-cutout' : ''}.${ext}`, new Uint8Array(await file.arrayBuffer()), file.type);
-    return { url };
+    const url = await getStore().uploadImage(`${planner.id}/${name}`, bytes, type);
+    return note ? { url, note } : { url };
   } catch (err) {
     console.error('Photo upload failed', err);
     return { error: 'The photo could not be uploaded. Please try again.' };
@@ -401,6 +425,8 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
     Object.assign(patch, eventTheme(theme, colors));
   }
   if (Number.isFinite(big) && big >= 1000) patch.bigSprayKobo = big * 100;
+  const dance = str(form, 'danceStyle');
+  if (isDanceStyle(dance)) patch.danceStyle = dance;
   const title = cleanDisplayName(str(form, 'title'));
   if (title) patch.title = title;
   const label = cleanDisplayName(str(form, 'recipientLabel'));

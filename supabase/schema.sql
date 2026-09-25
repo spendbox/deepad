@@ -141,6 +141,8 @@ create index if not exists spray_intents_event_idx on spray_intents (event_id);
 alter table spray_events add column if not exists hype_lines jsonb not null default '[]'::jsonb;
 -- Added later: the planner's own theme colours ({"primary": "#..", "secondary": "#.."}).
 alter table spray_events add column if not exists theme_colors jsonb;
+-- Added later: how the cut-out celebrant dances on the big screen.
+alter table spray_events add column if not exists dance_style text not null default 'groove';
 
 -- Public storage folder for celebrant photos (shown on the big screen).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

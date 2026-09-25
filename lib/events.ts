@@ -19,6 +19,7 @@ import { cleanNarration } from './text';
 import type { MoneyRow, Planner, SprayEvent, Transfer } from './types';
 import { hypeLinesFor } from './hype';
 import type { ThemeColors } from './themes';
+import { DEFAULT_DANCE, type DanceStyle } from './dance';
 import { buildReportPdf, reportFileName } from './report-pdf';
 
 /** Paystack customer email for an event; its one-time accounts use the same one. */
@@ -381,6 +382,7 @@ export type ScreenFeed = {
     recipientLabel: string;
     theme: string;
     themeColors: ThemeColors | null;
+    danceStyle: DanceStyle;
     photos: string[];
     /** Shown when a spray has no message. */
     hypeLines: string[];
@@ -415,6 +417,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number): Promise<S
       recipientLabel: event.recipientLabel,
       theme: event.theme,
       themeColors: event.themeColors ?? null,
+      danceStyle: event.danceStyle ?? DEFAULT_DANCE,
       photos: event.photos ?? [],
       hypeLines: hypeLinesFor(event.hypeLines, event.celebrantName),
       phase: eventPhase(event),

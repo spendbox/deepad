@@ -7,7 +7,9 @@ import { eventTimeline } from '@/lib/earnings';
 import { eventPhase, formatWhen } from '@/lib/event-info';
 import { checkPaystackForTransfers, closeEvent, summarise } from '@/lib/events';
 import { groupAccountNumber, naira, percent } from '@/lib/money';
+import { photoroomConfigured } from '@/lib/photoroom';
 import { requirePlanner } from '@/lib/session';
+import { resolveTheme } from '@/lib/themes';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import { retrySetup, setPaused, setTransferHidden } from '../../../actions';
@@ -53,6 +55,8 @@ export default async function EventPage({
     Date.now(),
   );
   const link = `${await siteUrl()}/${event.slug}`;
+  const canRemoveBg = photoroomConfigured();
+  const screenTheme = resolveTheme(event.theme, event.themeColors);
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });
@@ -214,10 +218,24 @@ export default async function EventPage({
         </section>
       )}
 
-      <details className="card">
-        <summary>Celebrant photos ({event.photos.length})</summary>
-        <EventPhotos eventId={event.id} initial={event.photos} />
-      </details>
+      <section className="card settings-card">
+        <div className="settings-head">
+          <h2>Celebrant photos</h2>
+          <span className="hint">
+            {canRemoveBg
+              ? 'With the background removed, they dance on the big screen and catch the money.'
+              : 'They show on the big screen between sprays.'}
+          </span>
+        </div>
+        <EventPhotos
+          eventId={event.id}
+          initial={event.photos}
+          dance={event.danceStyle ?? 'groove'}
+          canRemoveBg={canRemoveBg}
+          bg={screenTheme.bg}
+          glow={screenTheme.accent}
+        />
+      </section>
 
       <section className="card settings-card">
         <div className="settings-head">
