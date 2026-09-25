@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { after } from 'next/server';
 import CopyButton from '@/components/CopyButton';
 import PayoutNote from '@/components/PayoutNote';
+import { eventTimeline } from '@/lib/earnings';
 import { eventPhase, formatWhen } from '@/lib/event-info';
 import { checkPaystackForTransfers, closeEvent, summarise } from '@/lib/events';
 import { groupAccountNumber, naira, percent } from '@/lib/money';
@@ -11,6 +12,7 @@ import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import { retrySetup, setPaused, setTransferHidden } from '../../../actions';
 import AutoRefresh from '../../AutoRefresh';
+import EarningsChart from '../../earnings/EarningsChart';
 import AllSpraysDialog from './AllSpraysDialog';
 import DeleteEvent from './DeleteEvent';
 import EventPhotos from './EventPhotos';
@@ -44,6 +46,12 @@ export default async function EventPage({
 
   const transfers = await store.listTransfers(event.id, 1000);
   const s = summarise(transfers);
+  const timeline = eventTimeline(
+    transfers.filter((t) => !t.outsideWindow).map((t) => ({ at: new Date(t.createdAt).getTime(), kobo: t.plannerFeeKobo })),
+    new Date(event.startsAt).getTime(),
+    new Date(event.endsAt).getTime(),
+    Date.now(),
+  );
   const link = `${await siteUrl()}/${event.slug}`;
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
@@ -77,7 +85,8 @@ export default async function EventPage({
 
   return (
     <DashShell>
-      <AutoRefresh seconds={6} />
+      {/* Live: fresh numbers every few seconds. Otherwise only now and then. */}
+      {phase !== 'ended' && <AutoRefresh seconds={phase === 'live' ? 6 : 30} />}
       {created === '1' && (
         <div className="banner info" role="status">
           <strong>Your event is ready.</strong> Share the link below and open it on the big screen at the party.
@@ -142,6 +151,14 @@ export default async function EventPage({
         <div className="tile"><div className="v">{naira(s.plannerKobo)}</div><div className="k">You earn</div></div>
         <div className="tile"><div className="v">{naira(s.celebrantKobo)}</div><div className="k">{event.celebrantName} gets</div></div>
       </div>
+
+      {phase !== 'upcoming' && timeline.buckets.length > 1 && event.plannerFeeBps > 0 && (
+        <EarningsChart
+          bars={timeline.buckets.map((b) => ({ label: b.label, tip: b.tip, kobo: b.kobo, sprays: b.sprays }))}
+          title="Your earnings through the event"
+          per={timeline.slotLabel === 'hour' ? 'hour' : `${timeline.slotLabel.split(' ')[0]} min`}
+        />
+      )}
 
       {phase !== 'ended' && (
         <section className="card">
@@ -213,6 +230,7 @@ export default async function EventPage({
             title: event.title,
             recipientLabel: event.recipientLabel,
             theme: event.theme,
+            themeColors: event.themeColors ?? null,
             bigSprayNaira: event.bigSprayKobo / 100,
             endsAt: event.endsAt,
           }}

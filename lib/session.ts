@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import 'server-only';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -5,7 +6,8 @@ import { ADMIN_COOKIE, isValidAdminToken, makePlannerToken, passwordVersion, PLA
 import { getStore } from './store';
 import type { Planner } from './types';
 
-export async function currentPlanner(): Promise<Planner | null> {
+/** Who is logged in. Remembered for the rest of the request, so pages don't ask the database twice. */
+export const currentPlanner = cache(async (): Promise<Planner | null> => {
   const jar = await cookies();
   const session = await readPlannerToken(jar.get(PLANNER_COOKIE)?.value);
   if (!session) return null;
@@ -13,7 +15,7 @@ export async function currentPlanner(): Promise<Planner | null> {
   // A password change since this login makes the old login invalid.
   if (!planner || (await passwordVersion(planner.passwordHash)) !== session.pv) return null;
   return planner;
-}
+});
 
 /** For planner pages and actions: send them to log in if they are not. */
 export async function requirePlanner(): Promise<Planner> {

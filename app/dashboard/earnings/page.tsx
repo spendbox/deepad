@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { bucketize, isRangeId, RANGES, rangeWindow, type RangeId } from '@/lib/earnings';
+import { bucketize, fullLabel, isRangeId, RANGES, rangeWindow, type RangeId } from '@/lib/earnings';
 import { formatWhen } from '@/lib/event-info';
 import { naira } from '@/lib/money';
 import { requirePlanner } from '@/lib/session';
@@ -18,15 +18,12 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
 
   // Every event this planner ran, including deleted ones: their money was real.
   const events = await store.listEventsByPlanner(planner.id, { includeDeleted: true });
-  const perEvent = await Promise.all(
-    events.map(async (e) => ({ event: e, transfers: (await store.listTransfers(e.id, 100000)).filter((t) => !t.outsideWindow) })),
-  );
-  const all = perEvent.flatMap(({ event, transfers }) =>
-    transfers.map((t) => ({ eventId: event.id, at: new Date(t.createdAt).getTime(), mine: t.plannerFeeKobo, sprayed: t.amountKobo })),
-  );
+  // One query for all of them, just the money columns.
+  const money = (await store.listMoneyRows(events.map((e) => e.id))).filter((t) => !t.outsideWindow);
+  const all = money.map((t) => ({ eventId: t.eventId, at: new Date(t.createdAt).getTime(), mine: t.plannerFeeKobo, sprayed: t.amountKobo }));
 
   const now = Date.now();
-  const first = all.length ? Math.min(...all.map((a) => a.at)) : null;
+  const first = all.length ? all.reduce((m, a) => Math.min(m, a.at), Infinity) : null;
   const { from, unit } = rangeWindow(range, now, first);
   const inRange = all.filter((a) => a.at >= from && a.at <= now);
   const bars = bucketize(inRange.map((a) => ({ at: a.at, kobo: a.mine })), from, unit, now);
@@ -44,20 +41,17 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
     if (before > 0) delta = { pct: Math.round(((earned - before) / before) * 100), up: earned >= before };
   }
 
-  const rows = perEvent
-    .map(({ event, transfers }) => {
-      const t = transfers.filter((x) => {
-        const at = new Date(x.createdAt).getTime();
-        return at >= from && at <= now;
-      });
-      return {
-        event,
-        sprays: t.length,
-        sprayed: t.reduce((s, x) => s + x.amountKobo, 0),
-        mine: t.reduce((s, x) => s + x.plannerFeeKobo, 0),
-      };
-    })
-    .filter((r) => r.sprays > 0)
+  const byEvent = new Map<string, { sprays: number; sprayed: number; mine: number }>();
+  for (const a of inRange) {
+    const r = byEvent.get(a.eventId) ?? { sprays: 0, sprayed: 0, mine: 0 };
+    r.sprays += 1;
+    r.sprayed += a.sprayed;
+    r.mine += a.mine;
+    byEvent.set(a.eventId, r);
+  }
+  const rows = events
+    .filter((e) => byEvent.has(e.id))
+    .map((event) => ({ event, ...byEvent.get(event.id)! }))
     .sort((a, b) => b.mine - a.mine);
 
   const rangeLabel = RANGES.find((r) => r.id === range)!.label.toLowerCase();
@@ -93,7 +87,11 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
         <div className="tile"><div className="v">{naira(lifetime)}</div><div className="k">Earned all time</div></div>
       </div>
 
-      <EarningsChart bars={bars.map((b) => ({ label: b.label, kobo: b.kobo, sprays: b.sprays }))} title={`Your earnings by ${unit}`} />
+      <EarningsChart
+        bars={bars.map((b) => ({ label: b.label, tip: fullLabel(b.start, unit), kobo: b.kobo, sprays: b.sprays }))}
+        title="Your earnings over time"
+        per={unit}
+      />
 
       <section className="card">
         <h2>By event</h2>

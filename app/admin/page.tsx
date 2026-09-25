@@ -16,7 +16,8 @@ export default async function AdminHome() {
   await requireAdmin();
   const store = getStore();
   const [planners, events, logs] = await Promise.all([store.listPlanners(), store.listEvents(), store.listPaymentLogs(40)]);
-  const sums = await Promise.all(events.map(async (e) => summarise(await store.listTransfers(e.id, 100000))));
+  const money = await store.listMoneyRows(events.map((e) => e.id));
+  const sums = events.map((e) => summarise(money.filter((m) => m.eventId === e.id)));
   const plannerName = new Map(planners.map((p) => [p.id, p.name]));
   const total = sums.reduce(
     (a, s) => ({ sprayed: a.sprayed + s.totalKobo, platform: a.platform + s.platformKobo, processing: a.processing + s.processingKobo, outside: a.outside + s.outside.length }),

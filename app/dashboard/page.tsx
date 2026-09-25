@@ -14,7 +14,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const planner = await requirePlanner();
   const store = getStore();
   const events = await store.listEventsByPlanner(planner.id);
-  const stats = await Promise.all(events.map((e) => store.eventStats(e.id)));
+  const money = await store.listMoneyRows(events.map((e) => e.id));
+  const totals = new Map<string, number>();
+  for (const m of money) if (!m.outsideWindow) totals.set(m.eventId, (totals.get(m.eventId) ?? 0) + m.amountKobo);
   const needsBank = !planner.accountNumber;
 
   return (
@@ -44,7 +46,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       ) : (
         <div className="stack" style={{ gap: 10 }}>
-          {events.map((e, i) => (
+          {events.map((e) => (
             <Link key={e.id} href={`/dashboard/events/${e.id}`} className="card event-card">
               <div className="row-between">
                 <span className="title">{e.title}</span>
@@ -52,7 +54,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               </div>
               <div className="row-between">
                 <span className="hint">{formatWhen(e.startsAt)}</span>
-                <span className="display tabular">{naira(stats[i].totalKobo)}</span>
+                <span className="display tabular">{naira(totals.get(e.id) ?? 0)}</span>
               </div>
               {e.setupStatus !== 'ready' && (
                 <span className="hint" style={{ color: 'var(--danger)' }}>Account number not ready yet</span>

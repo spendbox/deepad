@@ -17,7 +17,7 @@ import { slugProblem } from '@/lib/slug';
 import { MAX_HYPE_LENGTH, MAX_HYPE_LINES } from '@/lib/hype';
 import { getStore } from '@/lib/store';
 import { cleanDisplayName, cleanMessage } from '@/lib/text';
-import { isThemeId } from '@/lib/themes';
+import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
 import type { Planner, SprayEvent } from '@/lib/types';
 
 type FormState = { error?: string; ok?: string } | null;
@@ -153,8 +153,6 @@ export async function savePayoutAccount(_prev: FormState, form: FormData): Promi
 
   const changed = accountNumber !== planner.accountNumber || str(form, 'bankCode') !== (planner.bankCode ?? '');
   await getStore().updatePlanner(planner.id, {
-    name: cleanDisplayName(str(form, 'name')) || planner.name,
-    phone: str(form, 'phone').replace(/[^\d+]/g, '') || planner.phone,
     bankCode: str(form, 'bankCode') || null,
     bankName,
     accountNumber,
@@ -162,9 +160,20 @@ export async function savePayoutAccount(_prev: FormState, form: FormData): Promi
     // A new bank account needs a new Paystack subaccount for future events.
     ...(changed ? { paystackSubaccount: null } : {}),
   });
-  revalidatePath('/dashboard');
+  revalidatePath('/dashboard', 'layout');
   if (form.get('next') === 'dashboard') redirect('/dashboard');
-  return { ok: 'Saved.' };
+  return { ok: 'Payout account saved.' };
+}
+
+export async function saveProfileDetails(_prev: FormState, form: FormData): Promise<FormState> {
+  const planner = await requirePlanner();
+  const name = cleanDisplayName(str(form, 'name'));
+  const phone = str(form, 'phone').replace(/[^\d+]/g, '');
+  if (!name) return { error: 'Enter your name or business name.' };
+  if (phone.length < 7) return { error: 'Enter a phone number we can reach you on.' };
+  await getStore().updatePlanner(planner.id, { name, phone });
+  revalidatePath('/dashboard', 'layout');
+  return { ok: 'Details saved.' };
 }
 
 // ---------- Events ----------
@@ -179,12 +188,20 @@ export type NewEventInput = {
   startsAt: string;
   endsAt: string;
   theme: string;
+  themeColors?: { primary: string; secondary: string } | null;
   payoutBankCode: string;
   payoutBankName: string;
   payoutAccountNumber: string;
   payoutAccountName: string;
   plannerFeePercent: number;
 };
+
+/** A preset theme, or custom colours (falls back to the default if they're invalid). */
+function eventTheme(theme: unknown, colors: unknown): Pick<SprayEvent, 'theme' | 'themeColors'> {
+  const clean = cleanThemeColors(colors);
+  if (theme === 'custom') return clean ? { theme: 'custom', themeColors: clean } : { theme: 'owambe', themeColors: null };
+  return { theme: isEventThemeId(theme) ? theme : 'owambe', themeColors: null };
+}
 
 export async function createSprayEvent(input: NewEventInput): Promise<{ error: string } | { id: string }> {
   const planner = await requirePlanner();
@@ -232,7 +249,7 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     title,
     celebrantName,
     recipientLabel,
-    theme: isThemeId(input.theme) ? input.theme : 'owambe',
+    ...eventTheme(input.theme, input.themeColors),
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
     plannerFeeBps,
@@ -332,7 +349,9 @@ export async function uploadCelebrantPhoto(form: FormData): Promise<{ url: strin
   if (!ext) return { error: 'Please use a JPG, PNG or WebP photo.' };
   if (file.size > MAX_PHOTO_BYTES) return { error: 'That photo is too large (max 5 MB).' };
   try {
-    const url = await getStore().uploadImage(`${planner.id}/${randomUUID()}.${ext}`, new Uint8Array(await file.arrayBuffer()), file.type);
+    // Photos with the background removed are marked, so the big screen shows them without a frame.
+    const cutout = form.get('cutout') === '1' && (ext === 'png' || ext === 'webp');
+    const url = await getStore().uploadImage(`${planner.id}/${randomUUID()}${cutout ? '-cutout' : ''}.${ext}`, new Uint8Array(await file.arrayBuffer()), file.type);
     return { url };
   } catch (err) {
     console.error('Photo upload failed', err);
@@ -374,7 +393,13 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   const big = Number(str(form, 'bigSprayNaira').replace(/[^\d]/g, ''));
   const endsAtRaw = str(form, 'endsAt');
   const patch: Partial<SprayEvent> = {};
-  if (isThemeId(theme)) patch.theme = theme;
+  if (isEventThemeId(theme)) {
+    let colors: unknown = null;
+    try {
+      colors = JSON.parse(str(form, 'themeColors') || 'null');
+    } catch {}
+    Object.assign(patch, eventTheme(theme, colors));
+  }
   if (Number.isFinite(big) && big >= 1000) patch.bigSprayKobo = big * 100;
   const title = cleanDisplayName(str(form, 'title'));
   if (title) patch.title = title;
