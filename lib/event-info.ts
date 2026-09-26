@@ -33,7 +33,7 @@ export function formatWhen(iso: string): string {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
-    hour: 'numeric',
+    hour: 'numeric', hour12: true,
     minute: '2-digit',
     timeZone: 'Africa/Lagos',
   });

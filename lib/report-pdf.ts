@@ -91,7 +91,7 @@ export async function buildReportPdf(event: SprayEvent, planner: Planner, transf
   let y = A4.h - 136;
   page.drawText(fit(event.title, bold, 22, A4.w - 2 * M), { x: M, y, size: 22, font: bold, color: C.ink });
   y -= 20;
-  const dates = `${when(event.startsAt, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}  to  ${when(event.endsAt, { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short' })}`;
+  const dates = `${when(event.startsAt, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', hour12: true, minute: '2-digit' })}  to  ${when(event.endsAt, { hour: 'numeric', hour12: true, minute: '2-digit', day: 'numeric', month: 'short' })}`;
   page.drawText(safe(dates), { x: M, y, size: 10.5, font: regular, color: C.muted });
   y -= 15;
   page.drawText(fit(`Prepared for ${planner.name} · ${planner.email}`, regular, 10.5, A4.w - 2 * M), { x: M, y, size: 10.5, font: regular, color: C.muted });

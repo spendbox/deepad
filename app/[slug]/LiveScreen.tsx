@@ -14,7 +14,7 @@ const POLL_MS = 2000;
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const JOIN_GAP_MS = 600; // new sprayers step in one after another, not all at once
 const LEAVE_MS = 700; // time for a name tag to fade away
-const PIECE_MS = 1000; // each sprayer throws one piece of confetti a second (one per ₦200 sprayed)
+const PIECE_MS = 1000; // each piece of confetti (one per ₦100 sprayed) is a second of spraying
 const MIN_STAY_MS = 8000; // even a small spray stays long enough to read the name
 const TAG_MS = 12000; // the big name tag, before it becomes a small bubble that keeps spraying
 const BIG_TAG_MS = 15000; // a big sprayer's tag stays up this long, bigger and glowing
@@ -32,7 +32,7 @@ const BASE: Record<StageMode, { w: number; h: number }> = { tv: { w: 1920, h: 10
 type Props = { code: string; initialFeed: ScreenFeed };
 type Sprayer = ActiveSprayer & { until: number; tagUntil: number; leftAt?: number; lingering?: boolean };
 
-/** How long someone keeps spraying: one piece a second, one piece per ₦200 (at most 30 minutes). */
+/** How long someone keeps spraying: a second per piece, one piece per ₦100 (at most 30 minutes). */
 function stayMs(t: ScreenTransfer) {
   return Math.max(MIN_STAY_MS, (t.pieces || 1) * PIECE_MS);
 }
@@ -45,16 +45,33 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const lastId = useRef(initialFeed.recent.reduce((m, t) => Math.max(m, t.id), 0));
   const [waiting, setWaiting] = useState<ScreenTransfer[]>([]);
   const [sprayers, setSprayers] = useState<Sprayer[]>([]);
-  // People whose spray is still going (e.g. after the screen was reloaded) carry on as small bubbles.
+  const [burst, setBurst] = useState({ until: 0, big: false });
+  // The screen was opened (or reloaded) while people were spraying: they carry on where they were.
+  // Someone who sprayed seconds ago gets their big moment; others continue as small bubbles. If
+  // nobody's spray is still going, the most recent sprayer lingers, as they would have on screen.
   useEffect(() => {
     const at = Date.now();
-    const still = initialFeed.recent
-      .filter((t) => new Date(t.createdAt).getTime() + stayMs(t) > at + 5000)
+    const recent = initialFeed.recent.map((t) => ({ t, at: new Date(t.createdAt).getTime() }));
+    const resumed: Sprayer[] = recent
+      .filter(({ t, at: made }) => made + stayMs(t) > at + 2000)
       .slice(-LIMITS.tv.minis)
-      .map((t, i) => ({ t, slot: i, leaving: false, mini: true, tagUntil: at, until: new Date(t.createdAt).getTime() + stayMs(t) }));
-    if (still.length) setSprayers(still);
+      .map(({ t, at: made }, i) => {
+        const until = made + stayMs(t);
+        const tagUntil = Math.min(until, made + (t.big ? BIG_TAG_MS : TAG_MS));
+        return { t, slot: i, leaving: false, mini: at >= tagUntil, tagUntil, until };
+      });
+    const last = recent[recent.length - 1];
+    if (!resumed.length && last && last.at + stayMs(last.t) + LINGER_MS > at) {
+      const tagUntil = last.at + (last.t.big ? BIG_TAG_MS : TAG_MS);
+      resumed.push({ t: last.t, slot: 0, leaving: false, mini: false, tagUntil, lingering: true, until: last.at + stayMs(last.t) + LINGER_MS });
+    }
+    if (resumed.length) {
+      setSprayers(resumed);
+      // Still spraying: the burst of rain carries on too.
+      const fresh = resumed.filter((s) => !s.mini);
+      if (fresh.length) setBurst({ until: at + 4000, big: fresh.some((s) => s.t.big) });
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const [burst, setBurst] = useState({ until: 0, big: false });
   const lastJoin = useRef(0);
   const [now, setNow] = useState(() => Date.now());
   const [scale, setScale] = useState(1);
@@ -138,11 +155,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       if (now >= s.until) {
         if (!s.lingering && !lingerTaken && !waiting.length && !othersSpraying(s)) {
           lingerTaken = true;
-          return { ...s, lingering: true, until: now + LINGER_MS };
+          return { ...s, lingering: true, mini: false, until: now + LINGER_MS }; // alone on screen: back to the full name tag
         }
         return { ...s, leaving: true, leftAt: now }; // spray used up
       }
-      if (!s.mini && now >= s.tagUntil) {
+      if (!s.mini && !s.lingering && now >= s.tagUntil) {
         // The big tag makes way for others; the person keeps spraying as a small bubble (if there's room).
         if (minis < limits.minis) {
           minis += 1;

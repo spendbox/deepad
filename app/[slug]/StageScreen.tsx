@@ -89,10 +89,10 @@ const LINE_GAP_MS = 1300; // time between one line popping up and the next
 export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean };
 
 function clock(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', hour12: true, minute: '2-digit' });
 }
 function dayAndClock(iso: string) {
-  return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', hour12: true, minute: '2-digit' });
 }
 /** "T.M." → "TM" for the bubble; the first name's letter if there are no initials. */
 function bubble(t: ScreenTransfer) {
@@ -566,6 +566,10 @@ function LineCycler({ lines, arena, max, phone }: { lines: ScreenLine[]; arena: 
   linesRef.current = lines;
   const maxRef = useRef(max);
   maxRef.current = max;
+  const arenaRef = useRef(arena);
+  arenaRef.current = arena;
+  const phoneRef = useRef(phone);
+  phoneRef.current = phone;
   const next = useRef(0);
   const known = useRef<Set<string> | null>(null);
   const priority = useRef<string[]>([]);
@@ -591,7 +595,9 @@ function LineCycler({ lines, arena, max, phone }: { lines: ScreenLine[]; arena: 
         const onScreen = new Set(list.map((s) => s.line.id));
         const active = list.filter((s) => !s.leaving).length;
         const room = Math.min(maxRef.current, ls.length);
-        if (ls.length && active < room && now - lastPop.current >= LINE_GAP_MS) {
+        // Only when there's a free gap for it, so a new line never lands on someone's name.
+        const fits = arenaRef.current.roomFor(phoneRef.current ? 320 : 480, phoneRef.current ? 120 : 170);
+        if (ls.length && active < room && now - lastPop.current >= LINE_GAP_MS && fits) {
           let pick: ScreenLine | undefined;
           while (priority.current.length && !pick) {
             const pid = priority.current.shift()!;

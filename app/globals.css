@@ -140,11 +140,12 @@ details.card > summary::after { content: '+'; font-size: 22px; }
 details.card[open] > summary::after { content: '–'; }
 
 /* ---------- Event wizard ---------- */
-.type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-@media (min-width: 640px) { .type-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* As many per row as fit (no word ever spills out of its button, whatever the screen width) */
+.type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
 .type-btn {
-  min-height: 60px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; padding: 8px;
-  font-family: var(--display); font-weight: 800; font-size: 16px; transition: border-color .15s, background .15s;
+  min-height: 60px; min-width: 0; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; padding: 8px 10px;
+  font-family: var(--display); font-weight: 800; font-size: 16px; line-height: 1.15; overflow-wrap: anywhere; hyphens: auto;
+  transition: border-color .15s, background .15s;
 }
 .type-btn:hover { border-color: var(--field); }
 .type-btn[aria-pressed='true'] { background: var(--aubergine); border-color: var(--aubergine); color: var(--gold); }
@@ -180,8 +181,7 @@ details.card[open] > summary::after { content: '–'; }
 .wz-intro { margin: 0; color: var(--ink-muted); font-size: 15.5px; line-height: 1.5; }
 .wz-panel { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
 .wz-panel h2 { font-size: 17px; margin: 0; }
-.wz-times { display: grid; gap: 16px; }
-@media (min-width: 640px) { .wz-times { grid-template-columns: 1fr 1fr; } }
+.wz-times { display: grid; gap: 18px; }
 .wz-timeline { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 16px; background: var(--aubergine); color: var(--ivory); }
 .wz-timeline > div:not(.wz-timeline-line) { display: flex; flex-direction: column; gap: 2px; }
 .wz-timeline .hint { color: var(--lilac); font-size: 12px; }
@@ -691,3 +691,71 @@ details .settings-form { margin-top: 12px; }
   .ev-tabs button { padding: 0 10px; font-size: 14px; }
   .bulk-bar .actions, .bulk-bar > .btn { width: 100%; }
 }
+
+/* ---------- Date and time picker (components/DateTimeField.tsx) ---------- */
+.dtf-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.dtf-date { position: relative; flex: 1 1 190px; min-width: 0; }
+.dtf-date .input { padding-right: 52px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.dtf-cal-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 10px;
+  border: 0; background: var(--wash); color: var(--aubergine); display: grid; place-items: center; cursor: pointer;
+}
+.dtf-cal-btn:hover, .dtf-cal-btn[aria-expanded='true'] { background: var(--aubergine); color: var(--gold); }
+.dtf-cal {
+  position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: 300px; max-width: calc(100vw - 32px); padding: 14px;
+  border-radius: 18px; background: #fff; border: 1px solid var(--line); box-shadow: 0 24px 50px -24px rgba(31, 10, 38, .45);
+}
+.dtf-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-family: var(--display); }
+.dtf-cal-head button {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-size: 20px; line-height: 1; cursor: pointer;
+}
+.dtf-cal-head button:hover { background: var(--wash); }
+.dtf-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.dtf-dow { font-size: 12px; font-weight: 700; color: var(--ink-muted); padding: 4px 0; }
+.dtf-day {
+  aspect-ratio: 1; border-radius: 10px; border: 0; background: transparent; font: inherit; font-weight: 600; cursor: pointer;
+}
+.dtf-day:hover:not(:disabled) { background: var(--wash); }
+.dtf-day.today { box-shadow: inset 0 0 0 1.5px var(--gold); }
+.dtf-day.on { background: var(--aubergine); color: var(--gold); }
+.dtf-day:disabled { opacity: .3; cursor: default; }
+.dtf-time {
+  display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff;
+  flex: 0 0 auto;
+}
+.dtf-sel {
+  appearance: none; -webkit-appearance: none; height: 44px; min-width: 56px; padding: 0 12px; border-radius: 10px; border: 0;
+  background: var(--wash); font: inherit; font-weight: 700; font-size: 17px; text-align: center; text-align-last: center;
+  font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.dtf-sel:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.dtf-colon { font-weight: 800; font-size: 18px; }
+.dtf-ampm { display: flex; margin-left: 4px; padding: 3px; border-radius: 12px; background: var(--wash); }
+.dtf-ampm button {
+  height: 38px; min-width: 48px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer;
+  color: var(--ink-muted);
+}
+.dtf-ampm button[aria-pressed='true'] { background: var(--aubergine); color: var(--gold); box-shadow: 0 4px 10px -6px rgba(31, 10, 38, .6); }
+.dtf-read { font-size: 14px; font-weight: 600; color: var(--aubergine); }
+
+.settings-grid .dtf { grid-column: 1 / -1; }
+
+/* ---------- An on/off switch with a title and a short explanation ---------- */
+.switch-card {
+  display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; cursor: pointer;
+  border: 1.5px solid var(--line); background: #fff; transition: border-color .15s, background .15s;
+}
+.switch-card.on { border-color: var(--aubergine); background: var(--wash); }
+.switch-card input { position: absolute; opacity: 0; pointer-events: none; }
+.switch {
+  position: relative; flex-shrink: 0; width: 46px; height: 28px; margin-top: 2px; border-radius: 999px; background: var(--line);
+  transition: background .2s;
+}
+.switch::after {
+  content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff;
+  box-shadow: 0 2px 6px rgba(31, 10, 38, .3); transition: transform .2s;
+}
+.switch-card.on .switch { background: var(--aubergine); }
+.switch-card.on .switch::after { transform: translateX(18px); background: var(--gold); }
+.switch-card input:focus-visible + .switch { outline: 3px solid var(--gold); outline-offset: 2px; }
+.switch-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }

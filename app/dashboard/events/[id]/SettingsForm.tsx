@@ -2,12 +2,22 @@
 
 import { useActionState, useState } from 'react';
 import { RECIPIENT_CHOICES } from '@/lib/event-info';
+import DateTimeField from '@/components/DateTimeField';
 import SlugField from '@/components/SlugField';
 import ThemePicker from '@/components/ThemePicker';
 import type { ThemeColors } from '@/lib/themes';
 import { saveEventSettings } from '../../../actions';
 
-type Values = { slug: string; title: string; recipientLabel: string; theme: string; themeColors: ThemeColors | null; bigSprayNaira: number; endsAt: string };
+type Values = {
+  slug: string;
+  title: string;
+  recipientLabel: string;
+  theme: string;
+  themeColors: ThemeColors | null;
+  bigSprayNaira: number;
+  endsAt: string;
+  showCashlessNote: boolean;
+};
 
 function toLocalInput(iso: string): string {
   const d = new Date(iso);
@@ -35,10 +45,12 @@ export function DetailsForm({ eventId, ended, values }: { eventId: string; ended
   const [state, action, pending] = useSettings(eventId);
   const [label, setLabel] = useState(values.recipientLabel);
   const [endLocal, setEndLocal] = useState(() => toLocalInput(values.endsAt));
+  const [cashless, setCashless] = useState(values.showCashlessNote);
 
   return (
     <form action={action} className="settings-form">
       <input type="hidden" name="recipientLabel" value={label} />
+      <input type="hidden" name="showCashlessNote" value={cashless ? 'yes' : 'no'} />
       {/* Sent as a full date with time zone, so the server reads it correctly. */}
       <input type="hidden" name="endsAt" value={ended ? '' : localToIso(endLocal)} />
       <div className="settings-grid">
@@ -52,11 +64,7 @@ export function DetailsForm({ eventId, ended, values }: { eventId: string; ended
           <span className="hint">A single spray this big takes over the whole screen.</span>
         </div>
         {!ended && (
-          <div className="field">
-            <label htmlFor="s-end">Spraying ends</label>
-            <input id="s-end" type="datetime-local" className="input" value={endLocal} onChange={(e) => setEndLocal(e.target.value)} />
-            <span className="hint">Party running late? Push the end time back.</span>
-          </div>
+          <DateTimeField id="s-end" label="Spraying ends" value={endLocal} onChange={setEndLocal} hint="Party running late? Push the end time back." />
         )}
       </div>
       <div className="field">
@@ -67,6 +75,7 @@ export function DetailsForm({ eventId, ended, values }: { eventId: string; ended
           ))}
         </div>
       </div>
+      <CashlessToggle on={cashless} onChange={setCashless} />
       <div className="settings-foot">
         <Result state={state} />
         <button type="submit" className="btn btn-dark" disabled={pending}>{pending ? 'Saving…' : 'Save details'}</button>
@@ -142,5 +151,21 @@ export function LinkForm({ eventId, slug, link, canChange }: { eventId: string; 
         <button type="submit" className="btn btn-dark" disabled={pending || !sure || value === slug}>{pending ? 'Saving…' : 'Change link'}</button>
       </div>
     </form>
+  );
+}
+
+/** "No need to bring cash" on the guests' write-a-line page: on or off. */
+export function CashlessToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className={`switch-card${on ? ' on' : ''}`}>
+      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <span className="switch" aria-hidden="true" />
+      <span className="switch-text">
+        <strong>Tell guests they don’t need cash</strong>
+        <span className="hint">
+          Shows a short note on your “write a line” page: no need to hunt for mint notes, they can spray the celebrant by transfer at the party.
+        </span>
+      </span>
+    </label>
   );
 }

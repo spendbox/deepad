@@ -17,7 +17,7 @@ const LABEL: Record<LineStatus, string> = { pending: 'Waiting', approved: 'Appro
 const REFRESH_MS = 4000;
 
 function time(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', hour12: true, minute: '2-digit' });
 }
 
 /** The live list: new lines and status changes appear by themselves. */

@@ -419,15 +419,15 @@ export type ScreenTransfer = {
   /** 1 to 4: bigger sprays stay on screen spraying a little longer. */
   weight: number;
   /**
-   * How long this person keeps spraying, in pieces of confetti: one per ₦200,
+   * How long this person keeps spraying, in pieces of confetti: one per ₦100,
    * thrown one a second, up to 30 minutes. Never shown as an amount.
    */
   pieces: number;
   createdAt: string;
 };
 
-/** One confetti piece per ₦200, one a second, for at most 30 minutes. */
-export const NAIRA_PER_PIECE = 200;
+/** One confetti piece per ₦100, each one a second of spraying, for at most 30 minutes. */
+export const NAIRA_PER_PIECE = 100;
 export const MAX_PIECES = 30 * 60;
 export function sprayPieces(amountKobo: number): number {
   return Math.min(MAX_PIECES, Math.max(1, Math.floor(amountKobo / 100 / NAIRA_PER_PIECE)));

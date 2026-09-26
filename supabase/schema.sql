@@ -178,6 +178,8 @@ alter table spray_events add column if not exists camera_token text unique;
 -- Which open big screen shows the camera (any computer can take it with its "Show camera on this screen" button).
 alter table spray_events add column if not exists camera_screen text;
 alter table spray_events add column if not exists camera_screen_seen_at timestamptz;
+-- Show guests "no need to bring mint cash, spray by transfer" on the write-a-line page.
+alter table spray_events add column if not exists show_cashless_note boolean not null default true;
 create table if not exists camera_sessions (
   event_id uuid primary key references spray_events(id) on delete cascade,
   session_id text not null,

@@ -385,7 +385,7 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token, camera_screen, camera_screen_seen_at'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token, camera_screen, camera_screen_seen_at, show_cashless_note'],
       ['camera_sessions', 'event_id, session_id, offer, answer, updated_at'],
       ['spray_intents', 'reference, message'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],

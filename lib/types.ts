@@ -37,6 +37,8 @@ export type SprayEvent = {
   linesViewToken?: string | null;
   /** Secret for the "connect a camera" link (a phone that streams video to the big screen). */
   cameraToken?: string | null;
+  /** Show guests "no need to bring cash" on the write-a-line page (on unless the planner turns it off). */
+  showCashlessNote?: boolean | null;
   /** Which open big screen shows the live camera (a random id per screen), and when it last checked in. */
   cameraScreen?: string | null;
   cameraScreenSeenAt?: string | null;
