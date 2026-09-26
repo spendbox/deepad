@@ -164,6 +164,8 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
   const live = e.phase === 'live';
   const phone = mode === 'phone';
   const cutout = photo ? isCutout(photo) : false;
+  // Each photo's shape (height ÷ width), learnt when it loads, so short ones can sit higher.
+  const [shape, setShape] = useState<Record<string, number>>({});
   const layout = useMemo(() => layoutFor(size, mode, videoOn), [size, mode, videoOn]);
   // True while confetti and money are raining.
   const [raining, setRaining] = useState(false);
@@ -215,7 +217,11 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
           src={photo}
           alt={`Photo of ${e.celebrantName}`}
           className={`st-photo fade-in${cutout ? ' cutout' : ''}`}
-          style={cutout ? layout.cutout : layout.photo}
+          style={cutout ? cutoutBox(layout.cutout, size.h - layout.card, phone ? layout.cutout.width : Math.min(size.w * 0.55, size.h * 0.85), shape[photo]) : layout.photo}
+          onLoad={(ev) => {
+            const img = ev.currentTarget;
+            if (img.naturalWidth && img.naturalHeight && !shape[photo]) setShape((m) => ({ ...m, [photo]: img.naturalHeight / img.naturalWidth }));
+          }}
         />
       ) : (
         <div className="st-monogram" style={layout.monogram} aria-hidden="true">{monogram(e.celebrantName)}</div>
@@ -548,6 +554,22 @@ function VideoBackdrop({ video }: { video: React.RefObject<HTMLVideoElement | nu
     return () => clearInterval(id);
   }, [video]);
   return <canvas ref={ref} className="st-video-fill" width={64} height={36} aria-hidden="true" />;
+}
+
+/**
+ * Where a cut-out celebrant stands. A tall, full-body picture fills the height
+ * and its legs tuck behind the transfer card. A short one (head and shoulders,
+ * or a wide picture) would sink behind the card, so it's shown a little wider
+ * and lifted until only about 15% is hidden, without going above the top.
+ */
+function cutoutBox(box: { left: number; top: number; width: number; height: number }, cardTop: number, maxWidth: number, ratio?: number) {
+  if (!ratio) return box;
+  if (Math.min(box.height, box.width * ratio) >= box.height - 1) return box; // tall: fills the height as it is
+  // Short: a little wider (so it's bigger), then lifted so only about 15% hides behind the card.
+  const width = Math.max(box.width, Math.min(maxWidth, box.height / ratio));
+  const shown = Math.min(box.height, width * ratio);
+  const bottom = Math.max(box.top + shown, Math.min(box.top + box.height, cardTop + shown * 0.15));
+  return { left: box.left + box.width / 2 - width / 2, width, top: bottom - shown, height: shown };
 }
 
 // Re-draw only when something on screen changes, not on every clock tick.
