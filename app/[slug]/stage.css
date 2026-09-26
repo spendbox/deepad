@@ -232,8 +232,8 @@
   border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
 }
 .mp-note { margin-top: 2px; font-family: var(--body); font-size: 13px; line-height: 1.35; color: var(--s-muted); }
-.st-pay.m.quiet { height: 140px; padding: 0 20px; }
-.st-pay.m .st-pay-quiet { font-size: 28px; text-align: center; }
+.st-pay.m.quiet { height: 140px; padding: 0 24px; justify-content: center; align-items: center; }
+.st-pay.m .st-pay-quiet { width: 100%; font-size: 26px; line-height: 1.2; text-align: center; text-wrap: balance; }
 .st.phone .st-notice { left: 20px; right: 20px; top: 84px; width: auto; gap: 10px; padding: 22px; border-radius: 22px; background: var(--s-panel); }
 .st.phone .st-notice-big { font-size: 38px; }
 .st.phone .st-notice-sub { font-size: 18px; }
