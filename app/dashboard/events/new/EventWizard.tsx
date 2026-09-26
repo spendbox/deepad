@@ -16,6 +16,8 @@ import { naira, PLATFORM_FEE_BPS, splitTransfer } from '@/lib/money';
 import { resolveTheme, THEMES, type ThemeColors } from '@/lib/themes';
 import type { EventType } from '@/lib/types';
 import { createSprayEvent } from '../../../actions';
+import DateTimeField from '@/components/DateTimeField';
+import { CashlessToggle } from '../[id]/SettingsForm';
 
 const DRAFT_KEY = 'dashpad:event-draft';
 const STEP_NAMES = ['Celebration', 'Date & time', 'Screen colours', 'Photos', 'Payout account', 'Your cut', 'Review'];
@@ -42,6 +44,8 @@ type Draft = {
   slugEdited: boolean;
   photos: string[];
   recipientLabel: string;
+  /** "No need to bring cash" note on the guests' write-a-line page. */
+  showCashlessNote?: boolean;
   startsAt: string; // datetime-local value, in the phone's time zone
   endsAt: string;
   theme: string;
@@ -87,12 +91,12 @@ function when(local: string) {
   const d = new Date(local);
   return Number.isNaN(d.getTime())
     ? '—'
-    : d.toLocaleString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    : d.toLocaleString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', hour12: true, minute: '2-digit' });
 }
 
 function clock(local: string) {
   const d = new Date(local);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-NG', { hour: 'numeric', hour12: true, minute: '2-digit' });
 }
 
 function Check() {
@@ -218,6 +222,7 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
         celebrantName: d.celebrantName,
         title,
         recipientLabel: d.recipientLabel,
+        showCashlessNote: d.showCashlessNote !== false,
         startsAt: new Date(d.startsAt).toISOString(),
         endsAt: new Date(d.endsAt).toISOString(),
         theme: d.theme,
@@ -385,20 +390,15 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
                   </div>
                   <span className="hint">The screen will say: “₦20,000 sent to {d.recipientLabel}”.</span>
                 </div>
+                <CashlessToggle on={d.showCashlessNote !== false} onChange={(on) => set({ showCashlessNote: on })} />
               </>
             )}
 
             {step === S.when && (
               <>
                 <div className="wz-panel wz-times">
-                  <div className="field">
-                    <label htmlFor="w-start">Spraying starts</label>
-                    <input id="w-start" type="datetime-local" className="input" value={d.startsAt} onChange={(e) => setStart(e.target.value)} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="w-end">Spraying ends</label>
-                    <input id="w-end" type="datetime-local" className="input" value={d.endsAt} min={d.startsAt} onChange={(e) => set({ endsAt: e.target.value })} />
-                  </div>
+                  <DateTimeField id="w-start" label="Spraying starts" value={d.startsAt} onChange={setStart} />
+                  <DateTimeField id="w-end" label="Spraying ends" value={d.endsAt} min={d.startsAt} onChange={(endsAt) => set({ endsAt })} />
                 </div>
                 <div className="field">
                   <span className="field-label" id="w-dur">Quick length</span>
@@ -504,6 +504,7 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
                     <dt>Event</dt><dd>{title}</dd>
                     <dt>Link</dt><dd>{host}/{slug}</dd>
                     <dt>Screen says</dt><dd>“₦20,000 sent to {d.recipientLabel}”</dd>
+                    <dt>“No cash needed” note</dt><dd>{d.showCashlessNote !== false ? 'Shown to guests' : 'Hidden'}</dd>
                   </dl>
                 </section>
                 <section className="wz-panel review">

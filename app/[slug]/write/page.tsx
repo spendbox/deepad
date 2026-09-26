@@ -53,6 +53,23 @@ export default async function WriteLinePage({ params }: Props) {
         </div>
       </section>
 
+      {!ended && event.showCashlessNote !== false && (
+        <aside className="wl-cashless" aria-label="No cash needed">
+          <span className="wl-cashless-icon" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="6" y="2.5" width="12" height="19" rx="3" /><path d="M10 18h4" /><path d="M12 7v6M9.8 8.5h3.4a1.4 1.4 0 0 1 0 2.8h-2.4a1.4 1.4 0 0 0 0 2.8h3.4" />
+            </svg>
+          </span>
+          <div>
+            <strong>No mint notes? No wahala.</strong>
+            <p>
+              Skip the bank queue and leave the bundles of new notes at home. At the party, spray {event.celebrantName} right from your
+              banking app: one quick transfer to the event account, and your name lights up the big screen as the confetti flies.
+            </p>
+          </div>
+        </aside>
+      )}
+
       <main className="wl-card">
         {ended ? (
           <div className="wl-done">

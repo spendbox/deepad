@@ -66,7 +66,7 @@ export default async function EventPage({
   const canRemoveBg = cutoutsConfigured();
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${event.title}: spray here ${link}`)}`;
   const time = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });
+    new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', hour12: true, minute: '2-digit', timeZone: 'Africa/Lagos' });
 
   const sprayRow = (t: (typeof transfers)[number]) => (
     <div key={t.id} className="feed-item">
@@ -245,6 +245,7 @@ export default async function EventPage({
                       themeColors: event.themeColors ?? null,
                       bigSprayNaira: event.bigSprayKobo / 100,
                       endsAt: event.endsAt,
+                      showCashlessNote: event.showCashlessNote !== false,
                     }}
                   />
                 </SectionCard>

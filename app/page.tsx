@@ -72,10 +72,10 @@ export default function Home() {
       <section className="lp-hero">
         <div className="lp-hero-text">
           <p className="lp-kicker">For event planners and MCs</p>
-          <h1>Spray without cash. Keep the show.</h1>
+          <h1>Spray without cash. Keep the show going.</h1>
           <p className="lp-lead">
-            Guests transfer to your event’s account number and every spray pops up live on the big screen, with the
-            message they typed. You earn a cut of every naira.
+            Guests transfer straight to your event account, and every spray flashes live on the big screen in real time.
+            Give your crowd instant spotlight while you earn a cut of every naira.
           </p>
           <div className="actions">
             <Link href="/signup" className="btn btn-gold btn-lg">Create your spray event</Link>

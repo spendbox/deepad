@@ -194,6 +194,7 @@ export type NewEventInput = {
   payoutAccountNumber: string;
   payoutAccountName: string;
   plannerFeePercent: number;
+  showCashlessNote?: boolean;
 };
 
 /** A preset theme, or custom colours (falls back to the default if they're invalid). */
@@ -252,6 +253,7 @@ export async function createSprayEvent(input: NewEventInput): Promise<{ error: s
     ...eventTheme(input.theme, input.themeColors),
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
+    showCashlessNote: input.showCashlessNote !== false,
     plannerFeeBps,
     platformFeeBps: PLATFORM_FEE_BPS,
     bigSprayKobo: 100_000_00,
@@ -412,6 +414,7 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   const theme = str(form, 'theme');
   const big = Number(str(form, 'bigSprayNaira').replace(/[^\d]/g, ''));
   const endsAtRaw = str(form, 'endsAt');
+  const cashless = str(form, 'showCashlessNote');
   const patch: Partial<SprayEvent> = {};
   if (isEventThemeId(theme)) {
     let colors: unknown = null;
@@ -425,6 +428,7 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   if (title) patch.title = title;
   const label = cleanDisplayName(str(form, 'recipientLabel'));
   if (label) patch.recipientLabel = label;
+  if (cashless === 'yes' || cashless === 'no') patch.showCashlessNote = cashless === 'yes';
 
 
   const newSlug = str(form, 'slug').toLowerCase();

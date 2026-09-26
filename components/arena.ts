@@ -30,6 +30,8 @@ const MAX_SPEED = 42;
 
 export class Arena {
   private bodies = new Map<string, Body>();
+  /** Since when each box has been stuck touching something it can't bounce away from. */
+  private stuckSince = new Map<string, number>();
   private raf = 0;
   private last = 0;
   private seed = 1;
@@ -61,14 +63,32 @@ export class Arena {
     return a + ((this.seed - 1) / 2147483646) * (b - a);
   }
 
-  private overlaps(x: number, y: number, w: number, h: number, skip?: string) {
-    const hit = (r: Rect) => x - w / 2 - GAP < r.x1 && x + w / 2 + GAP > r.x0 && y - h / 2 - GAP < r.y1 && y + h / 2 + GAP > r.y0;
-    if (this.obstacles.some(hit)) return true;
+  /** How much a box here would overlap everything else (0 = a free spot). */
+  private crowding(x: number, y: number, w: number, h: number, skip?: string) {
+    const area = (r: Rect) =>
+      Math.max(0, Math.min(x + w / 2 + GAP, r.x1) - Math.max(x - w / 2 - GAP, r.x0)) *
+      Math.max(0, Math.min(y + h / 2 + GAP, r.y1) - Math.max(y - h / 2 - GAP, r.y0));
+    let total = 0;
+    for (const r of this.obstacles) total += area(r);
     for (const b of this.bodies.values()) {
       if (b.id === skip || b.leaving) continue;
-      if (hit({ x0: b.x - b.w / 2, y0: b.y - b.h / 2, x1: b.x + b.w / 2, y1: b.y + b.h / 2 })) return true;
+      total += area({ x0: b.x - b.w / 2, y0: b.y - b.h / 2, x1: b.x + b.w / 2, y1: b.y + b.h / 2 });
     }
-    return false;
+    return total;
+  }
+
+  /** The freest spot for a box this size: the first free one found, or the least crowded of many tries. */
+  private freeSpot(w: number, h: number, skip?: string) {
+    const { x0, y0, x1, y1 } = this.bounds;
+    let best = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, c: Infinity };
+    for (let i = 0; i < 300; i++) {
+      const x = this.rand(x0 + w / 2, Math.max(x0 + w / 2, x1 - w / 2));
+      const y = this.rand(y0 + h / 2, Math.max(y0 + h / 2, y1 - h / 2));
+      const c = this.crowding(x, y, w, h, skip);
+      if (c < best.c) best = { x, y, c };
+      if (c === 0) break;
+    }
+    return best;
   }
 
   /** Put a new element on screen, in a free spot if there is one. */
@@ -76,13 +96,7 @@ export class Arena {
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     this.seed = (this.seed + id.length * 7919 + Date.now()) % 2147483646 || 1;
-    const { x0, y0, x1, y1 } = this.bounds;
-    let x = this.rand(x0 + w / 2, x1 - w / 2);
-    let y = this.rand(y0 + h / 2, y1 - h / 2);
-    for (let i = 0; i < 60 && this.overlaps(x, y, w, h); i++) {
-      x = this.rand(x0 + w / 2, x1 - w / 2);
-      y = this.rand(y0 + h / 2, y1 - h / 2);
-    }
+    const { x, y } = this.freeSpot(w, h);
     const angle = this.rand(0, Math.PI * 2);
     const speed = this.rand(MIN_SPEED, MAX_SPEED * 0.7) * (opts.big ? 0.6 : 1);
     this.bodies.set(id, {
@@ -97,7 +111,13 @@ export class Arena {
     this.start();
   }
 
+  /** Is there a free spot for a box this size right now? (e.g. wait with a new line until there is) */
+  roomFor(w: number, h: number) {
+    return this.freeSpot(w, h).c === 0;
+  }
+
   remove(id: string) {
+    this.stuckSince.delete(id);
     const b = this.bodies.get(id);
     if (b) this.sizer?.unobserve(b.el);
     this.bodies.delete(id);
@@ -151,7 +171,46 @@ export class Arena {
     for (const b of list) {
       this.clampToWalls(b);
       for (const r of this.obstacles) this.pushOutOf(b, r);
-      this.place(b);
+    }
+    this.unjam(list);
+    for (const b of list) this.place(b);
+  }
+
+  /**
+   * On a very busy screen a box can get pinned (between the celebrant, an edge
+   * and a neighbour) where bouncing can't free it. If one stays stuck touching
+   * something for a moment, it hops to the freest spot with a little pop.
+   */
+  private unjam(list: Body[]) {
+    const now = performance.now();
+    const stuck = new Set<Body>();
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (a.leaving) continue;
+      for (let j = i + 1; j < list.length; j++) {
+        const b = list[j];
+        if (b.leaving) continue;
+        if (Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 2 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + 2) {
+          stuck.add(a.mass <= b.mass ? a : b); // the lighter one moves
+        }
+      }
+    }
+    for (const b of list) {
+      if (!stuck.has(b)) {
+        this.stuckSince.delete(b.id);
+        continue;
+      }
+      const since = this.stuckSince.get(b.id) ?? now;
+      this.stuckSince.set(b.id, since);
+      if (now - since < 400) continue;
+      const spot = this.freeSpot(b.w, b.h, b.id);
+      b.x = spot.x;
+      b.y = spot.y;
+      this.stuckSince.delete(b.id);
+      (b.el.firstElementChild as HTMLElement | null)?.animate?.(
+        [{ transform: 'scale(.6)', opacity: 0.2 }, { transform: 'scale(1)', opacity: 1 }],
+        { duration: 380, easing: 'cubic-bezier(.34, 1.56, .64, 1)' },
+      );
     }
   }
 
