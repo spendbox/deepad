@@ -39,6 +39,12 @@ export type SprayEvent = {
   cameraToken?: string | null;
   /** Show guests "no need to bring cash" on the write-a-line page (on unless the planner turns it off). */
   showCashlessNote?: boolean | null;
+  /** Show each sprayer's bank transfer comment under their name on the big screen (on unless turned off). */
+  showComments?: boolean | null;
+  /** Check comments with AI before they reach the screen: rude ones are dropped or politely reworded (on unless turned off). */
+  aiCommentFilter?: boolean | null;
+  /** Play a bank-alert sound on the big screen for every transfer (on unless turned off). */
+  alertSound?: boolean | null;
   /** Which open big screen shows the live camera (a random id per screen), and when it last checked in. */
   cameraScreen?: string | null;
   cameraScreenSeenAt?: string | null;
@@ -87,8 +93,15 @@ export type Transfer = {
   /** Bank account name of the sender. Private: never shown on screen. */
   senderName: string | null;
   senderBank: string | null;
-  /** The description the sender typed, cleaned. Shown on screen unless hidden. */
+  /** The description the sender typed, cleaned. Shown on screen (under their name) unless hidden or rude. */
   message: string | null;
+  /**
+   * The AI check of `message`: 'ok' (shown as is), 'rewritten' (shown as `screenMessage`),
+   * 'blocked' (never shown) or 'failed' (the simple word filter decides). Null = not checked.
+   */
+  moderation?: CommentModeration | null;
+  /** What the big screen shows after the AI check. */
+  screenMessage?: string | null;
   /** Exactly what the bank sent as the description, before cleaning. Private. */
   rawNarration: string | null;
   platformFeeKobo: number;
@@ -102,7 +115,9 @@ export type Transfer = {
   createdAt: string;
 };
 
-export type NewTransfer = Omit<Transfer, 'id' | 'createdAt' | 'hidden'>;
+export type CommentModeration = 'ok' | 'rewritten' | 'blocked' | 'failed';
+
+export type NewTransfer = Omit<Transfer, 'id' | 'createdAt' | 'hidden' | 'moderation' | 'screenMessage'>;
 
 export type EventStats = { totalKobo: number; count: number };
 
@@ -164,7 +179,7 @@ export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transfe
 /**
  * A line shown on the big screen: a short wish for the celebrant, written by
  * the planner in their dashboard or by a guest on the event's "write a line"
- * page. Only these lines ever appear on screen (bank descriptions don't).
+ * page. (Bank transfer comments show separately, under each sprayer's name.)
  */
 export type SprayLine = {
   id: string;

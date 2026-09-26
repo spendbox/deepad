@@ -27,7 +27,10 @@ import EventTabs from './EventTabs';
 import PauseToggle from './PauseToggle';
 import SplitDialog from './SplitDialog';
 import SectionCard from '@/components/SectionCard';
-import { DetailsForm, LinkForm, ThemeForm } from './SettingsForm';
+import { DetailsForm, LinkForm, ScreenForm, ThemeForm } from './SettingsForm';
+import { aiFilterConfigured } from '@/lib/moderation';
+import { screenComment } from '@/lib/comments';
+import HideCommentButton from './HideCommentButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +71,16 @@ export default async function EventPage({
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', hour12: true, minute: '2-digit', timeZone: 'Africa/Lagos' });
 
+  const aiReady = aiFilterConfigured();
+  /** Tells the planner what the big screen does with a comment. */
+  const commentNote = (t: (typeof transfers)[number]) => {
+    if (event.showComments === false) return 'Comments are off on the big screen.';
+    if (t.hidden) return 'Hidden from the big screen.';
+    const shown = screenComment(t, { show: true, ai: event.aiCommentFilter !== false, aiReady });
+    if (!shown) return t.moderation == null && aiReady && event.aiCommentFilter !== false && Date.now() - new Date(t.createdAt).getTime() < 20_000 ? 'Being checked…' : 'Left off the big screen (not polite).';
+    return shown === t.message ? 'Shown on the big screen.' : `Shown on the big screen as “${shown}”.`;
+  };
+
   const sprayRow = (t: (typeof transfers)[number]) => (
     <div key={t.id} className="feed-item">
       <div style={{ minWidth: 0 }}>
@@ -77,8 +90,21 @@ export default async function EventPage({
           {t.senderBank ? ` · ${t.senderBank}` : ''}
           {t.outsideWindow ? ' · outside event time, not shown' : ''}
         </div>
-        {/* The bank description: only you see it (the big screen shows lines instead). */}
-        {t.message && <div className="msg">“{t.message}”</div>}
+        {/* The bank description, and whether the big screen shows it under the sender's name. */}
+        {t.message && (
+          <div className="msg">
+            “{t.message}”
+            <span className="hint" style={{ display: 'block', fontStyle: 'normal' }}>
+              {commentNote(t)}
+              {event.showComments !== false && !t.outsideWindow && (
+                <>
+                  {' · '}
+                  <HideCommentButton eventId={event.id} transferId={t.id} hidden={t.hidden} />
+                </>
+              )}
+            </span>
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         <span className="amt">{naira(t.amountKobo)}</span>
@@ -176,7 +202,7 @@ export default async function EventPage({
                 <SectionCard
                   icon="people"
                   title="Who sprayed"
-                  hint="The big screen shows only first names and initials, never amounts."
+                  hint="The big screen shows only first names and initials (with their comment, if polite), never amounts."
                   action={<a href={`/dashboard/events/${event.id}/report`} className="btn btn-sm">PDF report</a>}
                 >
                   {transfers.length === 0 ? (
@@ -246,6 +272,18 @@ export default async function EventPage({
                       bigSprayNaira: event.bigSprayKobo / 100,
                       endsAt: event.endsAt,
                       showCashlessNote: event.showCashlessNote !== false,
+                    }}
+                  />
+                </SectionCard>
+
+                <SectionCard icon="details" title="Transfer comments and sound" hint="What the big screen does when money comes in.">
+                  <ScreenForm
+                    eventId={event.id}
+                    aiReady={aiFilterConfigured()}
+                    values={{
+                      showComments: event.showComments !== false,
+                      aiCommentFilter: event.aiCommentFilter !== false,
+                      alertSound: event.alertSound !== false,
                     }}
                   />
                 </SectionCard>

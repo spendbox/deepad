@@ -16,6 +16,7 @@ import type {
   LineStatus,
   Transfer,
   CameraSession,
+  CommentModeration,
 } from '../types';
 import { computeStats, type Store } from './types';
 
@@ -262,6 +263,9 @@ export class SupabaseStore implements Store {
   async setTransferMessage(transferId: number, message: string | null, rawNarration: string | null) {
     check(await this.db.from('transfers').update({ message, raw_narration: rawNarration }).eq('id', transferId));
   }
+  async setTransferModeration(transferId: number, moderation: CommentModeration | null, screenMessage: string | null) {
+    check(await this.db.from('transfers').update({ moderation, screen_message: screenMessage }).eq('id', transferId));
+  }
   async setTransferSender(transferId: number, senderName: string, senderBank: string | null) {
     const patch: Row = { sender_name: senderName };
     if (senderBank) patch.sender_bank = senderBank;
@@ -385,10 +389,10 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token, camera_screen, camera_screen_seen_at, show_cashless_note'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token, camera_screen, camera_screen_seen_at, show_cashless_note, show_comments, ai_comment_filter, alert_sound'],
       ['camera_sessions', 'event_id, session_id, offer, answer, updated_at'],
       ['spray_intents', 'reference, message'],
-      ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration'],
+      ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration, moderation, screen_message'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome, raw'],
       ['spray_lines', 'id, text, author_name, photo_url, status, reviewed_at'],

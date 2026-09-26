@@ -2,6 +2,7 @@ import { emailConfigured } from '@/lib/email';
 import { relayConfigured } from '@/lib/camera';
 import { cutoutStatus } from '@/lib/cutouts';
 import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
+import { aiFilterConfigured } from '@/lib/moderation';
 import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import type { PaymentLog } from '@/lib/types';
@@ -65,6 +66,13 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
       detail: relayConfigured()
         ? 'Set up. Phone cameras can reach the big screen even on strict venue Wi-Fi.'
         : 'Optional, not set up. Phone cameras work on most networks; for venues whose Wi-Fi blocks them, add CLOUDFLARE_TURN_KEY_ID and CLOUDFLARE_TURN_KEY_API_TOKEN (free Cloudflare account).',
+    },
+    {
+      ok: aiFilterConfigured(),
+      title: 'AI check for transfer comments (OpenAI)',
+      detail: aiFilterConfigured()
+        ? 'Set up. Comments are checked by AI before they show on the big screen: rude ones are dropped or politely reworded.'
+        : 'Not set up: comments on the big screen are checked with the basic rude-word list only. Add OPENAI_API_KEY in Vercel (platform.openai.com → API keys) and redeploy.',
     },
     {
       ok: !!process.env.CRON_SECRET,

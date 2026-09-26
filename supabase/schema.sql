@@ -180,6 +180,13 @@ alter table spray_events add column if not exists camera_screen text;
 alter table spray_events add column if not exists camera_screen_seen_at timestamptz;
 -- Show guests "no need to bring mint cash, spray by transfer" on the write-a-line page.
 alter table spray_events add column if not exists show_cashless_note boolean not null default true;
+-- Bank transfer comments on the big screen, the AI rude-comment check, and the bank-alert sound (all on by default).
+alter table spray_events add column if not exists show_comments boolean not null default true;
+alter table spray_events add column if not exists ai_comment_filter boolean not null default true;
+alter table spray_events add column if not exists alert_sound boolean not null default true;
+-- The AI check of each comment ('ok', 'rewritten', 'blocked', 'failed') and what the screen shows.
+alter table transfers add column if not exists moderation text;
+alter table transfers add column if not exists screen_message text;
 create table if not exists camera_sessions (
   event_id uuid primary key references spray_events(id) on delete cascade,
   session_id text not null,

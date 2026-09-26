@@ -15,6 +15,7 @@ import type {
   LineStatus,
   Transfer,
   CameraSession,
+  CommentModeration,
 } from '../types';
 import { computeStats, type Store } from './types';
 
@@ -173,6 +174,10 @@ export class MemoryStore implements Store {
       .transfers.filter((t) => t.eventId === eventId)
       .sort((a, b) => b.id - a.id)
       .slice(0, limit);
+  }
+  async setTransferModeration(transferId: number, moderation: CommentModeration | null, screenMessage: string | null) {
+    const t = data().transfers.find((x) => x.id === transferId);
+    if (t) Object.assign(t, { moderation, screenMessage });
   }
   async setTransferMessage(transferId: number, message: string | null, rawNarration: string | null) {
     const t = data().transfers.find((x) => x.id === transferId);

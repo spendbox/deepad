@@ -429,6 +429,11 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   const label = cleanDisplayName(str(form, 'recipientLabel'));
   if (label) patch.recipientLabel = label;
   if (cashless === 'yes' || cashless === 'no') patch.showCashlessNote = cashless === 'yes';
+  // The big-screen switches: comments under names, the AI check of comments, the bank-alert sound.
+  for (const key of ['showComments', 'aiCommentFilter', 'alertSound'] as const) {
+    const v = str(form, key);
+    if (v === 'yes' || v === 'no') patch[key] = v === 'yes';
+  }
 
 
   const newSlug = str(form, 'slug').toLowerCase();
