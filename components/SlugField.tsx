@@ -5,7 +5,7 @@ import { slugify, slugProblem } from '@/lib/slug';
 
 type Status = { state: 'idle' | 'checking' | 'ok' | 'bad'; message?: string };
 
-/** The event's short link, e.g. dashpad.ng/tolu-and-dayo, checked as you type. */
+/** The event's short link, e.g. dashpad.site/tolu-and-dayo, checked as you type. */
 export default function SlugField({
   value,
   onChange,
@@ -24,7 +24,7 @@ export default function SlugField({
   locked?: boolean;
   onUnlock?: () => void;
 }) {
-  const [host, setHost] = useState('dashpad.ng');
+  const [host, setHost] = useState('dashpad.site');
   const [status, setStatus] = useState<Status>({ state: 'idle' });
 
   useEffect(() => setHost(window.location.host), []);

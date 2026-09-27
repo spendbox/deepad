@@ -253,7 +253,7 @@ export default function EventWizard({ plannerHasBank, canRemoveBg }: { plannerHa
   const screenTheme = resolveTheme(d.theme, d.themeColors);
   const themeName = d.theme === 'custom' ? 'Your own colours' : THEMES.find((t) => t.id === d.theme)?.name;
   const payoutReady = d.payout.accountNumber.length === 10 && !!d.payout.bankName && !!d.payout.accountName;
-  const host = typeof window !== 'undefined' ? window.location.host : 'dashpad.ng';
+  const host = typeof window !== 'undefined' ? window.location.host : 'dashpad.site';
   const progress = ((step + 1) / STEP_NAMES.length) * 100;
 
   // One-line summaries for the step list on big screens.

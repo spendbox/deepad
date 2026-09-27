@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: event ? `${event.title} · DashPad` : 'DashPad', robots: { index: false } };
 }
 
-// The event's short link, e.g. dashpad.ng/tolu-and-dayo. Open it on the venue TV or projector.
+// The event's short link, e.g. dashpad.site/tolu-and-dayo. Open it on the venue TV or projector.
 export default async function EventScreenPage({ params }: Props) {
   const { slug: code } = await params;
   const event = await getEvent(code);
