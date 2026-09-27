@@ -303,6 +303,20 @@ export class SupabaseStore implements Store {
   async markIntentPaid(reference: string, transferId: number) {
     check(await this.db.from('spray_intents').update({ status: 'paid', transfer_id: transferId }).eq('reference', reference));
   }
+  async setIntentThrown(reference: string, thrown: Record<string, number>, at: string) {
+    check(await this.db.from('spray_intents').update({ thrown, last_throw_at: at }).eq('reference', reference));
+  }
+  async listPaidIntents(eventId: string, limit = 100) {
+    const rows = check(
+      await this.db.from('spray_intents').select('*').eq('event_id', eventId).eq('status', 'paid')
+        .order('last_throw_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(limit),
+    );
+    return (rows ?? []).map((r) => fromRow<SprayIntent>(r, ['amountKobo', 'transferId']));
+  }
+  async getTransfer(id: number) {
+    const row = check(await this.db.from('transfers').select('*').eq('id', id).maybeSingle());
+    return row ? toTransfer(row) : null;
+  }
 
   // ----- Payment notification log -----
   // ----- Lines on the big screen -----
@@ -389,9 +403,9 @@ export class SupabaseStore implements Store {
     // Ask for one row of each table with every column added in later updates.
     const probes: [string, string][] = [
       ['planners', 'id, paystack_subaccount'],
-      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token, camera_screen, camera_screen_seen_at, show_cashless_note, show_comments, ai_comment_filter, alert_sound'],
+      ['spray_events', 'id, photos, deleted_at, paystack_dva_id, hype_lines, theme_colors, lines_view_token, camera_token, camera_screen, camera_screen_seen_at, show_cashless_note, cashless_note, show_comments, ai_comment_filter, alert_sound'],
       ['camera_sessions', 'event_id, session_id, offer, answer, updated_at'],
-      ['spray_intents', 'reference, message'],
+      ['spray_intents', 'reference, message, guest_name, thrown, last_throw_at'],
       ['transfers', 'id, processing_fee_kobo, outside_window, raw_narration, moderation, screen_message'],
       ['password_resets', 'id'],
       ['payment_logs', 'id, outcome, raw'],

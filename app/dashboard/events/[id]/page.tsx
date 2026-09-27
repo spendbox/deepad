@@ -272,6 +272,8 @@ export default async function EventPage({
                       bigSprayNaira: event.bigSprayKobo / 100,
                       endsAt: event.endsAt,
                       showCashlessNote: event.showCashlessNote !== false,
+                      cashlessNote: event.cashlessNote ?? '',
+                      celebrantName: event.celebrantName,
                     }}
                   />
                 </SectionCard>

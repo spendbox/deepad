@@ -39,6 +39,8 @@ export type SprayEvent = {
   cameraToken?: string | null;
   /** Show guests "no need to bring cash" on the write-a-line page (on unless the planner turns it off). */
   showCashlessNote?: boolean | null;
+  /** The planner's own wording for that note (null = the default, see cashlessNoteText). */
+  cashlessNote?: string | null;
   /** Show each sprayer's bank transfer comment under their name on the big screen (on unless turned off). */
   showComments?: boolean | null;
   /** Check comments with AI before they reach the screen: rude ones are dropped or politely reworded (on unless turned off). */
@@ -163,6 +165,8 @@ export type IntentStatus = 'pending' | 'paid';
 export type SprayIntent = {
   reference: string;
   eventId: string;
+  /** The name the guest typed, shown on screen instead of their bank name. */
+  guestName?: string | null;
   message: string | null;
   amountKobo: number;
   accountNumber: string;
@@ -171,10 +175,13 @@ export type SprayIntent = {
   expiresAt: string;
   status: IntentStatus;
   transferId: number | null;
+  /** Notes the guest has thrown from their phone so far, by value in naira: {"500": 12, "100": 3}. */
+  thrown?: Record<string, number> | null;
+  lastThrowAt?: string | null;
   createdAt: string;
 };
 
-export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transferId'>;
+export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transferId' | 'thrown' | 'lastThrowAt'>;
 
 /**
  * A line shown on the big screen: a short wish for the celebrant, written by

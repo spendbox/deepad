@@ -239,6 +239,7 @@
 .st.phone .ln-text { font-size: 19px; }
 .st.phone .st-monogram { width: 300px; height: 300px; }
 
+.st-pay.m.has-spray { height: 294px; }
 .st-pay.m { left: 12px; right: 12px; bottom: 12px; height: 232px; padding: 34px 20px 16px; gap: 10px; border-radius: 26px; justify-content: flex-start; }
 .st-pay.m .st-pay-tab { left: 18px; gap: 8px; padding: 7px 16px 7px 12px; font-size: 17px; }
 .st-pay.m .st-pay-tab svg { width: 18px; height: 18px; }
@@ -260,3 +261,14 @@
 .st.phone .st-notice-sub { font-size: 18px; }
 /* Let the bank and account name use their whole column, so long names shrink instead of running into each other */
 .mp-bottom .st-pay-field > :last-child { align-self: stretch; }
+
+/* Phones: spray from this phone, right under the account number */
+.mp-spray {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border-radius: 14px; border: 0;
+  background: var(--s-accent); color: var(--s-on-accent); font-family: var(--display); font-weight: 800; font-size: 17px; cursor: pointer;
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--s-accent) 80%, #000);
+}
+.mp-spray:focus-visible { outline: 3px solid var(--s-text); outline-offset: 2px; }
+/* Someone spraying from their phone who stopped throwing: they fade away slowly (and come back if they throw again) */
+.sp-unit.from-phone .sp-tag.leaving { animation: spFadeSlow 2.5s ease forwards; }
+@keyframes spFadeSlow { to { opacity: 0; transform: scale(.92); } }
