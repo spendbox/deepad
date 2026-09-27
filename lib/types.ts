@@ -24,7 +24,7 @@ export type SetupStatus = 'pending' | 'ready' | 'failed';
 
 export type SprayEvent = {
   id: string;
-  /** The event's short link: dashpad.ng/<slug>, chosen by the planner. */
+  /** The event's short link: dashpad.site/<slug>, chosen by the planner. */
   slug: string;
   plannerId: string;
   eventType: EventType;

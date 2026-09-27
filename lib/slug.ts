@@ -1,4 +1,4 @@
-// Event links are short and readable: dashpad.ng/tolu-and-dayo
+// Event links are short and readable: dashpad.site/tolu-and-dayo
 // Used by both the browser (live checking) and the server (final check).
 
 export const SLUG_MIN = 3;
@@ -6,7 +6,7 @@ export const SLUG_MAX = 40;
 
 /** Words that are already pages on the site, so events can't use them. */
 const RESERVED = new Set([
-  'dashboard', 'login', 'logout', 'signup', 'admin', 'api', 'e', 'forgot-password', 'reset-password',
+  'dashboard', 'login', 'logout', 'signup', 'admin', 'api', 'e', 'w', 'forgot-password', 'reset-password',
   'about', 'pricing', 'terms', 'privacy', 'help', 'support', 'contact', 'blog', 'dashpad', 'www',
   'static', 'public', 'images', 'assets', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'events', 'event', 'camera', 'lines',
 ]);

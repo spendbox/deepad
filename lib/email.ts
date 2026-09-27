@@ -1,7 +1,7 @@
 import 'server-only';
 
 // Sends email through Resend (resend.com). Needs RESEND_API_KEY and
-// EMAIL_FROM (e.g. "DashPad <reports@dashpad.ng>", on a domain verified in Resend).
+// EMAIL_FROM (e.g. "DashPad <reports@dashpad.site>", on a domain verified in Resend).
 
 export function emailConfigured(): boolean {
   return !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
