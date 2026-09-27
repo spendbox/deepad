@@ -81,6 +81,17 @@ test('bank narration keeps the sender’s own words', () => {
   assert.equal(cleanNarration('Happy birthday to SPENDBOX/DASHPAD TOLU', null, ['SPENDBOX/DASHPAD TOLU']), 'Happy birthday');
   assert.equal(cleanNarration('Dance well o TRF TO', null), 'Dance well o');
   assert.equal(cleanNarration('TO', null), null);
+  // The bank's default when the guest typed nothing (OPay: "from <full name>") is not a comment.
+  assert.equal(cleanNarration('from Oluwaseun Adebayo', who), null);
+  assert.equal(cleanNarration('From OLUWASEUN ADEBAYO', who), null);
+  assert.equal(cleanNarration('from Oluwaseun Tunde Adebayo', who), null); // with a middle name
+  assert.equal(cleanNarration('Transfer from Oluwaseun Adebayo', who), null);
+  assert.equal(cleanNarration('from Ada Obi', null), null); // sender's name not known yet
+  // …but what guests really type is kept.
+  assert.equal(cleanNarration('from the Adebayo family', who), 'from the Adebayo family');
+  assert.equal(cleanNarration('from Mummy', who), 'from Mummy');
+  assert.equal(cleanNarration('Enjoy o! from Oluwaseun', who), 'Enjoy o! from Oluwaseun');
+  assert.equal(cleanNarration('from Oluwaseun, happy married life!', who), 'from Oluwaseun, happy married life!');
   assert.equal(cleanNarration('Dance well TO DASHPAD/TOLU AND DAYO', null), 'Dance well');
   assert.equal(cleanNarration('000123456789012/Love you both', null), 'Love you both');
   assert.equal(cleanNarration(''), null);
