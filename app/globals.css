@@ -765,3 +765,76 @@ details .settings-form { margin-top: 12px; }
 .switch-card.on .switch::after { transform: translateX(18px); background: var(--gold); }
 .switch-card input:focus-visible + .switch { outline: 3px solid var(--gold); outline-offset: 2px; }
 .switch-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+/* ---------- Admin (DashPad staff) ---------- */
+.adm { min-height: 100dvh; background: var(--wash); }
+.adm-top { position: sticky; top: 0; z-index: 20; background: var(--aubergine); color: var(--ivory); box-shadow: 0 6px 20px -12px rgba(31, 10, 38, .6); }
+.adm-top-in {
+  max-width: 1160px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+}
+.adm-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.adm-brand:focus-visible, .adm-nav a:focus-visible, .adm-logout-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 10px; }
+.adm-badge {
+  padding: 3px 10px; border-radius: 999px; border: 1.5px solid var(--gold); color: var(--gold);
+  font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+}
+.adm-nav { display: flex; gap: 4px; margin-left: auto; }
+.adm-nav a {
+  color: var(--lilac); text-decoration: none; font-weight: 700; font-size: 15px; padding: 8px 12px; border-radius: 10px; white-space: nowrap;
+}
+.adm-nav a:hover { background: var(--plum); color: var(--ivory); }
+.adm-logout { margin: 0; }
+.adm-logout-btn {
+  min-height: 40px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--lilac); background: transparent;
+  color: var(--ivory); font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.adm-logout-btn:hover { background: var(--ivory); color: var(--aubergine); border-color: var(--ivory); }
+/* Phones: logo and log out on one line, sections scroll along a second line */
+@media (max-width: 700px) {
+  .adm-top-in { padding: 10px 14px 6px; }
+  .adm-logout { margin-left: auto; }
+  .adm-nav { order: 3; margin: 0 -14px; padding: 0 8px 4px; width: calc(100% + 28px); overflow-x: auto; }
+  .adm-nav a { font-size: 14px; padding: 8px 10px; }
+}
+.adm-main { max-width: 1160px; margin: 0 auto; padding: 20px 16px 80px; display: flex; flex-direction: column; gap: 18px; }
+@media (min-width: 900px) { .adm-main { padding: 28px 24px 80px; gap: 22px; } }
+.adm h1 { font-family: var(--display); font-weight: 800; font-size: 28px; margin: 0; line-height: 1.15; }
+.adm h2 { font-family: var(--display); font-weight: 800; font-size: 20px; margin: 0; }
+.adm h3 { font-family: var(--display); font-weight: 800; font-size: 16px; margin: 0; }
+.adm-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.adm-sub { margin: 4px 0 0; color: var(--ink-muted); font-size: 15px; }
+.adm-warn { display: flex; flex-direction: column; gap: 4px; }
+.adm-warn ul { margin: 0; padding-left: 18px; }
+.adm section[id] { scroll-margin-top: 90px; }
+/* Money tiles: the main number first and biggest */
+.adm .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .adm .tiles { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
+.adm .tile { padding: 14px 16px; }
+.adm .tile .v { font-size: 24px; }
+.adm .tile.dark { background: var(--aubergine); border-color: var(--aubergine); color: var(--ivory); }
+.adm .tile.dark .k { color: var(--lilac); }
+.adm-counts { display: flex; gap: 8px; flex-wrap: wrap; }
+.adm-count { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--ink-muted); }
+.adm-count strong { color: var(--aubergine); font-size: 16px; margin-right: 4px; }
+/* Tables: a soft header row, and links that look clickable */
+.adm table th { background: var(--wash); }
+/* On phones, wide tables scroll sideways instead of squeezing every word onto its own line */
+.adm .table-wrap table { min-width: 680px; }
+.adm table th:first-child { border-top-left-radius: 8px; }
+.adm table th:last-child { border-top-right-radius: 8px; }
+.adm table tbody tr:hover td { background: #fbf7fc; }
+.adm td a { color: var(--aubergine); font-weight: 700; white-space: nowrap; }
+/* Setup check: ready / optional / needs fixing */
+.adm-checks-sum { margin: 0; font-size: 15px; color: var(--ink-muted); }
+.adm .checks { display: grid; grid-template-columns: 1fr; gap: 12px 24px; }
+@media (min-width: 900px) { .adm .checks { grid-template-columns: 1fr 1fr; } }
+.checks li.optional .check-icon { background: #e6e2e8; color: var(--ink-muted); }
+.check-tag { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--ink-muted); background: #efe8f2; padding: 1px 8px; border-radius: 999px; }
+/* Event details: label on the left, value on the right */
+.adm-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; margin: 0; }
+.adm-facts dt { color: var(--ink-muted); font-size: 14px; font-weight: 700; padding-top: 1px; }
+.adm-facts dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .adm-facts { grid-template-columns: 1fr; gap: 2px; }
+  .adm-facts dd { margin-bottom: 8px; }
+}

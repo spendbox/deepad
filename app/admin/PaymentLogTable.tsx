@@ -11,7 +11,7 @@ const LABEL: Record<PaymentLog['outcome'], string> = {
 
 export default function PaymentLogTable({ logs, title = 'Payment notifications' }: { logs: PaymentLog[]; title?: string }) {
   return (
-    <section className="card">
+    <section className="card" id="payments">
       <h2>{title}</h2>
       <span className="hint">Every notification from Paystack, newest first. “Check” rows come from the backup check.</span>
       <div className="table-wrap">

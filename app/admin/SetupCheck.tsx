@@ -7,7 +7,8 @@ import { siteUrl } from '@/lib/site';
 import { getStore } from '@/lib/store';
 import type { PaymentLog } from '@/lib/types';
 
-type Check = { ok: boolean; title: string; detail: string };
+/** `optional`: not needed to run DashPad; shown grey (not red) while it isn't set up. */
+type Check = { ok: boolean; title: string; detail: string; optional?: boolean };
 
 /** A plain-English list of what is and isn't set up correctly. */
 export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
@@ -59,9 +60,11 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
     {
       ...cutoutStatus(),
       title: 'Background removal for photos',
+      optional: true,
     },
     {
-      ok: true, // optional: the live camera works on most networks without it
+      ok: relayConfigured(),
+      optional: true, // the live camera works on most networks without it
       title: 'Live camera relay (Cloudflare)',
       detail: relayConfigured()
         ? 'Set up. Phone cameras can reach the big screen even on strict venue Wi-Fi.'
@@ -69,6 +72,7 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
     },
     {
       ok: aiFilterConfigured(),
+      optional: true,
       title: 'AI check for transfer comments (OpenAI)',
       detail: aiFilterConfigured()
         ? 'Set up. Comments are checked by AI before they show on the big screen: spelling and grammar are fixed, rude ones are dropped or politely reworded.'
@@ -81,19 +85,29 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
     },
   ];
 
+  const ready = checks.filter((c) => c.ok).length;
+  const problems = checks.filter((c) => !c.ok && !c.optional).length;
   return (
-    <section className="card" aria-label="Setup check">
-      <h2>Setup check</h2>
+    <section className="card" id="setup" aria-label="Setup check">
+      <div className="row-between">
+        <h2>Setup check</h2>
+        <span className={`pill ${problems ? 'failed' : 'live'}`}>{problems ? `${problems} to fix` : 'All good'}</span>
+      </div>
+      <p className="adm-checks-sum">{ready} of {checks.length} set up{problems ? ` · ${problems} need fixing` : ''}. Grey ones are optional extras.</p>
       <ul className="checks">
-        {checks.map((c) => (
-          <li key={c.title} className={c.ok ? 'ok' : 'bad'}>
-            <span aria-hidden="true" className="check-icon">{c.ok ? '✓' : '!'}</span>
-            <div>
-              <strong>{c.title}</strong>
-              <div className="hint" style={{ overflowWrap: 'anywhere' }}>{c.detail}</div>
-            </div>
-          </li>
-        ))}
+        {checks.map((c) => {
+          const state = c.ok ? 'ok' : c.optional ? 'optional' : 'bad';
+          return (
+            <li key={c.title} className={state}>
+              <span aria-hidden="true" className="check-icon">{state === 'ok' ? '✓' : state === 'optional' ? '–' : '!'}</span>
+              <div>
+                <strong>{c.title}</strong>
+                {state === 'optional' && <span className="check-tag">Optional</span>}
+                <div className="hint" style={{ overflowWrap: 'anywhere' }}>{c.detail}</div>
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

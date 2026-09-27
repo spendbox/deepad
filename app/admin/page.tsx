@@ -26,15 +26,22 @@ export default async function AdminHome() {
 
   return (
     <AdminShell>
-      <h1>Overview</h1>
-      <SetupCheck logs={logs} />
+      <div className="adm-head">
+        <div>
+          <h1>Overview</h1>
+          <p className="adm-sub">Everything on DashPad, across all planners.</p>
+        </div>
+        <div className="adm-counts">
+          <span className="adm-count"><strong>{events.length}</strong>{events.length === 1 ? 'event' : 'events'}</span>
+          <span className="adm-count"><strong>{events.filter((e) => eventPhase(e) === 'live' && !e.deletedAt).length}</strong>live now</span>
+          <span className="adm-count"><strong>{planners.length}</strong>{planners.length === 1 ? 'planner' : 'planners'}</span>
+        </div>
+      </div>
       <div className="tiles">
         <div className="tile gold"><div className="v">{naira(total.platform - total.processing)}</div><div className="k">DashPad earnings after Paystack fees</div></div>
+        <div className="tile dark"><div className="v">{naira(total.sprayed)}</div><div className="k">Total sprayed</div></div>
         <div className="tile"><div className="v">{naira(total.platform)}</div><div className="k">DashPad 5% (before fees)</div></div>
         <div className="tile"><div className="v">{naira(total.processing)}</div><div className="k">Paystack fees paid by DashPad</div></div>
-        <div className="tile"><div className="v">{naira(total.sprayed)}</div><div className="k">Total sprayed</div></div>
-        <div className="tile"><div className="v">{events.length}</div><div className="k">Events</div></div>
-        <div className="tile"><div className="v">{planners.length}</div><div className="k">Planners</div></div>
       </div>
       {total.outside > 0 && (
         <div className="banner warn">
@@ -42,7 +49,7 @@ export default async function AdminHome() {
         </div>
       )}
 
-      <section className="card">
+      <section className="card" id="events">
         <h2>Events</h2>
         <div className="table-wrap">
           <table>
@@ -67,7 +74,7 @@ export default async function AdminHome() {
 
       <PaymentLogTable logs={logs} />
 
-      <section className="card">
+      <section className="card" id="planners">
         <h2>Planners</h2>
         <div className="table-wrap">
           <table>
@@ -87,6 +94,8 @@ export default async function AdminHome() {
           </table>
         </div>
       </section>
+
+      <SetupCheck logs={logs} />
     </AdminShell>
   );
 }
