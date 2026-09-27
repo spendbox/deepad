@@ -6,7 +6,7 @@
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number };
 export type BodyKind = 'sprayer' | 'line';
-export type BodyOptions = { kind: BodyKind; big?: boolean; perSecond?: number };
+export type BodyOptions = { kind: BodyKind; big?: boolean; perSecond?: number; money?: number };
 
 type Body = {
   id: string;
@@ -14,6 +14,7 @@ type Body = {
   kind: BodyKind;
   big: boolean;
   perSecond: number;
+  money: number;
   x: number; // centre
   y: number;
   w: number;
@@ -100,7 +101,7 @@ export class Arena {
     const angle = this.rand(0, Math.PI * 2);
     const speed = this.rand(MIN_SPEED, MAX_SPEED * 0.7) * (opts.big ? 0.6 : 1);
     this.bodies.set(id, {
-      id, el, kind: opts.kind, big: !!opts.big, perSecond: opts.perSecond ?? 1,
+      id, el, kind: opts.kind, big: !!opts.big, perSecond: opts.perSecond ?? 1, money: opts.money ?? 0,
       x, y, w, h, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
       mass: opts.big ? 4 : opts.kind === 'line' ? 2 : 1, leaving: false,
     });
@@ -129,11 +130,18 @@ export class Arena {
     if (b) b.leaving = leaving;
   }
 
+  /** How fast a sprayer throws, and how much of it is money (it changes as they step in and out of the spotlight). */
+  setRate(id: string, perSecond: number, money: number) {
+    const b = this.bodies.get(id);
+    if (b) { b.perSecond = perSecond; b.money = money; }
+  }
+
   /** Where the sprayers are right now, for the confetti. */
   emitters() {
-    const out: { id: number; x: number; y: number; perSecond: number }[] = [];
+    const out: { id: number; x: number; y: number; perSecond: number; money: number }[] = [];
     for (const b of this.bodies.values()) {
-      if (b.kind === 'sprayer' && !b.leaving) out.push({ id: hash(b.id), x: b.x, y: b.y, perSecond: b.perSecond });
+      if (b.kind !== 'sprayer' || b.leaving || b.perSecond <= 0) continue;
+      out.push({ id: hash(b.id), x: b.x, y: b.y, perSecond: b.perSecond, money: b.money });
     }
     return out;
   }

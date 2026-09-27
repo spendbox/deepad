@@ -18,7 +18,7 @@ export function ScreenPreview({ theme, label, size = 'md' }: { theme: ScreenThem
       </div>
       <div className="sp-bar" style={{ background: theme.accent, color: theme.onAccent }}>
         <span className="sp-acct">0123 456 789</span>
-        {size === 'md' && <span className="sp-bank">Wema Bank</span>}
+        {size === 'md' && <span className="sp-bank">Paystack-Titan</span>}
       </div>
     </div>
   );

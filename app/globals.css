@@ -141,11 +141,17 @@ details.card[open] > summary::after { content: '–'; }
 
 /* ---------- Event wizard ---------- */
 /* As many per row as fit (no word ever spills out of its button, whatever the screen width) */
-.type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+/* Event types: each button keeps its word whole and simply moves to the next line when there's no room,
+   and the buttons on a line stretch to share it evenly. */
+.type-grid { display: flex; flex-wrap: wrap; gap: 10px; }
 .type-btn {
-  min-height: 60px; min-width: 0; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; padding: 8px 10px;
-  font-family: var(--display); font-weight: 800; font-size: 16px; line-height: 1.15; overflow-wrap: anywhere; hyphens: auto;
+  flex: 1 1 128px; min-height: 56px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; padding: 8px 14px;
+  font-family: var(--display); font-weight: 800; font-size: 16px; line-height: 1.15; white-space: nowrap; text-align: center;
   transition: border-color .15s, background .15s;
+}
+@media (max-width: 480px) {
+  .type-grid { gap: 8px; }
+  .type-btn { flex-basis: 110px; min-height: 50px; padding: 8px 10px; font-size: 15px; }
 }
 .type-btn:hover { border-color: var(--field); }
 .type-btn[aria-pressed='true'] { background: var(--aubergine); border-color: var(--aubergine); color: var(--gold); }

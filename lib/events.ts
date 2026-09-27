@@ -440,16 +440,17 @@ export type ScreenTransfer = {
   /** 1 to 4: bigger sprays stay on screen spraying a little longer. */
   weight: number;
   /**
-   * How long this person keeps spraying, in pieces of confetti: one per ₦100,
-   * thrown one a second, up to 30 minutes. Never shown as an amount.
+   * How many ₦100 notes this person throws (one per ₦100 sent). Bigger sprays
+   * throw faster (lib/spray-pace.ts), for at most 30 minutes. Never shown as an amount.
    */
   pieces: number;
   createdAt: string;
 };
 
-/** One confetti piece per ₦100, each one a second of spraying, for at most 30 minutes. */
+/** One ₦100 note per ₦100 sent. */
 export const NAIRA_PER_PIECE = 100;
-export const MAX_PIECES = 30 * 60;
+/** Enough ₦100 notes for the fastest pace to fill 30 minutes (see lib/spray-pace.ts). */
+export const MAX_PIECES = 30 * 60 * 2;
 export function sprayPieces(amountKobo: number): number {
   return Math.min(MAX_PIECES, Math.max(1, Math.floor(amountKobo / 100 / NAIRA_PER_PIECE)));
 }

@@ -57,6 +57,10 @@
 .sp-tag.has-cmt { border-radius: 44px; padding-top: 10px; padding-bottom: 12px; }
 .sp-tag.big.has-cmt { border-radius: 64px; }
 .sp-tag.big .sp-cmt { max-width: 620px; font-size: 38px; font-weight: 700; }
+.sp-unit { display: flex; flex-direction: column; }
+/* Actively spraying: a ring in the party colour. Finished and just resting: quieter. */
+.st-arena .sp-tag.active:not(.big) { box-shadow: 0 0 0 3px color-mix(in srgb, var(--s-accent) 70%, transparent), 0 10px 26px -14px rgba(0, 0, 0, .45); }
+.sp-unit.done .sp-tag { opacity: .8; }
 @keyframes spIn { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes spOut { to { transform: scale(.6); opacity: 0; } }
 
@@ -120,22 +124,20 @@
   background: var(--s-accent); color: var(--s-on-accent); font-weight: 800; font-size: 28px; white-space: nowrap;
   box-shadow: 0 12px 24px -14px rgba(0, 0, 0, .5);
 }
-.st-pay-main { display: grid; grid-template-columns: minmax(0, 1fr) 2px fit-content(760px); align-items: stretch; column-gap: 56px; }
+.st-pay-main { display: grid; grid-template-columns: minmax(0, 1fr) 2px minmax(0, 600px); align-items: center; column-gap: 52px; }
+.st-pay-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.st-pay-side .st-pay-field { gap: 2px; }
 .st-pay-field { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; }
-.st-pay-divider { align-self: stretch; margin: 6px 0; background: color-mix(in srgb, var(--s-muted) 28%, transparent); border-radius: 2px; }
+.st-pay-divider { align-self: stretch; margin: 4px 0; background: color-mix(in srgb, var(--s-muted) 28%, transparent); border-radius: 2px; }
 .st-pay-label {
   font-family: var(--body); font-size: 20px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s-muted);
 }
 .st-acct { font-weight: 800; line-height: .95; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--s-text); }
-.st-bank { font-weight: 800; line-height: .95; letter-spacing: -0.025em; color: var(--s-accent); }
-.st-pay-foot {
-  display: flex; justify-content: space-between; align-items: flex-end; gap: 48px; min-width: 0;
-  padding-top: 14px; border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
-}
-.st-acct-name { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.st-bank { font-weight: 800; line-height: 1.05; letter-spacing: -0.015em; color: var(--s-accent); }
 .st-acct-name-v { font-weight: 800; letter-spacing: -0.005em; line-height: 1.1; color: var(--s-text); }
 .st-pay-note {
-  display: flex; align-items: flex-start; gap: 10px; flex: 0 0 auto; max-width: 560px; padding-bottom: 4px;
+  display: flex; align-items: center; gap: 10px; padding-top: 12px;
+  border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
   font-family: var(--body); font-size: 19px; line-height: 1.35; color: var(--s-muted);
 }
 .st-pay-note svg { flex-shrink: 0; margin-top: 2px; }
@@ -149,7 +151,6 @@
 .st-arena.packed .ln-text { font-size: 28px; }
 /* The bank sits on the right, hugging its own name, so the account number has room to breathe */
 .st-pay-field.right { align-items: flex-end; text-align: right; }
-.st-pay-note { justify-content: flex-end; text-align: right; }
 
 /* ---------- Live camera: the video fills the screen, everything else floats over it ---------- */
 .st-video {
@@ -243,11 +244,12 @@
 .st-pay.m .st-pay-tab svg { width: 18px; height: 18px; }
 .st-pay.m .st-pay-label { font-size: 12px; letter-spacing: .1em; }
 .st-pay.m .st-pay-field { gap: 4px; }
+.st-pay.m .st-bank, .st-pay.m .st-acct-name-v { line-height: 1.15; }
 .mp-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .mp-top .st-pay-field { flex: 1; min-width: 0; }
 .mp-top button { flex-shrink: 0; min-height: 52px; padding: 0 20px; font-size: 17px; border-radius: 14px; }
 .mp-bottom {
-  display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 14px; padding-top: 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; padding-top: 10px;
   border-top: 2px solid color-mix(in srgb, var(--s-muted) 16%, transparent);
 }
 .mp-note { margin-top: 2px; font-family: var(--body); font-size: 13px; line-height: 1.35; color: var(--s-muted); }

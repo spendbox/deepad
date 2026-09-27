@@ -92,7 +92,7 @@ export async function createCustomer(opts: { email: string; firstName: string; l
 
 /** Give the event its own account number ("dedicated virtual account"). */
 export async function createDedicatedAccount(opts: { customerCode: string; splitCode: string | null }) {
-  const preferredBank = process.env.PAYSTACK_DVA_BANK || (paystackIsLive() ? 'wema-bank' : 'test-bank');
+  const preferredBank = process.env.PAYSTACK_DVA_BANK || (paystackIsLive() ? 'titan-paystack' : 'test-bank');
   const data = await call<{ id: number; account_number: string; account_name: string; bank?: { name?: string } }>(
     'POST',
     '/dedicated_account',
