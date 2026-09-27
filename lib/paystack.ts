@@ -192,3 +192,40 @@ export async function createOneTimeAccount(opts: {
 export async function verifyTransaction(reference: string): Promise<PaystackTransaction> {
   return call<PaystackTransaction>('GET', `/transaction/verify/${encodeURIComponent(reference)}`);
 }
+
+// ---------- Sending money out (used for the "test alert": ₦1 with a message) ----------
+
+/** DashPad's money waiting in Paystack (NGN), which transfers are paid from. */
+export async function getBalanceKobo(): Promise<number> {
+  const data = await call<{ currency: string; balance: number }[]>('GET', '/balance');
+  return data.find((b) => b.currency === 'NGN')?.balance ?? 0;
+}
+
+/** Someone Paystack can send money to (a Nigerian bank account). */
+export async function createTransferRecipient(opts: { name: string; accountNumber: string; bankCode: string }): Promise<string> {
+  const data = await call<{ recipient_code: string }>('POST', '/transferrecipient', {
+    type: 'nuban',
+    name: opts.name.slice(0, 100),
+    account_number: opts.accountNumber,
+    bank_code: opts.bankCode,
+    currency: 'NGN',
+  });
+  return data.recipient_code;
+}
+
+/**
+ * Send money from DashPad's Paystack balance. `reason` is the description the
+ * receiver's bank shows. Status is usually 'pending' or 'success'; 'otp' means
+ * Paystack wants a one-time code for every transfer (switch that off in Paystack's settings).
+ */
+export async function sendTransfer(opts: { amountKobo: number; recipient: string; reason: string; reference: string }) {
+  const data = await call<{ status: string; transfer_code?: string; reference?: string }>('POST', '/transfer', {
+    source: 'balance',
+    amount: opts.amountKobo,
+    recipient: opts.recipient,
+    reason: opts.reason,
+    reference: opts.reference,
+    currency: 'NGN',
+  });
+  return { status: data.status, transferCode: data.transfer_code ?? null };
+}
