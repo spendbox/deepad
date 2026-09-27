@@ -91,6 +91,11 @@
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 @keyframes lnIn { from { transform: scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+/* The one line on screen, in its corner: it pops out from the corner and shrinks back into it. */
+.ln-corner { position: absolute; z-index: 3; pointer-events: none; }
+.ln-corner .ln-bubble { max-width: 100%; transform-origin: 0 0; animation: lnPop .6s cubic-bezier(.34, 1.56, .64, 1) both; }
+.ln-corner .ln-bubble.leaving { animation: lnOut .45s ease forwards; }
+@keyframes lnPop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.04); opacity: 1; } 100% { transform: none; } }
 @keyframes lnOut { to { transform: scale(.85); opacity: 0; } }
 
 /* Before and after the event */
@@ -136,7 +141,7 @@
 .st-pay-note svg { flex-shrink: 0; margin-top: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .ln-bubble { animation: none; }
+  .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .ln-bubble, .ln-corner .ln-bubble { animation: none; }
   .sp-tag.leaving, .ln-bubble.leaving { opacity: 0; }
 }
 

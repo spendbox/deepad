@@ -78,7 +78,7 @@ export default async function EventPage({
     if (t.hidden) return 'Hidden from the big screen.';
     const shown = screenComment(t, { show: true, ai: event.aiCommentFilter !== false, aiReady });
     if (!shown) return t.moderation == null && aiReady && event.aiCommentFilter !== false && Date.now() - new Date(t.createdAt).getTime() < 20_000 ? 'Being checked…' : 'Left off the big screen (not polite).';
-    return shown === t.message ? 'Shown on the big screen.' : `Shown on the big screen as “${shown}”.`;
+    return shown === t.message ? 'Shown on the big screen.' : `Shown on the big screen as “${shown}” (tidied by AI).`;
   };
 
   const sprayRow = (t: (typeof transfers)[number]) => (

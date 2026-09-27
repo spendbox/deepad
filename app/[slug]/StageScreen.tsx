@@ -55,6 +55,9 @@ function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean) {
       target: { x: [cx - 70, cx + 70] as [number, number], y: [photoTop + 90 - canvas.top, faceBottom + 120 - canvas.top] as [number, number] },
       cutout: { left: cx - Math.min(w * 0.55, cutoutH * 0.4), top: photoTop, width: Math.min(w * 1.1, cutoutH * 0.8), height: cutoutH },
       photo: { left: 24, top: photoTop, width: w - 48, height: photoH },
+      // One line at a time, in the top-left corner; names keep out of this box.
+      line: { left: 14, top: 82, maxWidth: 300 },
+      lineZone: { x0: 0, y0: 70, x1: 330, y1: 240 },
       monogram: { left: cx - 150, top: (h - card) / 2 - 150, width: 300, height: 300, fontSize: 90 },
       ambient: { cx, cy: faceBottom - 40 },
     };
@@ -75,12 +78,14 @@ function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean) {
     },
     cutout: { left: cx - cutoutH * 0.36, top: photoTop, width: cutoutH * 0.72, height: cutoutH },
     photo: { left: cx - photoH * 0.4, top: photoTop, width: photoH * 0.8, height: photoH },
+    // One line at a time, in the top-left corner; names keep out of this box.
+    line: { left: 56, top: 124, maxWidth: Math.min(520, cx - half - 90) },
+    lineZone: { x0: 30, y0: 104, x1: Math.min(600, cx - half - 20), y1: 360 },
     monogram: { left: cx - 210, top: (h - 366) / 2 - 170 },
     ambient: { cx, cy: (h - 366) / 2 + 40 },
   };
 }
-const MAX_LINES = 3; // lines on screen at once (fewer when a big crowd is spraying)
-const LINE_GAP_MS = 1300; // time between one line popping up and the next
+const LINE_GAP_MS = 900; // pause between one line leaving and the next popping up
 
 /**
  * Someone spraying. First a big name tag for a few seconds; then (if they
@@ -102,9 +107,9 @@ function bubble(t: ScreenTransfer) {
 function monogram(name: string) {
   return name.split(/[\s&]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join(' & ');
 }
-/** Each line stays up 2 to 5 seconds: longer lines get longer. */
+/** Each line stays up 4 to 8 seconds: longer lines get longer, so there's time to read them. */
 export function lineDuration(text: string) {
-  return Math.round(Math.min(5000, Math.max(2000, 1600 + text.length * 40)));
+  return Math.round(Math.min(8000, Math.max(4000, 2500 + text.length * 50)));
 }
 
 /** Puts its element into the arena on mount and takes it out on unmount. */
@@ -177,13 +182,14 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
     const t = setTimeout(() => setRaining(false), left + 2500); // + time for the last pieces to fall
     return () => clearTimeout(t);
   }, [rainUntil]);
+  // While there are lines to show, their corner is kept clear: names bounce off it like off the celebrant.
+  const hasLines = live && lines.length > 0;
   const arena = useMemo(() => new Arena(layout.arena, [layout.zone]), []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => arena.setBounds(layout.arena, [layout.zone]), [arena, layout]);
+  useEffect(() => arena.setBounds(layout.arena, hasLines ? [layout.zone, layout.lineZone] : [layout.zone]), [arena, layout, hasLines]);
   useEffect(() => () => arena.stop(), [arena]);
   const { canvas } = layout;
   const spraying = sprayers.some((s) => !s.leaving);
   const crowd = sprayers.filter((s) => !s.leaving && !s.mini).length + Math.floor(sprayers.filter((s) => !s.leaving && s.mini).length / 2);
-  const maxLines = phone ? 1 : crowd >= 7 ? 1 : crowd >= 4 ? 2 : MAX_LINES;
   // Names shrink a little as the screen fills (2 or fewer: full size), never below about three-quarters.
   const tagZoom = Math.max(phone ? 0.78 : 0.72, 1 - Math.max(0, crowd - 2) * (phone ? 0.07 : 0.05));
 
@@ -279,8 +285,8 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                 </div>
               </ArenaBody>
             ))}
-            <LineCycler lines={lines} arena={arena} max={maxLines} phone={phone} />
           </div>
+          <LineCycler lines={lines} phone={phone} box={layout.line} />
         </>
       ) : (
         <div className="st-notice">
@@ -583,24 +589,18 @@ export default memo(StageScreen);
 type ShownLine = { key: string; line: ScreenLine; until: number; leaving: boolean };
 
 /**
- * Approved lines pop up around the celebrant, a few at a time, each for 2 to 5
+ * Approved lines pop up one at a time in the top-left corner, each for 4 to 8
  * seconds (longer lines stay longer), cycling through all of them endlessly.
  * A newly approved line jumps the queue.
  */
-function LineCycler({ lines, arena, max, phone }: { lines: ScreenLine[]; arena: Arena; max: number; phone?: boolean }) {
-  const [shown, setShown] = useState<ShownLine[]>([]);
+function LineCycler({ lines, phone, box }: { lines: ScreenLine[]; phone?: boolean; box: { left: number; top: number; maxWidth: number } }) {
+  const [shown, setShown] = useState<ShownLine | null>(null);
   const linesRef = useRef(lines);
   linesRef.current = lines;
-  const maxRef = useRef(max);
-  maxRef.current = max;
-  const arenaRef = useRef(arena);
-  arenaRef.current = arena;
-  const phoneRef = useRef(phone);
-  phoneRef.current = phone;
   const next = useRef(0);
   const known = useRef<Set<string> | null>(null);
   const priority = useRef<string[]>([]);
-  const lastPop = useRef(0);
+  const freeAt = useRef(0);
   const count = useRef(0);
 
   // Newly approved lines go to the front of the queue.
@@ -615,51 +615,40 @@ function LineCycler({ lines, arena, max, phone }: { lines: ScreenLine[]; arena: 
     const id = setInterval(() => {
       const now = Date.now();
       setShown((cur) => {
-        let list = cur
-          .filter((s) => !(s.leaving && now >= s.until + 450)) // gone after fading out
-          .map((s) => (!s.leaving && now >= s.until ? { ...s, leaving: true } : s));
-        const ls = linesRef.current;
-        const onScreen = new Set(list.map((s) => s.line.id));
-        const active = list.filter((s) => !s.leaving).length;
-        const room = Math.min(maxRef.current, ls.length);
-        // Only when there's a free gap for it, so a new line never lands on someone's name.
-        const fits = arenaRef.current.roomFor(phoneRef.current ? 320 : 480, phoneRef.current ? 120 : 170);
-        if (ls.length && active < room && now - lastPop.current >= LINE_GAP_MS && fits) {
-          let pick: ScreenLine | undefined;
-          while (priority.current.length && !pick) {
-            const pid = priority.current.shift()!;
-            pick = ls.find((l) => l.id === pid && !onScreen.has(l.id));
-          }
-          for (let tries = 0; !pick && tries < ls.length; tries++) {
-            const cand = ls[next.current % ls.length];
-            next.current += 1;
-            if (!onScreen.has(cand.id)) pick = cand;
-          }
-          if (pick) {
-            lastPop.current = now;
-            count.current += 1;
-            list = [...list, { key: `l${pick.id}-${count.current}`, line: pick, until: now + lineDuration(pick.text), leaving: false }];
-          }
+        if (cur && !cur.leaving && now >= cur.until) return { ...cur, leaving: true }; // time's up: pop away
+        if (cur && cur.leaving && now >= cur.until + 450) {
+          freeAt.current = now + LINE_GAP_MS; // gone; a short pause before the next
+          return null;
         }
-        return list.length === cur.length && list.every((s, i) => s === cur[i]) ? cur : list;
+        if (cur || now < freeAt.current) return cur;
+        const ls = linesRef.current;
+        if (!ls.length) return null;
+        let pick: ScreenLine | undefined;
+        while (priority.current.length && !pick) {
+          const pid = priority.current.shift()!;
+          pick = ls.find((l) => l.id === pid);
+        }
+        if (!pick) {
+          pick = ls[next.current % ls.length];
+          next.current += 1;
+        }
+        count.current += 1;
+        return { key: `l${pick.id}-${count.current}`, line: pick, until: now + lineDuration(pick.text), leaving: false };
       });
     }, 250);
     return () => clearInterval(id);
   }, []);
 
+  if (!shown) return null;
   return (
-    <>
-      {shown.map((s) => (
-        <ArenaBody key={s.key} arena={arena} id={s.key} kind="line" leaving={s.leaving}>
-          <div className={`ln-bubble${s.leaving ? ' leaving' : ''}`}>
-            <div className="ln-head">
-              <Avatar name={s.line.name} photo={s.line.photo} size={phone ? 30 : 46} />
-              <span className="ln-name">{s.line.name}</span>
-            </div>
-            <div className="ln-text">“{s.line.text}”</div>
-          </div>
-        </ArenaBody>
-      ))}
-    </>
+    <div className="ln-corner" style={{ left: box.left, top: box.top, maxWidth: box.maxWidth }} aria-live="polite">
+      <div key={shown.key} className={`ln-bubble${shown.leaving ? ' leaving' : ''}`}>
+        <div className="ln-head">
+          <Avatar name={shown.line.name} photo={shown.line.photo} size={phone ? 30 : 46} />
+          <span className="ln-name">{shown.line.name}</span>
+        </div>
+        <div className="ln-text">“{shown.line.text}”</div>
+      </div>
+    </div>
   );
 }

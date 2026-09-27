@@ -178,11 +178,11 @@ export function ScreenForm({ eventId, values, aiReady }: { eventId: string; valu
         on={v.showComments && v.aiCommentFilter}
         disabled={!v.showComments}
         onChange={(on) => set({ aiCommentFilter: on })}
-        title="Smart rude-word filter (AI)"
+        title="Smart filter and grammar fix (AI)"
         hint={
           aiReady
-            ? 'AI reads each comment first: rude ones (in English, Pidgin, Yoruba, Igbo or Hausa) are dropped, and ones that meant well are politely reworded.'
-            : 'AI reads each comment first and drops or politely rewords rude ones. It isn’t switched on for DashPad yet, so the basic rude-word filter is used for now.'
+            ? 'AI reads each comment first: it fixes spelling and grammar (Pidgin stays Pidgin), drops rude ones (in English, Pidgin, Yoruba, Igbo or Hausa), and politely rewords ones that meant well.'
+            : 'AI reads each comment first, fixes its spelling and grammar, and drops or politely rewords rude ones. It isn’t switched on for DashPad yet, so the basic rude-word filter is used for now.'
         }
       />
       <Switch
