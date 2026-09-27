@@ -13,7 +13,10 @@ export const NOTES = [
   { base: '#6E4A2E', light: '#B98A5E', label: '1000' }, // brown, like the ₦1000
   { base: '#2F5FA7', light: '#7FA6DE', label: '500' }, // blue, like the ₦500
   { base: '#2E7A5A', light: '#79C19F', label: '200' }, // green
+  { base: '#8C2F5C', light: '#D98AB0', label: '100' }, // red-violet, like the ₦100
 ];
+/** The ₦100 note: what each sprayer throws (one note per ₦100 they sent). */
+export const NOTE_100 = 3;
 
 /** A naira note, drawn once at twice its size so it stays sharp. */
 export function noteSprite(n: (typeof NOTES)[number]): HTMLCanvasElement {
@@ -70,7 +73,7 @@ type Piece = {
 };
 
 /** Someone spraying. `money` (0 to 1): how many of their throws are naira notes rather than confetti. */
-export type Emitter = { id: number; x: number; y: number; perSecond: number; money?: number };
+export type Emitter = { id: number; x: number; y: number; perSecond: number; money?: number; note?: number };
 
 /**
  * People spraying: every emitter (a sprayer's name on screen) throws naira
@@ -88,7 +91,10 @@ export function SprayCanvas({
   height,
   className = '',
   style,
+  onThrow,
 }: {
+  /** Called as each sprayer throws (e.g. to flick their hand). */
+  onThrow?: (id: number) => void;
   emitters?: Emitter[];
   /** Live positions (e.g. from moving name tags), asked for every frame instead of `emitters`. */
   source?: () => Emitter[];
@@ -105,6 +111,8 @@ export function SprayCanvas({
   const readRef = useRef(read);
   const kick = useRef<() => void>(() => {});
   readRef.current = read;
+  const throwRef = useRef(onThrow);
+  throwRef.current = onThrow;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -131,7 +139,7 @@ export function SprayCanvas({
         w, h: isNote ? w / 2 : ribbon ? w * 0.5 : w, round: !isNote && !ribbon && r(0, 1) < 0.5,
         color: colors[Math.floor(r(0, colors.length))],
         rot: r(0, 6.28), vr: isNote ? r(-3, 3) : r(-7, 7), flip: r(0, 6.28), vf: isNote ? r(2, 4) : r(5, 11), drift: r(-40, 40),
-        note: isNote ? Math.floor(r(0, notes.length)) : -1,
+        note: isNote ? e.note ?? Math.floor(r(0, notes.length)) : -1,
       });
     };
 
@@ -142,11 +150,13 @@ export function SprayCanvas({
       for (const id of [...nextAt.keys()]) if (!ids.has(id)) nextAt.delete(id);
       for (const e of live) {
         const due = nextAt.get(e.id);
-        if (due === undefined) nextAt.set(e.id, now + r(0, 300));
+        if (e.perSecond <= 0) continue;
+        if (due === undefined) nextAt.set(e.id, now + r(200, 600));
         else if (now >= due) {
           spawn(e, now);
-          // Usually one piece a second, now and then two.
-          nextAt.set(e.id, now + (1000 / e.perSecond) * (r(0, 1) < 0.25 ? 0.5 : 1) * r(0.85, 1.15));
+          throwRef.current?.(e.id);
+          // At their own pace, a little uneven like a real hand.
+          nextAt.set(e.id, now + (1000 / e.perSecond) * r(0.85, 1.15));
         }
       }
 

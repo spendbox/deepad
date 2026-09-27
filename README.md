@@ -32,10 +32,11 @@ description. Senders stay anonymous on screen.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
 - The big screen never shows amounts. Each sprayer appears around the celebrant as their first name
-  and initials. Whoever just sprayed gets the **spotlight** for a few seconds (longer for a big spray): their
-  name steps forward and glows, they throw a fast stream of naira notes onto the celebrant, and everyone else
-  fades back. New sprayers take turns in the spotlight (turns get shorter when a crowd is waiting). The
-  confetti falling over the whole screen is kept light, so the sprayer is always the main show.
+  and initials, with a hand underneath that throws a **₦100 note onto the celebrant for every ₦100 sent**.
+  Bigger sprays throw faster (`lib/spray-pace.ts`): ₦5,000 is a note every 2.5 s (about 2 minutes),
+  ₦10,000 every 1.75 s (about 3 minutes), ₦100,000 about twice a second (10 minutes); never over 30 minutes.
+  Everyone spraying keeps their full name tag; when the screen fills up, the one spraying longest carries on
+  as a small bubble. The confetti falling over the whole screen is kept light, so the sprayers are the show.
 - Lines on the screen come only from the planner (dashboard) or guests (the shareable `/write` page).
   Guests' lines wait for the planner's approval (one by one or in bulk); only approved lines show, one at
   a time in the top-left corner, and the screen cycles through them endlessly. A secret view-only page (`/lines/<token>`) shows every line
@@ -71,7 +72,8 @@ description. Senders stay anonymous on screen.
    (Run it again after updates; it is safe to repeat. It also creates the `celebrant-photos` storage folder.)
 2. **Vercel:** add every setting in `.env.example`, then redeploy.
 3. **Paystack:** set the webhook URL to `https://<your-site>/api/webhooks/paystack`.
-   Paystack must have *Dedicated Virtual Accounts* enabled on your business.
+   Paystack must have *Dedicated Virtual Accounts* enabled on your business. Event account numbers
+   come from Paystack-Titan (set `PAYSTACK_DVA_BANK=wema-bank` to use Wema Bank instead).
 4. **Resend:** create an account, verify your domain, and add `RESEND_API_KEY` and `EMAIL_FROM`.
 
 ## For developers

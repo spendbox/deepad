@@ -3,13 +3,14 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Arena, type BodyKind } from '@/components/arena';
 import Avatar from '@/components/Avatar';
-import { SprayCanvas } from '@/components/Confetti';
+import { NOTE_100, SprayCanvas } from '@/components/Confetti';
 import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import Logo from '@/components/Logo';
 import Rain from '@/components/Rain';
 import type { ScreenFeed, ScreenLine, ScreenTransfer } from '@/lib/events';
 import { isCutout } from '@/lib/photos';
+import { NAIRA_PER_NOTE, noteIntervalMs } from '@/lib/spray-pace';
 import type { ScreenTheme } from '@/lib/themes';
 
 // The big-screen layout, drawn in design pixels and scaled to fit: 1920 wide
@@ -88,21 +89,44 @@ function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean) {
 const LINE_GAP_MS = 900; // pause between one line leaving and the next popping up
 
 /**
- * Someone spraying. First a big name tag for a few seconds; then (if they
- * sprayed enough to keep going) a small bubble that keeps throwing confetti,
- * one piece a second, until their spray is used up.
+ * Someone spraying: their name tag with a hand underneath that throws ₦100 notes
+ * onto the celebrant, one per ₦100 they sent, until it's all sprayed. When the
+ * screen fills up, the one spraying longest carries on as a small bubble.
+ * `done`: finished spraying, just resting on screen (no hand, no throws).
  */
-export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean; spot: boolean };
+export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean; done: boolean };
 
-/**
- * How fast each sprayer throws, and how much of it is naira notes. The person in the
- * spotlight sprays a fast stream of notes onto the celebrant, like spraying a wad by
- * hand; everyone else throws gently (or not at all) so the star stands out.
- */
-function sprayRate(s: ActiveSprayer, someoneInSpotlight: boolean, phone: boolean): { perSecond: number; money: number } {
-  if (s.spot) return s.t.big ? { perSecond: phone ? 6 : 8, money: 0.8 } : { perSecond: phone ? 4 : 5, money: 0.7 };
-  if (s.mini) return { perSecond: someoneInSpotlight ? 0 : 0.4, money: 0 };
-  return someoneInSpotlight ? { perSecond: 0.3, money: 0 } : { perSecond: 1, money: 0.3 };
+/** Everyone spraying throws ₦100 notes at their own pace: faster for bigger sprays (lib/spray-pace.ts). */
+function sprayRate(s: ActiveSprayer): { perSecond: number; money: number } {
+  if (s.done) return { perSecond: 0, money: 0 };
+  return { perSecond: 1000 / noteIntervalMs((s.t.pieces || 1) * NAIRA_PER_NOTE), money: 1 };
+}
+
+/** A hand coming out from under the name, holding up a fan of ₦100 notes; it flicks with every throw. */
+function SprayHand({ size }: { size: number }) {
+  return (
+    <span className="sp-hand" style={{ width: size, height: size }} aria-hidden="true">
+      <svg className="sp-hand-i" viewBox="0 0 80 80" width={size} height={size}>
+        {/* the fan of ₦100 notes, held up */}
+        <g transform="translate(47 36)">
+          {[-48, -22, 4, 30].map((a) => (
+            <g key={a} transform={`rotate(${a})`}>
+              <rect x="-8" y="-34" width="16" height="32" rx="2.5" fill="#8C2F5C" stroke="#F1C3DA" strokeWidth="1.6" />
+              <circle cx="0" cy="-25" r="3.6" fill="#D98AB0" />
+              <rect x="-4" y="-15" width="8" height="2.4" rx="1" fill="#F1C3DA" />
+            </g>
+          ))}
+        </g>
+        {/* the arm, with a sleeve in the party colour */}
+        <path d="M44 50 L30 80" stroke="#7A4A33" strokeWidth="15" strokeLinecap="round" />
+        <path d="M34 70 L26 86" stroke="var(--s-accent)" strokeWidth="21" />
+        {/* the fist gripping the notes */}
+        <rect x="34" y="32" width="26" height="21" rx="9" fill="#8A5A40" />
+        <path d="M40 38 H56 M40 43.5 H56 M40 49 H55" stroke="#6E4530" strokeWidth="1.6" strokeLinecap="round" />
+        <ellipse cx="35.5" cy="38" rx="5.5" ry="8" transform="rotate(-18 35.5 38)" fill="#9A6A4C" />
+      </svg>
+    </span>
+  );
 }
 
 function clock(iso: string) {
@@ -203,8 +227,6 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
   useEffect(() => () => arena.stop(), [arena]);
   const { canvas } = layout;
   const spraying = sprayers.some((s) => !s.leaving);
-  // Someone just sprayed: they're the star; everything else steps back for a moment.
-  const spotlight = sprayers.some((s) => s.spot && !s.leaving);
   const crowd = sprayers.filter((s) => !s.leaving && !s.mini).length + Math.floor(sprayers.filter((s) => !s.leaving && s.mini).length / 2);
   // Names shrink a little as the screen fills (2 or fewer: full size), never below about three-quarters.
   const tagZoom = Math.max(phone ? 0.78 : 0.72, 1 - Math.max(0, crowd - 2) * (phone ? 0.07 : 0.05));
@@ -266,7 +288,8 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
             style={{ left: 0, top: 0, zIndex: 4 }}
           />
           <SprayCanvas
-            source={() => arena.emitters().map((m) => ({ ...m, x: m.x - canvas.left, y: m.y - canvas.top }))}
+            source={() => arena.emitters().map((m) => ({ ...m, note: NOTE_100, x: m.x - canvas.left, y: m.y - canvas.top }))}
+            onThrow={(id) => arena.flick(id)}
             active={spraying}
             target={layout.target}
             width={canvas.width}
@@ -274,7 +297,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
             style={{ left: canvas.left, top: canvas.top, zIndex: 4 }}
           />
           <div
-            className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}${spotlight ? ' spotlit' : ''}`}
+            className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`}
             style={{ '--tz': tagZoom.toFixed(2) } as React.CSSProperties}
             aria-live="polite"
           >
@@ -285,10 +308,11 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                 id={`s${s.t.id}`}
                 kind="sprayer"
                 big={s.t.big && !s.mini}
-                {...sprayRate(s, spotlight, phone)}
+                {...sprayRate(s)}
                 leaving={s.leaving}
               >
-                <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.spot ? ' spot' : ''}${s.t.comment && !s.mini ? ' has-cmt' : ''}${s.leaving ? ' leaving' : ''}`}>
+                <div className={`sp-unit${s.done ? ' done' : ''}${s.leaving ? ' leaving' : ''}`}>
+                <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.done ? '' : ' active'}${s.t.comment && !s.mini ? ' has-cmt' : ''}${s.leaving ? ' leaving' : ''}`}>
                   {s.t.big && !s.mini && <span className="sp-badge">Big spray!</span>}
                   <Avatar
                     name={s.t.firstName ?? 'Guest'}
@@ -301,10 +325,12 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                     {s.t.comment && !s.mini && <span className="sp-cmt">“{s.t.comment}”</span>}
                   </span>
                 </div>
+                {!s.done && <SprayHand size={s.mini ? (phone ? 36 : 54) : s.t.big ? (phone ? 64 : 110) : phone ? 50 : 86} />}
+                </div>
               </ArenaBody>
             ))}
           </div>
-          <LineCycler lines={lines} phone={phone} box={layout.line} quiet={spotlight} />
+          <LineCycler lines={lines} phone={phone} box={layout.line} />
         </>
       ) : (
         <div className="st-notice">
@@ -611,7 +637,7 @@ type ShownLine = { key: string; line: ScreenLine; until: number; leaving: boolea
  * seconds (longer lines stay longer), cycling through all of them endlessly.
  * A newly approved line jumps the queue.
  */
-function LineCycler({ lines, phone, box, quiet }: { lines: ScreenLine[]; phone?: boolean; box: { left: number; top: number; maxWidth: number }; quiet?: boolean }) {
+function LineCycler({ lines, phone, box }: { lines: ScreenLine[]; phone?: boolean; box: { left: number; top: number; maxWidth: number } }) {
   const [shown, setShown] = useState<ShownLine | null>(null);
   const linesRef = useRef(lines);
   linesRef.current = lines;
@@ -659,7 +685,7 @@ function LineCycler({ lines, phone, box, quiet }: { lines: ScreenLine[]; phone?:
 
   if (!shown) return null;
   return (
-    <div className={`ln-corner${quiet ? ' quiet' : ''}`} style={{ left: box.left, top: box.top, maxWidth: box.maxWidth }} aria-live="polite">
+    <div className="ln-corner" style={{ left: box.left, top: box.top, maxWidth: box.maxWidth }} aria-live="polite">
       <div key={shown.key} className={`ln-bubble${shown.leaving ? ' leaving' : ''}`}>
         <div className="ln-head">
           <Avatar name={shown.line.name} photo={shown.line.photo} size={phone ? 30 : 46} />

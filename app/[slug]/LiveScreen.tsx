@@ -6,6 +6,7 @@ import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { keepAwake } from '@/lib/wake';
 import { alertSoundBlocked, playAlert, unlockAlertSound } from '@/lib/alert-sound';
+import { sprayDurationMs } from '@/lib/spray-pace';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import StageScreen, { type ActiveSprayer, type StageMode, type StageSize } from './StageScreen';
 import { screenIdFor, useLiveCamera } from './useLiveCamera';
@@ -13,35 +14,27 @@ import './stage.css';
 
 const POLL_MS = 2000;
 const PHOTO_MS = 7000; // each celebrant photo shows this long
-// New sprayers step in one after another, each getting the spotlight for a moment (like stepping onto the
-// dance floor one at a time). A crowd waiting? Turns get shorter so nobody waits long.
-const SPOT_MS = 6000; // how long a new sprayer is the star of the screen
-const BIG_SPOT_MS = 10000; // a big sprayer gets longer
-function joinGap(waiting: number) {
-  return waiting > 8 ? 900 : waiting > 3 ? 1800 : 3000;
-}
+const JOIN_GAP_MS = 600; // new sprayers step in one after another, not all at once
 const LEAVE_MS = 700; // time for a name tag to fade away
-const PIECE_MS = 1000; // each piece of confetti (one per ₦100 sprayed) is a second of spraying
-const MIN_STAY_MS = 8000; // even a small spray stays long enough to read the name
-const TAG_MS = 12000; // the big name tag, before it becomes a small bubble that keeps spraying
-const BIG_TAG_MS = 15000; // a big sprayer's tag stays up this long, bigger and glowing
 // Confetti and money rain over the whole screen for as long as anyone is spraying. Each new sprayer
 // sets off a burst on top, longer and stronger for bigger sprays (by spray size, weight 1-4; big last).
 const BURST_MS = [0, 3000, 4500, 6000, 8000];
 const BIG_BURST_MS = 10000;
 // The last person spraying stays (and keeps spraying) up to 2 more minutes, until someone new comes.
 const LINGER_MS = 120_000;
-// How many name tags and small bubbles fit at once, before others wait (tags) or bow out (bubbles).
+// How many full name tags and small bubbles fit at once. Everyone spraying keeps their full name tag
+// (with their hand throwing money) until the screen fills up; then the one spraying longest shrinks to a
+// small bubble that keeps spraying, to make room. Bubbles beyond the limit bow out.
 const LIMITS: Record<StageMode, { tags: number; minis: number }> = { tv: { tags: 8, minis: 14 }, phone: { tags: 3, minis: 5 } };
 // Design sizes the layout is drawn at, then scaled (and stretched to the screen's shape).
 const BASE: Record<StageMode, { w: number; h: number }> = { tv: { w: 1920, h: 1080 }, phone: { w: 540, h: 960 } };
 
 type Props = { code: string; initialFeed: ScreenFeed };
-type Sprayer = ActiveSprayer & { until: number; tagUntil: number; joinedAt: number; leftAt?: number; lingering?: boolean };
+type Sprayer = ActiveSprayer & { until: number; joinedAt: number; leftAt?: number; lingering?: boolean };
 
-/** How long someone keeps spraying: a second per piece, one piece per ₦100 (at most 30 minutes). */
+/** How long someone keeps spraying: one ₦100 note per throw, faster for bigger sprays (lib/spray-pace.ts). */
 function stayMs(t: ScreenTransfer) {
-  return Math.max(MIN_STAY_MS, (t.pieces || 1) * PIECE_MS);
+  return sprayDurationMs(t.pieces || 1);
 }
 
 export default function LiveScreen({ code, initialFeed }: Props) {
@@ -54,23 +47,18 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const [sprayers, setSprayers] = useState<Sprayer[]>([]);
   const [burst, setBurst] = useState({ until: 0, big: false });
   // The screen was opened (or reloaded) while people were spraying: they carry on where they were.
-  // Someone who sprayed seconds ago gets their big moment; others continue as small bubbles. If
-  // nobody's spray is still going, the most recent sprayer lingers, as they would have on screen.
+  // The most recent ones get full name tags; others continue as small bubbles. If nobody's spray is
+  // still going, the most recent sprayer lingers, as they would have on screen.
   useEffect(() => {
     const at = Date.now();
     const recent = initialFeed.recent.map((t) => ({ t, at: new Date(t.createdAt).getTime() }));
-    const resumed: Sprayer[] = recent
-      .filter(({ t, at: made }) => made + stayMs(t) > at + 2000)
-      .slice(-LIMITS.tv.minis)
-      .map(({ t, at: made }, i) => {
-        const until = made + stayMs(t);
-        const tagUntil = Math.min(until, made + (t.big ? BIG_TAG_MS : TAG_MS));
-        return { t, slot: i, leaving: false, mini: at >= tagUntil, spot: false, joinedAt: made, tagUntil, until };
-      });
+    const still = recent.filter(({ t, at: made }) => made + stayMs(t) > at + 2000).slice(-(LIMITS.tv.tags + LIMITS.tv.minis));
+    const resumed: Sprayer[] = still.map(({ t, at: made }, i) => ({
+      t, slot: i, leaving: false, mini: i < still.length - LIMITS.tv.tags, done: false, joinedAt: made, until: made + stayMs(t),
+    }));
     const last = recent[recent.length - 1];
     if (!resumed.length && last && last.at + stayMs(last.t) + LINGER_MS > at) {
-      const tagUntil = last.at + (last.t.big ? BIG_TAG_MS : TAG_MS);
-      resumed.push({ t: last.t, slot: 0, leaving: false, mini: false, spot: false, joinedAt: last.at, tagUntil, lingering: true, until: last.at + stayMs(last.t) + LINGER_MS });
+      resumed.push({ t: last.t, slot: 0, leaving: false, mini: false, done: true, joinedAt: last.at, lingering: true, until: last.at + stayMs(last.t) + LINGER_MS });
     }
     if (resumed.length) {
       setSprayers(resumed);
@@ -161,30 +149,33 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       if (now >= s.until) {
         if (!s.lingering && !lingerTaken && !waiting.length && !othersSpraying(s)) {
           lingerTaken = true;
-          return { ...s, lingering: true, mini: false, until: now + LINGER_MS }; // alone on screen: back to the full name tag
+          // Alone on screen: back to the full name tag, resting (no longer throwing).
+          return { ...s, lingering: true, done: true, mini: false, until: now + LINGER_MS };
         }
         return { ...s, leaving: true, leftAt: now }; // spray used up
       }
-      if (!s.mini && !s.lingering && now >= s.tagUntil) {
-        // The big tag makes way for others; the person keeps spraying as a small bubble (if there's room).
-        if (minis < limits.minis) {
-          minis += 1;
-          return { ...s, mini: true };
-        }
-        return { ...s, leaving: true, leftAt: now };
-      }
       return s;
     });
-    if (live && !paused && waiting.length && now - lastJoin.current >= joinGap(waiting.length)) {
+    if (live && !paused && waiting.length && now - lastJoin.current >= JOIN_GAP_MS) {
       const [next, ...rest] = waiting;
-      const tags = list.filter((s) => !s.mini && !s.leaving).length;
-      if (tags < limits.tags || next.big) {
+      {
         const until = now + stayMs(next);
-        // A crowd waiting? Tags make way sooner so everyone gets a turn.
-        const tagMs = next.big ? BIG_TAG_MS : Math.max(6000, TAG_MS * (rest.length > 4 ? 0.5 : 1));
         // Someone new: whoever was lingering on their own makes way.
         list = list.map((s) => (s.lingering && !s.leaving ? { ...s, leaving: true, leftAt: now } : s));
-        list = [...list, { t: next, slot: list.length, leaving: false, mini: false, spot: false, joinedAt: now, tagUntil: Math.min(until, now + tagMs), until }];
+        // Screen full of name tags? The one spraying longest shrinks to a small bubble (still spraying) to make room.
+        const tags = list.filter((s) => !s.mini && !s.leaving);
+        if (tags.length >= limits.tags) {
+          const oldest = tags.filter((s) => !s.t.big).sort((a, b) => a.joinedAt - b.joinedAt)[0] ?? tags.sort((a, b) => a.joinedAt - b.joinedAt)[0];
+          list = list.map((s) => (s !== oldest ? s : minis < limits.minis ? { ...s, mini: true } : { ...s, leaving: true, leftAt: now }));
+          if (minis < limits.minis) minis += 1;
+        }
+        // Too many bubbles: the one closest to finishing bows out.
+        const bubbles = list.filter((s) => s.mini && !s.leaving);
+        if (bubbles.length > limits.minis) {
+          const first = bubbles.sort((a, b) => a.until - b.until)[0];
+          list = list.map((s) => (s === first ? { ...s, leaving: true, leftAt: now } : s));
+        }
+        list = [...list, { t: next, slot: list.length, leaving: false, mini: false, done: false, joinedAt: now, until }];
         setWaiting(rest);
         lastJoin.current = now;
         // The bank-alert sound, as each new sprayer steps in (if the planner left it on).
@@ -194,10 +185,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         setBurst((b) => ({ until: Math.max(b.until, now + len), big: next.big || (b.big && b.until > now) }));
       }
     }
-    // The spotlight: the newest sprayer, for a few seconds after they step in. Everyone else steps back.
-    const newest = list.filter((s) => !s.leaving && !s.mini).reduce<Sprayer | null>((m, s) => (!m || s.joinedAt > m.joinedAt ? s : m), null);
-    const star = newest && now - newest.joinedAt < (newest.t.big ? BIG_SPOT_MS : SPOT_MS) ? newest : null;
-    list = list.map((s) => ((s === star) === s.spot ? s : { ...s, spot: s === star }));
     if (list.length !== sprayers.length || list.some((s, i) => s !== sprayers[i])) setSprayers(list);
   }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -277,9 +264,9 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // It rains for as long as anyone is still spraying (so bigger sprays keep it going longer).
   const rainUntil = sprayers.reduce((m, s) => (s.leaving ? m : Math.max(m, s.until)), 0);
   // Only a new list when someone arrives or leaves, so the screen redraws only then.
-  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}${s.mini ? 'm' : ''}${s.spot ? 's' : ''}${s.t.firstName ?? ''}|${s.t.comment ?? ''}`).join(',');
+  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}${s.mini ? 'm' : ''}${s.done ? 'd' : ''}${s.t.firstName ?? ''}|${s.t.comment ?? ''}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const shownSprayers = useMemo<ActiveSprayer[]>(() => sprayers.map(({ t, slot, leaving, mini, spot }) => ({ t, slot, leaving, mini, spot })), [sprayerKey]);
+  const shownSprayers = useMemo<ActiveSprayer[]>(() => sprayers.map(({ t, slot, leaving, mini, done }) => ({ t, slot, leaving, mini, done })), [sprayerKey]);
 
   const fullScreenButton = (
     <button

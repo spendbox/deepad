@@ -57,21 +57,17 @@
 .sp-tag.has-cmt { border-radius: 44px; padding-top: 10px; padding-bottom: 12px; }
 .sp-tag.big.has-cmt { border-radius: 64px; }
 .sp-tag.big .sp-cmt { max-width: 620px; font-size: 38px; font-weight: 700; }
-/* The spotlight: whoever just sprayed steps forward, a little bigger, glowing, with a soft light behind
-   them; everyone else steps back (fainter) until their moment passes. */
-/* (Dimmed on the wrapper: the tags' own pop-in animation holds their opacity.) */
-.st-arena .ab { transition: opacity .5s ease, filter .5s ease; }
-.st-arena.spotlit .ab:not(:has(.spot)) { opacity: .4; filter: saturate(.6); }
-.st-arena .sp-tag.spot { zoom: 1.12; border: 4px solid var(--s-accent); box-shadow: 0 0 0 10px color-mix(in srgb, var(--s-accent) 22%, transparent), 0 24px 60px -18px rgba(0, 0, 0, .6); z-index: 2; }
-.st-arena .sp-tag.big.spot { zoom: 1.08; }
-.st-arena .sp-tag.spot::after {
-  content: ''; position: absolute; inset: -60px; border-radius: 999px; z-index: -1; pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--s-accent) 40%, transparent), transparent);
-  animation: spGlow 1.6s ease-in-out infinite;
-}
-.ab:has(.spot) { z-index: 2; }
-.ln-corner { transition: opacity .5s ease; }
-.ln-corner.quiet { opacity: .35; }
+/* Everyone spraying: their name, with a hand underneath (on the side facing the celebrant) that
+   flicks as it throws each ₦100 note. The arena sets data-side as they move around. */
+.sp-unit { display: flex; flex-direction: column; align-items: flex-end; }
+.ab[data-side='l'] .sp-unit { align-items: flex-start; }
+.sp-hand { display: block; margin: -10px 30px 0; transition: opacity .4s ease; }
+.ab[data-side='l'] .sp-hand { transform: scaleX(-1); }
+.sp-hand-i { display: block; transform-origin: 38% 100%; overflow: visible; }
+.sp-unit.leaving .sp-hand { opacity: 0; }
+/* Actively spraying: a ring in the party colour. Finished and just resting: quieter. */
+.st-arena .sp-tag.active:not(.big) { box-shadow: 0 0 0 3px color-mix(in srgb, var(--s-accent) 70%, transparent), 0 10px 26px -14px rgba(0, 0, 0, .45); }
+.sp-unit.done .sp-tag { opacity: .8; }
 @keyframes spIn { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes spOut { to { transform: scale(.6); opacity: 0; } }
 
@@ -156,7 +152,7 @@
 .st-pay-note svg { flex-shrink: 0; margin-top: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .sp-tag.spot::after, .ln-bubble, .ln-corner .ln-bubble { animation: none; }
+  .st-dot, .sp-tag, .sp-tag.big, .sp-tag.big::before, .ln-bubble, .ln-corner .ln-bubble { animation: none; }
   .sp-tag.leaving, .ln-bubble.leaving { opacity: 0; }
 }
 
@@ -247,8 +243,7 @@
 .st.phone .sp-cmt { max-width: 230px; font-size: 18px; }
 .st.phone .sp-tag.big .sp-cmt { max-width: 280px; font-size: 20px; }
 .st.phone .sp-tag.has-cmt { border-radius: 26px; }
-.st.phone .st-arena .sp-tag.spot { border-width: 3px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--s-accent) 22%, transparent); }
-.st.phone .st-arena .sp-tag.spot::after { inset: -30px; }
+.st.phone .sp-hand { margin: -6px 14px 0; }
 .st.phone .ln-bubble { max-width: 300px; padding: 10px 14px 12px; gap: 6px; border-radius: 18px 18px 18px 6px; }
 .st.phone .ln-head { gap: 8px; }
 .st.phone .ln-name { font-size: 15px; }

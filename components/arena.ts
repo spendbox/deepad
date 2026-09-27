@@ -136,17 +136,47 @@ export class Arena {
     if (b) { b.perSecond = perSecond; b.money = money; }
   }
 
-  /** Where the sprayers are right now, for the confetti. */
+  /**
+   * Where the sprayers are right now, for the confetti: at their hand (the element
+   * marked .sp-hand), or the middle of their name tag if they have none.
+   */
   emitters() {
     const out: { id: number; x: number; y: number; perSecond: number; money: number }[] = [];
     for (const b of this.bodies.values()) {
-      if (b.kind === 'sprayer' && !b.leaving && b.perSecond > 0) out.push({ id: hash(b.id), x: b.x, y: b.y, perSecond: b.perSecond, money: b.money });
+      if (b.kind !== 'sprayer' || b.leaving || b.perSecond <= 0) continue;
+      const hand = b.el.querySelector<HTMLElement>('.sp-hand');
+      const x = hand ? b.x - b.w / 2 + hand.offsetLeft + hand.offsetWidth * 0.6 : b.x;
+      const y = hand ? b.y - b.h / 2 + hand.offsetTop + hand.offsetHeight * 0.2 : b.y;
+      out.push({ id: hash(b.id), x, y, perSecond: b.perSecond, money: b.money });
     }
     return out;
   }
 
+  /** A sprayer just threw a note: flick their hand. */
+  flick(emitterId: number) {
+    for (const b of this.bodies.values()) {
+      if (hash(b.id) !== emitterId) continue;
+      b.el.querySelector('.sp-hand-i')?.animate?.(
+        [
+          { transform: 'rotate(0deg)' },
+          { transform: 'rotate(-16deg)', offset: 0.3 },
+          { transform: 'rotate(24deg)', offset: 0.6 },
+          { transform: 'rotate(0deg)' },
+        ],
+        { duration: 420, easing: 'ease-out' },
+      );
+      return;
+    }
+  }
+
   private place(b: Body) {
     b.el.style.transform = `translate3d(${(b.x - b.w / 2).toFixed(1)}px, ${(b.y - b.h / 2).toFixed(1)}px, 0)`;
+    // Which side of the celebrant they're on, so their hand throws toward the celebrant.
+    const zone = this.obstacles[0];
+    if (zone) {
+      const side = b.x < (zone.x0 + zone.x1) / 2 ? 'r' : 'l';
+      if (b.el.dataset.side !== side) b.el.dataset.side = side;
+    }
   }
 
   private step(dt: number) {
