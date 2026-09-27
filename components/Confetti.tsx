@@ -91,10 +91,7 @@ export function SprayCanvas({
   height,
   className = '',
   style,
-  onThrow,
 }: {
-  /** Called as each sprayer throws (e.g. to flick their hand). */
-  onThrow?: (id: number) => void;
   emitters?: Emitter[];
   /** Live positions (e.g. from moving name tags), asked for every frame instead of `emitters`. */
   source?: () => Emitter[];
@@ -111,8 +108,6 @@ export function SprayCanvas({
   const readRef = useRef(read);
   const kick = useRef<() => void>(() => {});
   readRef.current = read;
-  const throwRef = useRef(onThrow);
-  throwRef.current = onThrow;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -154,8 +149,7 @@ export function SprayCanvas({
         if (due === undefined) nextAt.set(e.id, now + r(200, 600));
         else if (now >= due) {
           spawn(e, now);
-          throwRef.current?.(e.id);
-          // At their own pace, a little uneven like a real hand.
+          // At their own pace, a little uneven, like spraying by hand.
           nextAt.set(e.id, now + (1000 / e.perSecond) * r(0.85, 1.15));
         }
       }

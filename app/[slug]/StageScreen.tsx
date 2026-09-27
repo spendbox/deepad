@@ -89,10 +89,10 @@ function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean) {
 const LINE_GAP_MS = 900; // pause between one line leaving and the next popping up
 
 /**
- * Someone spraying: their name tag with a hand underneath that throws ₦100 notes
- * onto the celebrant, one per ₦100 they sent, until it's all sprayed. When the
+ * Someone spraying: their name tag throws ₦100 notes onto the celebrant, one per
+ * ₦100 they sent, until it's all sprayed. When the
  * screen fills up, the one spraying longest carries on as a small bubble.
- * `done`: finished spraying, just resting on screen (no hand, no throws).
+ * `done`: finished spraying, just resting on screen (no throws).
  */
 export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean; done: boolean };
 
@@ -100,33 +100,6 @@ export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean;
 function sprayRate(s: ActiveSprayer): { perSecond: number; money: number } {
   if (s.done) return { perSecond: 0, money: 0 };
   return { perSecond: 1000 / noteIntervalMs((s.t.pieces || 1) * NAIRA_PER_NOTE), money: 1 };
-}
-
-/** A hand coming out from under the name, holding up a fan of ₦100 notes; it flicks with every throw. */
-function SprayHand({ size }: { size: number }) {
-  return (
-    <span className="sp-hand" style={{ width: size, height: size }} aria-hidden="true">
-      <svg className="sp-hand-i" viewBox="0 0 80 80" width={size} height={size}>
-        {/* the fan of ₦100 notes, held up */}
-        <g transform="translate(47 36)">
-          {[-48, -22, 4, 30].map((a) => (
-            <g key={a} transform={`rotate(${a})`}>
-              <rect x="-8" y="-34" width="16" height="32" rx="2.5" fill="#8C2F5C" stroke="#F1C3DA" strokeWidth="1.6" />
-              <circle cx="0" cy="-25" r="3.6" fill="#D98AB0" />
-              <rect x="-4" y="-15" width="8" height="2.4" rx="1" fill="#F1C3DA" />
-            </g>
-          ))}
-        </g>
-        {/* the arm, with a sleeve in the party colour */}
-        <path d="M44 50 L30 80" stroke="#7A4A33" strokeWidth="15" strokeLinecap="round" />
-        <path d="M34 70 L26 86" stroke="var(--s-accent)" strokeWidth="21" />
-        {/* the fist gripping the notes */}
-        <rect x="34" y="32" width="26" height="21" rx="9" fill="#8A5A40" />
-        <path d="M40 38 H56 M40 43.5 H56 M40 49 H55" stroke="#6E4530" strokeWidth="1.6" strokeLinecap="round" />
-        <ellipse cx="35.5" cy="38" rx="5.5" ry="8" transform="rotate(-18 35.5 38)" fill="#9A6A4C" />
-      </svg>
-    </span>
-  );
 }
 
 function clock(iso: string) {
@@ -289,7 +262,6 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
           />
           <SprayCanvas
             source={() => arena.emitters().map((m) => ({ ...m, note: NOTE_100, x: m.x - canvas.left, y: m.y - canvas.top }))}
-            onThrow={(id) => arena.flick(id)}
             active={spraying}
             target={layout.target}
             width={canvas.width}
@@ -325,7 +297,6 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                     {s.t.comment && !s.mini && <span className="sp-cmt">“{s.t.comment}”</span>}
                   </span>
                 </div>
-                {!s.done && <SprayHand size={s.mini ? (phone ? 36 : 54) : s.t.big ? (phone ? 64 : 110) : phone ? 50 : 86} />}
                 </div>
               </ArenaBody>
             ))}
@@ -358,12 +329,12 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
             <div className="mp-bottom">
               <div className="st-pay-field">
                 <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={30} />
+                <FitText className="st-bank" text={e.accountBank ?? ''} max={19} />
               </div>
               {e.accountName && (
                 <div className="st-pay-field right">
                   <div className="st-pay-label">Account name</div>
-                  <FitText className="st-acct-name-v" text={e.accountName} max={19} />
+                  <FitText className="st-acct-name-v" text={e.accountName} max={20} />
                 </div>
               )}
             </div>
@@ -382,14 +353,14 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
               <div className="st-pay-divider" aria-hidden="true" />
               <div className="st-pay-field">
                 <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={62} />
+                <FitText className="st-bank" text={e.accountBank ?? ''} max={44} />
               </div>
               {e.accountName && (
                 <>
                   <div className="st-pay-divider" aria-hidden="true" />
                   <div className="st-pay-field">
                     <div className="st-pay-label">Account name</div>
-                    <FitText className="st-acct-name-v" text={e.accountName} max={36} />
+                    <FitText className="st-acct-name-v" text={e.accountName} max={32} />
                   </div>
                 </>
               )}
@@ -401,28 +372,29 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
               <BankIcon />
               Transfer any amount to spray {e.celebrantName}
             </div>
+            {/* The account number is the one big thing; the bank and account name sit beside it, smaller. */}
             <div className="st-pay-main">
               <div className="st-pay-field">
                 <div className="st-pay-label">Account number</div>
-                <FitText className="st-acct" text={acct} max={118} />
+                <FitText className="st-acct" text={acct} max={124} />
               </div>
               <div className="st-pay-divider" aria-hidden="true" />
-              <div className="st-pay-field right">
-                <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={104} />
+              <div className="st-pay-side">
+                <div className="st-pay-field">
+                  <div className="st-pay-label">Bank</div>
+                  <FitText className="st-bank" text={e.accountBank ?? ''} max={50} />
+                </div>
+                {e.accountName && (
+                  <div className="st-pay-field">
+                    <div className="st-pay-label">Account name</div>
+                    <FitText className="st-acct-name-v" text={e.accountName} max={38} />
+                  </div>
+                )}
               </div>
             </div>
-            <div className="st-pay-foot">
-              {e.accountName ? (
-                <div className="st-acct-name">
-                  <div className="st-pay-label">Account name</div>
-                  <FitText className="st-acct-name-v" text={e.accountName} max={40} />
-                </div>
-              ) : <span />}
-              <span className="st-pay-note">
-                <ClockIcon />
-                <span>Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</span>
-              </span>
+            <div className="st-pay-note">
+              <ClockIcon />
+              <span>Transfers can take up to a minute to show. Only confirmed transfers appear, and amounts are never shown.</span>
             </div>
           </footer>
         )

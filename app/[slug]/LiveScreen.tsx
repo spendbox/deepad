@@ -23,7 +23,7 @@ const BIG_BURST_MS = 10000;
 // The last person spraying stays (and keeps spraying) up to 2 more minutes, until someone new comes.
 const LINGER_MS = 120_000;
 // How many full name tags and small bubbles fit at once. Everyone spraying keeps their full name tag
-// (with their hand throwing money) until the screen fills up; then the one spraying longest shrinks to a
+// until the screen fills up; then the one spraying longest shrinks to a
 // small bubble that keeps spraying, to make room. Bubbles beyond the limit bow out.
 const LIMITS: Record<StageMode, { tags: number; minis: number }> = { tv: { tags: 8, minis: 14 }, phone: { tags: 3, minis: 5 } };
 // Design sizes the layout is drawn at, then scaled (and stretched to the screen's shape).
