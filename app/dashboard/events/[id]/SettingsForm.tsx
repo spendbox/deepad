@@ -154,6 +154,65 @@ export function LinkForm({ eventId, slug, link, canChange }: { eventId: string; 
   );
 }
 
+type ScreenValues = { showComments: boolean; aiCommentFilter: boolean; alertSound: boolean };
+
+/** What the big screen does with each transfer: show the sender's comment, check it with AI, play a sound. */
+export function ScreenForm({ eventId, values, aiReady }: { eventId: string; values: ScreenValues; aiReady: boolean }) {
+  const [state, action, pending] = useSettings(eventId);
+  const [v, setV] = useState(values);
+  const changed = (Object.keys(v) as (keyof ScreenValues)[]).some((k) => v[k] !== values[k]);
+  const set = (patch: Partial<ScreenValues>) => setV((cur) => ({ ...cur, ...patch }));
+
+  return (
+    <form action={action} className="settings-form">
+      {(Object.keys(v) as (keyof ScreenValues)[]).map((k) => (
+        <input key={k} type="hidden" name={k} value={v[k] ? 'yes' : 'no'} />
+      ))}
+      <Switch
+        on={v.showComments}
+        onChange={(on) => set({ showComments: on })}
+        title="Show transfer comments"
+        hint="What guests type as the description in their bank app appears under their name on the big screen. Rude comments are left out automatically."
+      />
+      <Switch
+        on={v.showComments && v.aiCommentFilter}
+        disabled={!v.showComments}
+        onChange={(on) => set({ aiCommentFilter: on })}
+        title="Smart rude-word filter (AI)"
+        hint={
+          aiReady
+            ? 'AI reads each comment first: rude ones (in English, Pidgin, Yoruba, Igbo or Hausa) are dropped, and ones that meant well are politely reworded.'
+            : 'AI reads each comment first and drops or politely rewords rude ones. It isn’t switched on for DashPad yet, so the basic rude-word filter is used for now.'
+        }
+      />
+      <Switch
+        on={v.alertSound}
+        onChange={(on) => set({ alertSound: on })}
+        title="Bank alert sound"
+        hint="The big screen plays a “ka-ching” alert for every transfer that comes in. Click anywhere on the big screen once so the browser allows sound."
+      />
+      <div className="settings-foot">
+        <Result state={state} />
+        <button type="submit" className="btn btn-dark" disabled={pending || !changed}>{pending ? 'Saving…' : 'Save'}</button>
+      </div>
+    </form>
+  );
+}
+
+/** An on/off switch with a title and a line of explanation. */
+function Switch({ on, onChange, title, hint, disabled }: { on: boolean; onChange: (on: boolean) => void; title: string; hint: string; disabled?: boolean }) {
+  return (
+    <label className={`switch-card${on ? ' on' : ''}`} style={disabled ? { opacity: 0.55 } : undefined}>
+      <input type="checkbox" checked={on} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <span className="switch" aria-hidden="true" />
+      <span className="switch-text">
+        <strong>{title}</strong>
+        <span className="hint">{hint}</span>
+      </span>
+    </label>
+  );
+}
+
 /** "No need to bring cash" on the guests' write-a-line page: on or off. */
 export function CashlessToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (

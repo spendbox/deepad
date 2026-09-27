@@ -5,6 +5,7 @@ import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { keepAwake } from '@/lib/wake';
+import { alertSoundBlocked, playAlert, unlockAlertSound } from '@/lib/alert-sound';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import StageScreen, { type ActiveSprayer, type StageMode, type StageSize } from './StageScreen';
 import { screenIdFor, useLiveCamera } from './useLiveCamera';
@@ -108,16 +109,15 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           seen.current.add(t.id);
           lastId.current = Math.max(lastId.current, t.id);
         });
-        // A name that arrived late (some banks send it later): show it on whoever is already spraying.
+        // A name or comment that arrived late (some banks send it later; comments are checked first),
+        // or a comment the planner just hid: update whoever is already spraying.
         const byId = new Map(data.recent.map((t) => [t.id, t]));
-        setSprayers((list) =>
-          list.some((x) => byId.get(x.t.id) && byId.get(x.t.id)!.firstName !== x.t.firstName)
-            ? list.map((x) => {
-                const u = byId.get(x.t.id);
-                return u && u.firstName !== x.t.firstName ? { ...x, t: u } : x;
-              })
-            : list,
-        );
+        const changed = (x: ScreenTransfer) => {
+          const u = byId.get(x.id);
+          return !!u && (u.firstName !== x.firstName || u.comment !== x.comment);
+        };
+        setSprayers((list) => (list.some((x) => changed(x.t)) ? list.map((x) => (changed(x.t) ? { ...x, t: byId.get(x.t.id)! } : x)) : list));
+        setWaiting((list) => (list.some(changed) ? list.map((x) => (changed(x) ? byId.get(x.id)! : x)) : list));
         // Big sprays skip the queue and show straight away.
         if (fresh.length) setWaiting((w) => [...fresh.filter((t) => t.big), ...w, ...fresh.filter((t) => !t.big)]);
       } catch {
@@ -181,6 +181,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         list = [...list, { t: next, slot: list.length, leaving: false, mini: false, tagUntil: Math.min(until, now + tagMs), until }];
         setWaiting(rest);
         lastJoin.current = now;
+        // The bank-alert sound, as each new sprayer steps in (if the planner left it on).
+        if (feed.event.alertSound) playAlert(next.big);
         // A fresh burst of rain for each new sprayer; bigger sprays, bigger burst.
         const len = next.big ? BIG_BURST_MS : BURST_MS[next.weight] ?? 3000;
         setBurst((b) => ({ until: Math.max(b.until, now + len), big: next.big || (b.big && b.until > now) }));
@@ -209,6 +211,23 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  // --- Browsers only allow sound after a click, tap or key press: the first one switches the alert sound on. ---
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  useEffect(() => {
+    const unlock = () => {
+      unlockAlertSound().then((ok) => {
+        setSoundBlocked(!ok && alertSoundBlocked());
+        if (ok) for (const ev of ['pointerdown', 'keydown', 'touchend'] as const) window.removeEventListener(ev, unlock);
+      });
+    };
+    for (const ev of ['pointerdown', 'keydown', 'touchend'] as const) window.addEventListener(ev, unlock);
+    // It may already be allowed (e.g. this site was clicked before); if not, show the button.
+    unlockAlertSound().then((ok) => setSoundBlocked(!ok));
+    return () => {
+      for (const ev of ['pointerdown', 'keydown', 'touchend'] as const) window.removeEventListener(ev, unlock);
+    };
   }, []);
 
   // --- Keep the laptop awake while the screen is up (asking again whenever the system drops it). ---
@@ -248,7 +267,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   // It rains for as long as anyone is still spraying (so bigger sprays keep it going longer).
   const rainUntil = sprayers.reduce((m, s) => (s.leaving ? m : Math.max(m, s.until)), 0);
   // Only a new list when someone arrives or leaves, so the screen redraws only then.
-  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}${s.mini ? 'm' : ''}${s.t.firstName ?? ''}`).join(',');
+  const sprayerKey = sprayers.map((s) => `${s.t.id}${s.leaving ? 'x' : ''}${s.mini ? 'm' : ''}${s.t.firstName ?? ''}|${s.t.comment ?? ''}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const shownSprayers = useMemo<ActiveSprayer[]>(() => sprayers.map(({ t, slot, leaving, mini }) => ({ t, slot, leaving, mini })), [sprayerKey]);
 
@@ -266,7 +285,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   );
 
   // ---------- The big screen (the same stage on a TV, a laptop or a phone) ----------
-  const controlsOn = showControls || camMenu || !!camNotice;
+  const soundHint = e.alertSound && soundBlocked && e.phase !== 'ended';
+  const controlsOn = showControls || camMenu || !!camNotice || soundHint;
   return (
     <div className={`screen-root${controlsOn ? '' : ' idle'}`} style={themeVars}>
       <div className="stage" style={{ width: size.w, height: size.h, transform: `translate(-50%, -50%) scale(${scale})` }}>
@@ -292,6 +312,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
       {!compact && (
       <div className={`scr-controls${controlsOn ? '' : ' hidden'}`}>
         {camNotice && !camMenu && <div className="cam-notice" role="status">{camNotice}</div>}
+        {soundHint && !camMenu && (
+          <button type="button" className="fs-btn take" onClick={() => unlockAlertSound().then((ok) => setSoundBlocked(!ok))}>
+            🔔 Turn on the alert sound
+          </button>
+        )}
         {cam.canTakeOver && !camMenu && (
           <button type="button" className="fs-btn take" disabled={cam.claiming} onClick={cam.takeOver}>
             {cam.claiming ? 'Switching…' : 'Show camera on this screen'}

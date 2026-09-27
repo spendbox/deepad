@@ -36,7 +36,13 @@ description. Senders stay anonymous on screen.
 - Lines on the screen come only from the planner (dashboard) or guests (the shareable `/write` page).
   Guests' lines wait for the planner's approval (one by one or in bulk); only approved lines show, and
   the screen cycles through them endlessly. A secret view-only page (`/lines/<token>`) shows every line
-  live. Bank transfer descriptions are only shown to the planner.
+  live.
+- **Transfer comments**: what a guest types as the description in their bank app shows under their name on
+  the big screen. Rude comments are left out silently (never starred): a rude-word list always runs, and with
+  `OPENAI_API_KEY` set, AI checks each comment first and politely rewords ones that meant well. Planners can
+  switch comments and the AI check off (Settings), or hide any single comment from the "Who sprayed" list.
+- **Bank alert sound**: the big screen plays a "ka-ching" for every spray (a fuller chime for a big spray).
+  Planners can switch it off in Settings. Browsers only allow sound after one click or tap on the screen.
 - Only transfers confirmed by Paystack ever reach the screen: either its signed webhook, or (as a
   backup while the screen is open) by asking Paystack's API directly for the event's payments.
 - After the event, the planner is emailed a short summary with a branded **PDF report** attached

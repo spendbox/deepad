@@ -16,6 +16,7 @@ import type {
   LineStatus,
   Transfer,
   CameraSession,
+  CommentModeration,
 } from '../types';
 
 export interface Store {
@@ -69,6 +70,8 @@ export interface Store {
   setTransferHidden(eventId: string, transferId: number, hidden: boolean): Promise<void>;
   /** Fill in a description that arrived after the payment was first recorded. */
   setTransferMessage(transferId: number, message: string | null, rawNarration: string | null): Promise<void>;
+  /** Save the AI check of a transfer's comment (null clears it, e.g. after the comment changed). */
+  setTransferModeration(transferId: number, moderation: CommentModeration | null, screenMessage: string | null): Promise<void>;
   /** Fill in the sender's name and bank when they arrive after the payment was first recorded. */
   setTransferSender(transferId: number, senderName: string, senderBank: string | null): Promise<void>;
   /** Totals of transfers that counted (inside the event window). */

@@ -16,7 +16,8 @@ import type { ScreenTheme } from '@/lib/themes';
 // on a TV or projector, 540 wide on a phone, stretched to the screen's own
 // shape so it always fills it edge to edge.
 // The celebrant stands in the middle, as tall as the screen allows. Everyone
-// spraying floats around them as a name tag throwing confetti; approved lines
+// spraying floats around them as a name tag (with the comment from their
+// bank transfer underneath, if any) throwing confetti; approved lines
 // pop up around them in turns. Name tags and lines drift and bounce off each
 // other, so nothing overlaps. The account number stays big at the bottom.
 // Amounts are never shown.
@@ -263,14 +264,18 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                 perSecond={1}
                 leaving={s.leaving}
               >
-                <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.leaving ? ' leaving' : ''}`}>
+                <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.t.comment && !s.mini ? ' has-cmt' : ''}${s.leaving ? ' leaving' : ''}`}>
                   {s.t.big && !s.mini && <span className="sp-badge">Big spray!</span>}
                   <Avatar
                     name={s.t.firstName ?? 'Guest'}
                     size={s.mini ? (phone ? 30 : 48) : s.t.big ? (phone ? 60 : 104) : phone ? 42 : 68}
                     letters={bubble(s.t)}
                   />
-                  <span className="sp-name">{s.t.firstName ?? 'A guest'}</span>
+                  <span className="sp-who">
+                    <span className="sp-name">{s.t.firstName ?? 'A guest'}</span>
+                    {/* What they typed in their bank app, under their name (only while the full tag shows). */}
+                    {s.t.comment && !s.mini && <span className="sp-cmt">“{s.t.comment}”</span>}
+                  </span>
                 </div>
               </ArenaBody>
             ))}

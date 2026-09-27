@@ -21,6 +21,8 @@ import { cleanNarration, senderFirstName, senderInitials } from './text';
 import type { MoneyRow, Planner, SprayEvent, Transfer } from './types';
 import type { ThemeColors } from './themes';
 import { buildReportPdf, reportFileName } from './report-pdf';
+import { screenComment } from './comments';
+import { aiFilterConfigured, moderateComment } from './moderation';
 
 /** Paystack customer email for an event; its one-time accounts use the same one. */
 function eventCustomerEmail(event: SprayEvent): string {
@@ -171,12 +173,27 @@ export async function recordTransfer(
     result.transfer = { ...result.transfer, senderName: name, senderBank: bank ?? result.transfer.senderBank };
   }
   // Seen before without a description (e.g. found by the backup check), and now we have one.
+  let newComment = result.created && !!message;
   if (!result.created && !result.transfer.message && message) {
     await store.setTransferMessage(result.transfer.id, message, rawNarration);
     result.transfer = { ...result.transfer, message, rawNarration };
+    newComment = true;
+  }
+  // A new comment for the big screen: the AI checks it first (only once per comment).
+  if (newComment && message && commentsOn(event) && aiCheckOn(event) && aiFilterConfigured()) {
+    const checked = await moderateComment(message);
+    await store
+      .setTransferModeration(result.transfer.id, checked.moderation, checked.screenMessage)
+      .then(() => { result.transfer = { ...result.transfer, ...checked }; })
+      .catch((err) => console.error('Saving the comment check failed (run the latest schema.sql?)', err));
   }
   return result;
 }
+
+/** The planner's switches: all on unless turned off. */
+export const commentsOn = (event: Pick<SprayEvent, 'showComments'>) => event.showComments !== false;
+export const aiCheckOn = (event: Pick<SprayEvent, 'aiCommentFilter'>) => event.aiCommentFilter !== false;
+export const alertSoundOn = (event: Pick<SprayEvent, 'alertSound'>) => event.alertSound !== false;
 
 /**
  * A payment came without the sender's name (some banks, e.g. GTBank, don't send it).
@@ -214,6 +231,8 @@ export async function recleanMessages(event: SprayEvent): Promise<number> {
     const message = cleanNarration(t.rawNarration, t.senderName, receivers);
     if (message !== t.message) {
       await store.setTransferMessage(t.id, message, t.rawNarration);
+      // The comment changed: its old AI check no longer applies (the word filter decides now).
+      if (t.moderation) await store.setTransferModeration(t.id, null, null).catch(() => {});
       changed += 1;
     }
   }
@@ -414,6 +433,8 @@ export type ScreenTransfer = {
   firstName: string | null;
   /** e.g. "T.M." */
   initials: string | null;
+  /** What they typed in their bank app, shown under their name. Null if comments are off, it's empty, or it wasn't polite. */
+  comment: string | null;
   /** Big spray (at or over the planner's big-spray amount): gets the full-screen moment. */
   big: boolean;
   /** 1 to 4: bigger sprays stay on screen spraying a little longer. */
@@ -448,6 +469,8 @@ export type ScreenFeed = {
     startsAt: string;
     endsAt: string;
     paused: boolean;
+    /** Play a bank-alert sound for each new spray. */
+    alertSound: boolean;
     accountNumber: string | null;
     accountBank: string | null;
     accountName: string | null;
@@ -482,6 +505,8 @@ export async function screenFeed(event: SprayEvent, afterId?: number, screenId?:
   // Only approved lines, and plenty of them: the screen cycles through them all.
   const lines = await store.listLines(event.id, { status: ['approved'], limit: 300 });
   const cam = eventPhase(event) === 'ended' ? null : await freshCamera(event.id);
+  const aiReady = aiFilterConfigured();
+  const now = Date.now();
   return {
     event: {
       title: event.title,
@@ -494,6 +519,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number, screenId?:
       startsAt: event.startsAt,
       endsAt: event.endsAt,
       paused: event.paused,
+      alertSound: alertSoundOn(event),
       accountNumber: event.setupStatus === 'ready' ? event.accountNumber : null,
       accountBank: event.setupStatus === 'ready' ? event.accountBank : null,
       accountName: event.setupStatus === 'ready' ? event.accountName : null,
@@ -504,6 +530,7 @@ export async function screenFeed(event: SprayEvent, afterId?: number, screenId?:
         id: t.id,
         firstName: senderFirstName(t.senderName),
         initials: senderInitials(t.senderName),
+        comment: screenComment(t, { show: commentsOn(event), ai: aiCheckOn(event), aiReady, now }),
         big: event.bigSprayKobo > 0 && t.amountKobo >= event.bigSprayKobo,
         weight: sprayWeight(t.amountKobo),
         pieces: sprayPieces(t.amountKobo),
