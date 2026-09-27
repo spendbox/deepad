@@ -28,8 +28,8 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
   const s = summarise(transfers);
 
   return (
-    <AdminShell>
-      <p style={{ margin: 0 }}><Link href="/admin">← Overview</Link></p>
+    <AdminShell tab="events">
+      <p style={{ margin: 0 }}><Link href="/admin/events">← All events</Link></p>
       <div className="adm-head">
         <h1>{event.title}</h1>
         <PhasePill phase={eventPhase(event)} />
@@ -101,7 +101,7 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
         </div>
       </section>
       <PaymentLogTable logs={logs} title="Payment notifications for this event" />
-      <p><Link href="/admin">← Overview</Link></p>
+      <p><Link href="/admin/events">← All events</Link></p>
     </AdminShell>
   );
 }

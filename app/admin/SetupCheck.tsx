@@ -8,10 +8,10 @@ import { getStore } from '@/lib/store';
 import type { PaymentLog } from '@/lib/types';
 
 /** `optional`: not needed to run DashPad; shown grey (not red) while it isn't set up. */
-type Check = { ok: boolean; title: string; detail: string; optional?: boolean };
+export type Check = { ok: boolean; title: string; detail: string; optional?: boolean };
 
-/** A plain-English list of what is and isn't set up correctly. */
-export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
+/** Everything DashPad needs, and whether each is set up. */
+export async function getSetupChecks(logs: PaymentLog[]): Promise<Check[]> {
   const store = getStore();
   const schema = await store.schemaProblems();
   const webhookUrl = `${await siteUrl()}/api/webhooks/paystack`;
@@ -84,11 +84,19 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
       detail: process.env.CRON_SECRET ? 'CRON_SECRET is set.' : 'CRON_SECRET is missing in Vercel.',
     },
   ];
+  return checks;
+}
 
+/** How many required things still need fixing (optional extras don't count). */
+export const problemCount = (checks: Check[]) => checks.filter((c) => !c.ok && !c.optional).length;
+
+/** A plain-English list of what is and isn't set up correctly. */
+export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
+  const checks = await getSetupChecks(logs);
   const ready = checks.filter((c) => c.ok).length;
-  const problems = checks.filter((c) => !c.ok && !c.optional).length;
+  const problems = problemCount(checks);
   return (
-    <section className="card" id="setup" aria-label="Setup check">
+    <section className="card" aria-label="Setup check">
       <div className="row-between">
         <h2>Setup check</h2>
         <span className={`pill ${problems ? 'failed' : 'live'}`}>{problems ? `${problems} to fix` : 'All good'}</span>

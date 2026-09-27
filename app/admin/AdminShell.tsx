@@ -4,8 +4,18 @@ import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
 import { emailConfigured } from '@/lib/email';
 import { adminLogout } from '../actions';
 
-/** DashPad staff area: a dark bar along the top (logo, sections, log out) and the page below. */
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+export type AdminTab = 'overview' | 'events' | 'payments' | 'planners' | 'setup';
+
+const TABS: { id: AdminTab; label: string; href: string }[] = [
+  { id: 'overview', label: 'Overview', href: '/admin' },
+  { id: 'events', label: 'Events', href: '/admin/events' },
+  { id: 'payments', label: 'Payments', href: '/admin/payments' },
+  { id: 'planners', label: 'Planners', href: '/admin/planners' },
+  { id: 'setup', label: 'Setup', href: '/admin/setup' },
+];
+
+/** DashPad staff area: a dark bar along the top (logo, tabs, log out) and the page below. */
+export default function AdminShell({ tab, children }: { tab: AdminTab; children: React.ReactNode }) {
   const warnings: string[] = [];
   if (!paystackConfigured()) warnings.push('Paystack is not connected (PAYSTACK_SECRET_KEY). Events cannot get account numbers.');
   else if (!paystackIsLive()) warnings.push('Paystack is in TEST mode: no real money moves.');
@@ -21,10 +31,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <span className="adm-badge">Admin</span>
           </Link>
           <nav className="adm-nav" aria-label="Admin sections">
-            <Link href="/admin#events">Events</Link>
-            <Link href="/admin#payments">Payments</Link>
-            <Link href="/admin#planners">Planners</Link>
-            <Link href="/admin#setup">Setup</Link>
+            {TABS.map((t) => (
+              <Link key={t.id} href={t.href} aria-current={t.id === tab ? 'page' : undefined}>{t.label}</Link>
+            ))}
           </nav>
           <form action={adminLogout} className="adm-logout">
             <button type="submit" className="adm-logout-btn">Log out</button>
@@ -32,9 +41,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       </header>
       <main className="adm-main">
-        {warnings.length > 0 && (
+        {/* On every tab except Setup, which lists everything in full. */}
+        {warnings.length > 0 && tab !== 'setup' && (
           <div className="banner warn adm-warn" role="status">
-            <strong>Needs attention</strong>
+            <div className="row-between">
+              <strong>Needs attention</strong>
+              <Link href="/admin/setup" className="adm-see-all">Open Setup →</Link>
+            </div>
             <ul>
               {warnings.map((w) => <li key={w}>{w}</li>)}
             </ul>

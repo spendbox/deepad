@@ -783,6 +783,7 @@ details .settings-form { margin-top: 12px; }
   color: var(--lilac); text-decoration: none; font-weight: 700; font-size: 15px; padding: 8px 12px; border-radius: 10px; white-space: nowrap;
 }
 .adm-nav a:hover { background: var(--plum); color: var(--ivory); }
+.adm-nav a[aria-current='page'] { background: var(--plum); color: var(--gold); box-shadow: inset 0 -3px 0 var(--gold); }
 .adm-logout { margin: 0; }
 .adm-logout-btn {
   min-height: 40px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--lilac); background: transparent;
@@ -793,14 +794,21 @@ details .settings-form { margin-top: 12px; }
 @media (max-width: 700px) {
   .adm-top-in { padding: 10px 14px 6px; }
   .adm-logout { margin-left: auto; }
-  .adm-nav { order: 3; margin: 0 -14px; padding: 0 8px 4px; width: calc(100% + 28px); overflow-x: auto; }
-  .adm-nav a { font-size: 14px; padding: 8px 10px; }
+  .adm-nav { order: 3; margin: 0 -14px; padding: 0 6px 4px; width: calc(100% + 28px); overflow-x: auto; justify-content: space-between; gap: 0; }
+  .adm-top-in { gap: 10px 10px; }
+  .adm-nav a { font-size: 13px; padding: 8px 5px; }
+  .adm-badge { padding: 2px 7px; font-size: 10px; }
+  .adm-logout-btn { min-height: 36px; padding: 0 12px; font-size: 14px; }
+}
+@media (max-width: 370px) {
+  .adm-nav a { font-size: 12.5px; padding: 8px 4px; }
 }
 .adm-main { max-width: 1160px; margin: 0 auto; padding: 20px 16px 80px; display: flex; flex-direction: column; gap: 18px; }
 @media (min-width: 900px) { .adm-main { padding: 28px 24px 80px; gap: 22px; } }
 .adm h1 { font-family: var(--display); font-weight: 800; font-size: 28px; margin: 0; line-height: 1.15; }
 .adm h2 { font-family: var(--display); font-weight: 800; font-size: 20px; margin: 0; }
 .adm h3 { font-family: var(--display); font-weight: 800; font-size: 16px; margin: 0; }
+.adm-see-all { font-weight: 700; color: var(--aubergine); white-space: nowrap; }
 .adm-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
 .adm-sub { margin: 4px 0 0; color: var(--ink-muted); font-size: 15px; }
 .adm-warn { display: flex; flex-direction: column; gap: 4px; }
