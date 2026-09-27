@@ -72,7 +72,15 @@ test('bank narration keeps the sender’s own words', () => {
   assert.equal(cleanNarration('WEB TRANSFER FROM OLUWASEUN ADEBAYO - Congrats', who), 'Congrats');
   assert.equal(cleanNarration('HAPPY BIRTHDAY MAMA', null), 'Happy birthday mama');
   assert.equal(cleanNarration('NIP FRM JOHN DOE-God bless you', null), 'God bless you');
-  assert.equal(cleanNarration('Enjoy o! from Oluwaseun', who), 'Enjoy o!');
+  // Names the guest typed themselves are kept.
+  assert.equal(cleanNarration('Enjoy o! from Oluwaseun', who), 'Enjoy o! from Oluwaseun');
+  assert.equal(cleanNarration('Big love from the Adebayo family', who), 'Big love from the Adebayo family');
+  assert.equal(cleanNarration('Congrats - OLUWASEUN ADEBAYO', who), 'Congrats');
+  // Nothing left hanging at the end ("… to" once the receiving account's name is removed).
+  assert.equal(cleanNarration('Happy birthday to', null), 'Happy birthday');
+  assert.equal(cleanNarration('Happy birthday to SPENDBOX/DASHPAD TOLU', null, ['SPENDBOX/DASHPAD TOLU']), 'Happy birthday');
+  assert.equal(cleanNarration('Dance well o TRF TO', null), 'Dance well o');
+  assert.equal(cleanNarration('TO', null), null);
   assert.equal(cleanNarration('Dance well TO DASHPAD/TOLU AND DAYO', null), 'Dance well');
   assert.equal(cleanNarration('000123456789012/Love you both', null), 'Love you both');
   assert.equal(cleanNarration(''), null);

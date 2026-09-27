@@ -71,7 +71,7 @@ export default async function SetupCheck({ logs }: { logs: PaymentLog[] }) {
       ok: aiFilterConfigured(),
       title: 'AI check for transfer comments (OpenAI)',
       detail: aiFilterConfigured()
-        ? 'Set up. Comments are checked by AI before they show on the big screen: rude ones are dropped or politely reworded.'
+        ? 'Set up. Comments are checked by AI before they show on the big screen: spelling and grammar are fixed, rude ones are dropped or politely reworded.'
         : 'Not set up: comments on the big screen are checked with the basic rude-word list only. Add OPENAI_API_KEY in Vercel (platform.openai.com → API keys) and redeploy.',
     },
     {

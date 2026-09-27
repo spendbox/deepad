@@ -34,12 +34,13 @@ description. Senders stay anonymous on screen.
 - The big screen never shows amounts. Each sprayer appears around the celebrant as their first name
   and initials, throwing confetti (one or two pieces a second) for a while, so many people can spray at once.
 - Lines on the screen come only from the planner (dashboard) or guests (the shareable `/write` page).
-  Guests' lines wait for the planner's approval (one by one or in bulk); only approved lines show, and
-  the screen cycles through them endlessly. A secret view-only page (`/lines/<token>`) shows every line
+  Guests' lines wait for the planner's approval (one by one or in bulk); only approved lines show, one at
+  a time in the top-left corner, and the screen cycles through them endlessly. A secret view-only page (`/lines/<token>`) shows every line
   live.
 - **Transfer comments**: what a guest types as the description in their bank app shows under their name on
   the big screen. Rude comments are left out silently (never starred): a rude-word list always runs, and with
-  `OPENAI_API_KEY` set, AI checks each comment first and politely rewords ones that meant well. Planners can
+  `OPENAI_API_KEY` set, AI checks each comment first, fixes its spelling and grammar, and politely rewords
+  ones that meant well. Names the guest typed stay in; only the name the bank adds on its own is removed. Planners can
   switch comments and the AI check off (Settings), or hide any single comment from the "Who sprayed" list.
 - **Bank alert sound**: the big screen plays a "ka-ching" for every spray (a fuller chime for a big spray).
   Planners can switch it off in Settings. Browsers only allow sound after one click or tap on the screen.

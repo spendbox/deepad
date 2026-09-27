@@ -133,16 +133,7 @@ export function cleanNarration(
   });
   s = kept.join(' - ');
 
-  // 2) The sender's name, wherever it appears (screen must stay anonymous).
-  const nameWords = (senderName ?? '')
-    .toLowerCase()
-    .split(/[^\p{L}']+/u)
-    .filter((w) => w.length >= 2);
-  if (nameWords.length) {
-    const re = new RegExp(`(?<![\\p{L}])(${nameWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\p{L}])`, 'giu');
-    s = s.replace(re, ' ');
-  }
-  // Without a sender name, "FRM SOME NAME - message" still hides the capitalised name.
+  // 2) Without a sender name, the bank's own "FRM SOME NAME - " in front of the message is removed.
   s = s.replace(/^(?:[A-Z]{2,6}\s+)*(?:FRM|FROM)\s+[A-Z][A-Z .'-]*?\s*(?:[-:]|\s-\s)\s*(?=\S)/, '');
 
   // 3) Leading bank words ("NIP FRM", "TRANSFER FROM", "WEB TRF") and trailing "TO DASHPAD…".
@@ -158,9 +149,29 @@ export function cleanNarration(
     s = s.slice(m[0].length);
   }
 
+  // The sender's name as the BANK added it (a piece of its own, e.g. "NIP/ADA OBI/Congrats") is removed,
+  // since the screen shows their name anyway. Names the guest typed themselves stay: "Love from the Obi family".
+  const nameWords = (senderName ?? '')
+    .toLowerCase()
+    .split(/[^\p{L}']+/u)
+    .filter((w) => w.length >= 2);
+  if (nameWords.length) {
+    const onlyName = (chunk: string) => {
+      const ws = chunk.toLowerCase().split(/[^\p{L}']+/u).filter(Boolean);
+      return ws.length > 0 && ws.every((w) => nameWords.includes(w));
+    };
+    s = s.split(/\s+-\s+/).filter((piece) => !onlyName(piece)).join(' - ');
+    const name = `(?:${nameWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`;
+    s = s.replace(new RegExp(`^${name}(?:\\s+${name})*\\s*[-:/]\\s*(?=\\S)`, 'iu'), '');
+    s = s.replace(new RegExp(`\\s*[-:/]\\s*${name}(?:\\s+${name})*$`, 'iu'), '');
+    if (onlyName(s)) return null;
+  }
+
   // 4) Tidy up leftover separators and shouting.
   s = collapseSpaces(s.replace(/\s*-\s*(-\s*)+/g, ' - ')).replace(/^[\s\-:,.;/|]+|[\s\-:,;/|]+$/g, '');
-  s = s.replace(/\s+(?:from|frm|by)$/i, '');
+  // Bank words left hanging at the end, e.g. "Happy birthday to" once "SPENDBOX/DASHPAD…" was removed.
+  for (let i = 0; i < 3; i++) s = s.replace(/[\s\-:,;/|]+(?:from|frm|by|to|for|via|trf|nip)$/i, '').replace(/[\s\-:,;/|]+$/, '');
+  if (/^(?:to|for|from|frm|by)$/i.test(s)) return null;
   if (!/\p{L}/u.test(s)) return null;
   if (s.length > 3 && s === s.toUpperCase()) s = s.charAt(0) + s.slice(1).toLowerCase();
   return cleanMessage(s);
