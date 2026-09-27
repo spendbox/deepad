@@ -167,7 +167,10 @@ export function cleanNarration(
     if (onlyName(s)) return null;
   }
 
-  // 4) Tidy up leftover separators and shouting.
+  // 4) The bank's own default description when the guest typed nothing, e.g. OPay's "from Ada Obi".
+  if (isDefaultFromName(s, senderName)) return null;
+
+  // 5) Tidy up leftover separators and shouting.
   s = collapseSpaces(s.replace(/\s*-\s*(-\s*)+/g, ' - ')).replace(/^[\s\-:,.;/|]+|[\s\-:,;/|]+$/g, '');
   // Bank words left hanging at the end, e.g. "Happy birthday to" once "SPENDBOX/DASHPAD…" was removed.
   for (let i = 0; i < 3; i++) s = s.replace(/[\s\-:,;/|]+(?:from|frm|by|to|for|via|trf|nip)$/i, '').replace(/[\s\-:,;/|]+$/, '');
@@ -175,6 +178,25 @@ export function cleanNarration(
   if (!/\p{L}/u.test(s)) return null;
   if (s.length > 3 && s === s.toUpperCase()) s = s.charAt(0) + s.slice(1).toLowerCase();
   return cleanMessage(s);
+}
+
+/**
+ * Some banks (e.g. OPay) fill in "from <sender's full name>" when the guest
+ * types no description. That isn't a comment, so it's dropped. It counts as the
+ * default when, after "from", there's only a name: 1 to 5 capitalised words,
+ * at least one of them from the sender's bank name (when we know it).
+ * "from Mummy", "from the Obi family" or "Enjoy! from Ada" are kept.
+ */
+export function isDefaultFromName(text: string, senderName?: string | null): boolean {
+  const m = /^(?:(?:sent|transfer|trf|mobile transfer|opay transfer)\s+)?(?:from|frm)\s*[:\-]?\s+([\p{L}' .-]+?)[\s.]*$/iu.exec(text.trim());
+  if (!m) return false;
+  const words = m[1].split(/[\s.]+/).filter(Boolean);
+  if (words.length === 0 || words.length > 5) return false;
+  // Names only: each word starts with a capital (or the whole thing is in capitals, as banks write it).
+  if (!words.every((w) => /^\p{Lu}/u.test(w))) return false;
+  const nameWords = (senderName ?? '').toLowerCase().split(/[^\p{L}']+/u).filter((w) => w.length >= 2);
+  if (!nameWords.length) return true;
+  return words.some((w) => nameWords.includes(w.toLowerCase()));
 }
 
 /**
