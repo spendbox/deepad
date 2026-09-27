@@ -8,7 +8,7 @@ import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
 import { eventPhase, EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
 import { escapeHtml, sendEmail } from '@/lib/email';
 import { checkPaystackForTransfers, recleanMessages, sendEventReport, setupEventPayments } from '@/lib/events';
-import { createTransferRecipient, deactivateDedicatedAccount, paystackConfigured, paystackIsLive, sendTransfer } from '@/lib/paystack';
+import { deactivateDedicatedAccount, paystackConfigured } from '@/lib/paystack';
 import { clampPlannerFeeBps, MAX_PLANNER_FEE_BPS, PLATFORM_FEE_BPS } from '@/lib/money';
 import { hashPassword, verifyPassword } from '@/lib/passwords';
 import { endPlannerSession, requireAdmin, requirePlanner, startPlannerSession } from '@/lib/session';
@@ -504,59 +504,6 @@ export async function adminRecleanMessages(eventId: string, _prev: FormState): P
   const changed = await recleanMessages(event);
   revalidatePath(`/admin/events/${eventId}`);
   return { ok: changed ? `Updated ${changed} message(s).` : 'All messages were already correct.' };
-}
-
-/**
- * Test alert: send a small amount (₦1 by default) from DashPad's Paystack balance to a bank
- * account, with a message and a short link in the description. Used to check, bank by bank,
- * whether the message and link show in the alert and can be tapped. Each send gets its own
- * link code, so the payment log shows which banks' links were opened.
- */
-type TestAlertState = { error?: string; ok?: string; sent?: string } | null;
-
-export async function adminSendTestAlert(_prev: TestAlertState, form: FormData): Promise<TestAlertState> {
-  await requireAdmin();
-  if (!paystackConfigured()) return { error: 'PAYSTACK_SECRET_KEY is not set.' };
-  const bankCode = str(form, 'bankCode');
-  const bankName = str(form, 'bankName') || 'the bank';
-  const accountNumber = str(form, 'accountNumber').replace(/\D/g, '');
-  const accountName = str(form, 'accountName');
-  const naira = Number(str(form, 'amount') || '1');
-  const template = str(form, 'message') || 'DashPad test. Tap: {link}';
-  if (!bankCode || accountNumber.length !== 10) return { error: 'Choose a bank and enter a 10-digit account number.' };
-  if (!accountName) return { error: 'Wait for the account name to show (it confirms the account is right).' };
-  if (!(naira >= 1 && naira <= 1000)) return { error: 'Send between ₦1 and ₦1,000.' };
-
-  const code = randomBytes(3).toString('hex').toUpperCase(); // e.g. "4F9A1C": which send this link came from
-  const site = await siteUrl();
-  const reason = template
-    .replace(/\{fulllink\}/g, `${site}/w/${code}`)
-    .replace(/\{link\}/g, `${site.replace(/^https?:\/\//, '')}/w/${code}`)
-    .slice(0, 100);
-  const reference = `dashpad-test-${code.toLowerCase()}-${Date.now()}`;
-  const store = getStore();
-  const log = (outcome: 'recorded' | 'error', detail: string) =>
-    store.logPayment({ source: 'check', paystackEvent: 'test_alert', reference: code, outcome, detail, eventId: null }).catch(() => {});
-  try {
-    const recipient = await createTransferRecipient({ name: accountName, accountNumber, bankCode });
-    const { status } = await sendTransfer({ amountKobo: Math.round(naira * 100), recipient, reason, reference });
-    const where = `${bankName} ${accountNumber.slice(0, 3)}…${accountNumber.slice(-3)}`;
-    if (status === 'otp') {
-      await log('error', `Test alert to ${where} needs an OTP. Turn off OTP for transfers in Paystack (Settings → Preferences) and try again.`);
-      return { error: 'Paystack wants a one-time code (OTP) for every transfer. Turn that off in Paystack: Settings → Preferences → Transfers, then try again.' };
-    }
-    await log('recorded', `Test alert (link code ${code}) sent to ${where}: ₦${naira}, “${reason}”. Paystack status: ${status}.`);
-    return {
-      ok: paystackIsLive()
-        ? `Sent (${status}). Check the alert on the ${bankName} account in a minute or two.`
-        : `Sent in TEST mode (${status}): no real money moves, so no real alert will arrive. Use your live key to test real banks.`,
-      sent: reason,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await log('error', `Test alert to ${bankName} failed: ${message}`);
-    return { error: `Paystack said: ${message}` };
-  }
 }
 
 export async function adminRetrySetup(eventId: string) {

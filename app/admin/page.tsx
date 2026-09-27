@@ -8,9 +8,6 @@ import PhasePill from '../dashboard/PhasePill';
 import AdminShell from './AdminShell';
 import PaymentLogTable from './PaymentLogTable';
 import SetupCheck from './SetupCheck';
-import TestAlert from './TestAlert';
-import { getBalanceKobo, paystackConfigured, paystackIsLive } from '@/lib/paystack';
-import { findSenderAccount } from '@/lib/sender-account';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin · DashPad' };
@@ -20,13 +17,6 @@ export default async function AdminHome() {
   const store = getStore();
   const [planners, events, logs] = await Promise.all([store.listPlanners(), store.listEvents(), store.listPaymentLogs(40)]);
   const money = await store.listMoneyRows(events.map((e) => e.id));
-  const balance = paystackConfigured() ? await getBalanceKobo().catch(() => null) : null;
-  // The sender's account number in recent payment notifications: full, or partly hidden?
-  const senderAccounts = logs
-    .filter((l) => l.source === 'webhook' && l.raw)
-    .map((l) => ({ when: new Date(l.createdAt).toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }), found: findSenderAccount(l.raw) }))
-    .flatMap(({ when, found }) => (found ? [{ when, ...found }] : []))
-    .slice(0, 5);
   const sums = events.map((e) => summarise(money.filter((m) => m.eventId === e.id)));
   const plannerName = new Map(planners.map((p) => [p.id, p.name]));
   const total = sums.reduce(
@@ -73,34 +63,6 @@ export default async function AdminHome() {
             </tbody>
           </table>
         </div>
-      </section>
-
-      <section className="card">
-        <h2>Test alert (₦1 with a link)</h2>
-        <p className="hint" style={{ marginTop: 0 }}>
-          Sends a small amount from DashPad’s Paystack balance with a message and a link in the description, to see how each
-          bank shows it. Try accounts at the banks your guests use (GTBank, OPay, Moniepoint, Access, Kuda…) and check:
-          does the whole message show, in the SMS and in the bank app? Can the link be tapped? Opened links show up in the
-          payment log below as “Test alert link … was opened”.
-        </p>
-        <p className="hint">
-          Paystack balance: <strong>{balance === null ? 'unknown' : naira(balance)}</strong>
-          {!paystackIsLive() && ' · TEST key in use: nothing reaches real banks.'}
-          {' '}· Each alert costs the amount plus Paystack’s transfer fee (about ₦10).
-        </p>
-        <TestAlert />
-        <h3 style={{ marginTop: 24 }}>Does Paystack tell us who paid? (needed to send alerts back)</h3>
-        {senderAccounts.length ? (
-          <ul className="hint">
-            {senderAccounts.map((a, i) => (
-              <li key={i}>
-                {a.when}: sender account <strong>{a.value}</strong> {a.full ? '✓ full number: alerts can be sent back' : '✗ partly hidden: alerts can’t be sent back'}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="hint">No payment notification with a sender account number yet. Make one real transfer to an event’s account and check back.</p>
-        )}
       </section>
 
       <PaymentLogTable logs={logs} />
