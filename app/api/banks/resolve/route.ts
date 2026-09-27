@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { PLANNER_COOKIE, readPlannerToken } from '@/lib/auth';
+import { ADMIN_COOKIE, isValidAdminToken, PLANNER_COOKIE, readPlannerToken } from '@/lib/auth';
 import { paystackConfigured, resolveAccount } from '@/lib/paystack';
 
-// Look up the name on a bank account. Logged-in planners only, to stop abuse.
+// Look up the name on a bank account. Logged-in planners (and the DashPad admin) only, to stop abuse.
 export async function GET(req: Request) {
   const jar = await cookies();
-  if (!(await readPlannerToken(jar.get(PLANNER_COOKIE)?.value))) {
+  const allowed = (await readPlannerToken(jar.get(PLANNER_COOKIE)?.value)) || (await isValidAdminToken(jar.get(ADMIN_COOKIE)?.value));
+  if (!allowed) {
     return NextResponse.json({ error: 'Please log in.' }, { status: 401 });
   }
   const url = new URL(req.url);
