@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { HamburgerIcon, useMobileMenu } from '@/components/useMobileMenu';
 import { logout } from '../actions';
 
 const icons = {
@@ -32,9 +32,8 @@ const LINKS = [
 ];
 
 export default function DashNav({ logo }: { logo: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const menu = useMobileMenu();
   const path = usePathname();
-  useEffect(() => setOpen(false), [path]);
 
   const isActive = (href: string) =>
     href === '/dashboard' ? path === '/dashboard' || path.startsWith('/dashboard/events') : path.startsWith(href);
@@ -44,24 +43,24 @@ export default function DashNav({ logo }: { logo: React.ReactNode }) {
       <div className="dash-side-top">
         {logo}
         <button
+          ref={menu.buttonRef}
           type="button"
           className="hamburger"
-          aria-expanded={open}
+          aria-expanded={menu.open}
           aria-controls="dash-menu"
-          aria-label={open ? 'Close menu' : 'Open menu'}
-          onClick={() => setOpen((v) => !v)}
+          aria-label={menu.open ? 'Close menu' : 'Open menu'}
+          onClick={menu.toggle}
         >
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-            {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
-          </svg>
+          <HamburgerIcon open={menu.open} />
         </button>
       </div>
-      <nav id="dash-menu" className={`dash-nav${open ? ' open' : ''}`} aria-label="Planner">
-        <Link href="/dashboard/events/new" className="dash-new">
+      {menu.open && <div className="menu-backdrop dash-backdrop" onClick={() => menu.close()} aria-hidden="true" />}
+      <nav id="dash-menu" ref={menu.panelRef} className={`dash-nav${menu.open ? ' open' : ''}`} aria-label="Planner">
+        <Link href="/dashboard/events/new" className="dash-new" onClick={() => menu.close()}>
           <span aria-hidden="true">+</span> New event
         </Link>
         {LINKS.map((l) => (
-          <Link key={l.href} href={l.href} className="dash-link" aria-current={isActive(l.href) ? 'page' : undefined}>
+          <Link key={l.href} href={l.href} className="dash-link" aria-current={isActive(l.href) ? 'page' : undefined} onClick={() => menu.close()}>
             <Icon name={l.icon} />
             {l.label}
           </Link>

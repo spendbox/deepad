@@ -28,22 +28,33 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
   const s = summarise(transfers);
 
   return (
-    <AdminShell>
-      <div className="row-between">
+    <AdminShell tab="events">
+      <p style={{ margin: 0 }}><Link href="/admin/events">← All events</Link></p>
+      <div className="adm-head">
         <h1>{event.title}</h1>
         <PhasePill phase={eventPhase(event)} />
       </div>
       <div className="card">
-        <span>Planner: <strong>{planner?.name}</strong> ({planner?.email}, {planner?.phone})</span>
-        <span>When: {formatWhen(event.startsAt)} → {formatWhen(event.endsAt)}</span>
-        <span>Link: <a href={`/${event.slug}`} target="_blank" rel="noreferrer">/{event.slug}</a></span>
-        <span>Payout: {event.payoutAccountName} · {event.payoutBankName} · {event.payoutAccountNumber}</span>
-        <span>Fees: DashPad {percent(event.platformFeeBps)} · planner {percent(event.plannerFeeBps)}</span>
-        <span>
-          Event account: {event.accountNumber ? `${event.accountNumber} (${event.accountBank})` : '—'} · setup{' '}
-          <strong>{event.setupStatus}</strong>
-          {event.setupError ? `: ${event.setupError}` : ''}
-        </span>
+        <dl className="adm-facts">
+          <dt>Planner</dt>
+          <dd><strong>{planner?.name}</strong> · {planner?.email} · {planner?.phone}</dd>
+          <dt>When</dt>
+          <dd>{formatWhen(event.startsAt)} → {formatWhen(event.endsAt)}</dd>
+          <dt>Link</dt>
+          <dd><a href={`/${event.slug}`} target="_blank" rel="noreferrer">/{event.slug}</a></dd>
+          <dt>Event account</dt>
+          <dd>
+            {event.accountNumber ? <><strong>{event.accountNumber}</strong> · {event.accountBank}</> : '—'}{' '}
+            <span className={`pill ${event.setupStatus === 'ready' ? 'live' : event.setupStatus === 'failed' ? 'failed' : ''}`}>setup {event.setupStatus}</span>
+            {event.setupError ? ` ${event.setupError}` : ''}
+          </dd>
+          <dt>Celebrant payout</dt>
+          <dd>{event.payoutAccountName} · {event.payoutBankName} · {event.payoutAccountNumber}</dd>
+          <dt>Fees</dt>
+          <dd>DashPad {percent(event.platformFeeBps)} · planner {percent(event.plannerFeeBps)}</dd>
+          <dt>Report emailed</dt>
+          <dd>{event.reportSentAt ? new Date(event.reportSentAt).toLocaleString('en-NG') : 'Not yet'}</dd>
+        </dl>
         {event.setupStatus !== 'ready' && (
           <form action={adminRetrySetup.bind(null, event.id)}>
             <button type="submit" className="btn btn-dark btn-sm">Retry payment setup</button>
@@ -51,7 +62,6 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
         )}
         {event.deletedAt && <span className="pill ended" style={{ alignSelf: 'flex-start' }}>Deleted by planner on {new Date(event.deletedAt).toLocaleString('en-NG')}</span>}
         {event.setupStatus === 'ready' && <CheckPaystackButton eventId={event.id} />}
-        <span>Report emailed: {event.reportSentAt ? new Date(event.reportSentAt).toLocaleString('en-NG') : 'not yet'}</span>
       </div>
       <div className="tiles">
         <div className="tile gold"><div className="v">{naira(s.platformKobo - s.processingKobo)}</div><div className="k">DashPad earnings after fees</div></div>
@@ -91,7 +101,7 @@ export default async function AdminEventPage({ params }: { params: Promise<{ id:
         </div>
       </section>
       <PaymentLogTable logs={logs} title="Payment notifications for this event" />
-      <p><Link href="/admin">← Overview</Link></p>
+      <p><Link href="/admin/events">← All events</Link></p>
     </AdminShell>
   );
 }

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { PaymentLog } from '@/lib/types';
 
 const LABEL: Record<PaymentLog['outcome'], string> = {
@@ -9,10 +10,13 @@ const LABEL: Record<PaymentLog['outcome'], string> = {
   error: 'Error',
 };
 
-export default function PaymentLogTable({ logs, title = 'Payment notifications' }: { logs: PaymentLog[]; title?: string }) {
+export default function PaymentLogTable({ logs, title = 'Payment notifications', seeAll }: { logs: PaymentLog[]; title?: string; seeAll?: string }) {
   return (
     <section className="card">
-      <h2>{title}</h2>
+      <div className="row-between">
+        <h2>{title}</h2>
+        {seeAll && <Link href={seeAll} className="adm-see-all">All payments →</Link>}
+      </div>
       <span className="hint">Every notification from Paystack, newest first. “Check” rows come from the backup check.</span>
       <div className="table-wrap">
         <table>
