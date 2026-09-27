@@ -2,17 +2,9 @@ import Logo from '@/components/Logo';
 import Link from 'next/link';
 import { paystackConfigured, paystackIsLive } from '@/lib/paystack';
 import { emailConfigured } from '@/lib/email';
-import { adminLogout } from '../actions';
+import AdminNav, { type AdminTab } from './AdminNav';
 
-export type AdminTab = 'overview' | 'events' | 'payments' | 'planners' | 'setup';
-
-const TABS: { id: AdminTab; label: string; href: string }[] = [
-  { id: 'overview', label: 'Overview', href: '/admin' },
-  { id: 'events', label: 'Events', href: '/admin/events' },
-  { id: 'payments', label: 'Payments', href: '/admin/payments' },
-  { id: 'planners', label: 'Planners', href: '/admin/planners' },
-  { id: 'setup', label: 'Setup', href: '/admin/setup' },
-];
+export type { AdminTab };
 
 /** DashPad staff area: a dark bar along the top (logo, tabs, log out) and the page below. */
 export default function AdminShell({ tab, children }: { tab: AdminTab; children: React.ReactNode }) {
@@ -30,14 +22,7 @@ export default function AdminShell({ tab, children }: { tab: AdminTab; children:
             <Logo size={30} tone="dark" />
             <span className="adm-badge">Admin</span>
           </Link>
-          <nav className="adm-nav" aria-label="Admin sections">
-            {TABS.map((t) => (
-              <Link key={t.id} href={t.href} aria-current={t.id === tab ? 'page' : undefined}>{t.label}</Link>
-            ))}
-          </nav>
-          <form action={adminLogout} className="adm-logout">
-            <button type="submit" className="adm-logout-btn">Log out</button>
-          </form>
+          <AdminNav tab={tab} attention={warnings.length > 0} />
         </div>
       </header>
       <main className="adm-main">

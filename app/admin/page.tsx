@@ -47,7 +47,7 @@ export default async function AdminHome() {
       <section className="card">
         <div className="row-between">
           <h2>Latest events</h2>
-          <Link href="/admin/events" className="adm-see-all">All {events.length} events →</Link>
+          <Link href="/admin/events" className="adm-see-all">{events.length === 1 ? 'See event' : `All ${events.length} events`} →</Link>
         </div>
         <EventsTable data={data} limit={5} />
       </section>
