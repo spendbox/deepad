@@ -92,7 +92,18 @@ const LINE_GAP_MS = 900; // pause between one line leaving and the next popping 
  * sprayed enough to keep going) a small bubble that keeps throwing confetti,
  * one piece a second, until their spray is used up.
  */
-export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean };
+export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean; spot: boolean };
+
+/**
+ * How fast each sprayer throws, and how much of it is naira notes. The person in the
+ * spotlight sprays a fast stream of notes onto the celebrant, like spraying a wad by
+ * hand; everyone else throws gently (or not at all) so the star stands out.
+ */
+function sprayRate(s: ActiveSprayer, someoneInSpotlight: boolean, phone: boolean): { perSecond: number; money: number } {
+  if (s.spot) return s.t.big ? { perSecond: phone ? 6 : 8, money: 0.8 } : { perSecond: phone ? 4 : 5, money: 0.7 };
+  if (s.mini) return { perSecond: someoneInSpotlight ? 0 : 0.4, money: 0 };
+  return someoneInSpotlight ? { perSecond: 0.3, money: 0 } : { perSecond: 1, money: 0.3 };
+}
 
 function clock(iso: string) {
   return new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', hour12: true, minute: '2-digit' });
@@ -119,6 +130,7 @@ function ArenaBody({
   kind,
   big,
   perSecond,
+  money,
   leaving,
   children,
 }: {
@@ -127,14 +139,16 @@ function ArenaBody({
   kind: BodyKind;
   big?: boolean;
   perSecond?: number;
+  money?: number;
   leaving: boolean;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (ref.current) arena.add(id, ref.current, { kind, big, perSecond });
+    if (ref.current) arena.add(id, ref.current, { kind, big, perSecond, money });
     return () => arena.remove(id);
   }, [arena, id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => arena.setRate(id, perSecond ?? 1, money ?? 0), [arena, id, perSecond, money]);
   useEffect(() => arena.setLeaving(id, leaving), [arena, id, leaving]);
   return (
     <div ref={ref} className="ab">
@@ -189,6 +203,8 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
   useEffect(() => () => arena.stop(), [arena]);
   const { canvas } = layout;
   const spraying = sprayers.some((s) => !s.leaving);
+  // Someone just sprayed: they're the star; everything else steps back for a moment.
+  const spotlight = sprayers.some((s) => s.spot && !s.leaving);
   const crowd = sprayers.filter((s) => !s.leaving && !s.mini).length + Math.floor(sprayers.filter((s) => !s.leaving && s.mini).length / 2);
   // Names shrink a little as the screen fills (2 or fewer: full size), never below about three-quarters.
   const tagZoom = Math.max(phone ? 0.78 : 0.72, 1 - Math.max(0, crowd - 2) * (phone ? 0.07 : 0.05));
@@ -237,14 +253,16 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
       {live ? (
         <>
           {!spraying && !lines.length && !videoOn && !phone && <div className="st-hello">Spray {e.celebrantName}!</div>}
+          {/* A light rain over the whole screen: just atmosphere. The real show is the sprayer's own throws. */}
           <Rain
             until={Math.max(rainUntil, burstUntil)}
             burstUntil={burstUntil}
-            burst={burstBig ? 3 : 2.2}
-            burstMoney={burstBig ? 0.55 : 0.35}
+            burst={burstBig ? 2.2 : 1.6}
+            burstMoney={burstBig ? 0.3 : 0.15}
+            money={0.1}
             width={Math.round(size.w)}
             height={Math.round(size.h)}
-            perSecond={phone ? 24 : 14}
+            perSecond={phone ? 6 : 4}
             style={{ left: 0, top: 0, zIndex: 4 }}
           />
           <SprayCanvas
@@ -256,7 +274,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
             style={{ left: canvas.left, top: canvas.top, zIndex: 4 }}
           />
           <div
-            className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}`}
+            className={`st-arena${crowd >= 7 ? ' packed' : crowd >= 4 ? ' crowd' : ''}${spotlight ? ' spotlit' : ''}`}
             style={{ '--tz': tagZoom.toFixed(2) } as React.CSSProperties}
             aria-live="polite"
           >
@@ -267,10 +285,10 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                 id={`s${s.t.id}`}
                 kind="sprayer"
                 big={s.t.big && !s.mini}
-                perSecond={1}
+                {...sprayRate(s, spotlight, phone)}
                 leaving={s.leaving}
               >
-                <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.t.comment && !s.mini ? ' has-cmt' : ''}${s.leaving ? ' leaving' : ''}`}>
+                <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.spot ? ' spot' : ''}${s.t.comment && !s.mini ? ' has-cmt' : ''}${s.leaving ? ' leaving' : ''}`}>
                   {s.t.big && !s.mini && <span className="sp-badge">Big spray!</span>}
                   <Avatar
                     name={s.t.firstName ?? 'Guest'}
@@ -286,7 +304,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
               </ArenaBody>
             ))}
           </div>
-          <LineCycler lines={lines} phone={phone} box={layout.line} />
+          <LineCycler lines={lines} phone={phone} box={layout.line} quiet={spotlight} />
         </>
       ) : (
         <div className="st-notice">
@@ -593,7 +611,7 @@ type ShownLine = { key: string; line: ScreenLine; until: number; leaving: boolea
  * seconds (longer lines stay longer), cycling through all of them endlessly.
  * A newly approved line jumps the queue.
  */
-function LineCycler({ lines, phone, box }: { lines: ScreenLine[]; phone?: boolean; box: { left: number; top: number; maxWidth: number } }) {
+function LineCycler({ lines, phone, box, quiet }: { lines: ScreenLine[]; phone?: boolean; box: { left: number; top: number; maxWidth: number }; quiet?: boolean }) {
   const [shown, setShown] = useState<ShownLine | null>(null);
   const linesRef = useRef(lines);
   linesRef.current = lines;
@@ -641,7 +659,7 @@ function LineCycler({ lines, phone, box }: { lines: ScreenLine[]; phone?: boolea
 
   if (!shown) return null;
   return (
-    <div className="ln-corner" style={{ left: box.left, top: box.top, maxWidth: box.maxWidth }} aria-live="polite">
+    <div className={`ln-corner${quiet ? ' quiet' : ''}`} style={{ left: box.left, top: box.top, maxWidth: box.maxWidth }} aria-live="polite">
       <div key={shown.key} className={`ln-bubble${shown.leaving ? ' leaving' : ''}`}>
         <div className="ln-head">
           <Avatar name={shown.line.name} photo={shown.line.photo} size={phone ? 30 : 46} />

@@ -9,6 +9,40 @@ import './confetti.css';
 
 export const CONFETTI_COLORS = ['var(--s-accent)', '#F4A6CB', '#E2A62B', '#F6D38A', '#5B1E6B', '#FFFFFF', '#1F7A5C'];
 
+export const NOTES = [
+  { base: '#6E4A2E', light: '#B98A5E', label: '1000' }, // brown, like the ₦1000
+  { base: '#2F5FA7', light: '#7FA6DE', label: '500' }, // blue, like the ₦500
+  { base: '#2E7A5A', light: '#79C19F', label: '200' }, // green
+];
+
+/** A naira note, drawn once at twice its size so it stays sharp. */
+export function noteSprite(n: (typeof NOTES)[number]): HTMLCanvasElement {
+  const W = 88;
+  const H = 44;
+  const c = document.createElement('canvas');
+  c.width = W * 2;
+  c.height = H * 2;
+  const g = c.getContext('2d')!;
+  g.scale(2, 2);
+  g.fillStyle = n.base;
+  g.beginPath();
+  g.roundRect(0, 0, W, H, 4);
+  g.fill();
+  g.strokeStyle = n.light;
+  g.lineWidth = 2;
+  g.strokeRect(4, 4, W - 8, H - 8);
+  g.fillStyle = n.light;
+  g.beginPath();
+  g.arc(22, H / 2, 11, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#FFFFFF';
+  g.font = '800 17px system-ui, sans-serif';
+  g.textAlign = 'right';
+  g.textBaseline = 'middle';
+  g.fillText(`₦${n.label}`, W - 9, H / 2 + 1);
+  return c;
+}
+
 /** A little random number generator that gives the same pieces for the same seed. */
 function seeded(seed: number) {
   let s = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
@@ -32,13 +66,16 @@ type Piece = {
   x0: number; y0: number; cx: number; cy: number; x1: number; y1: number; // arc from the sprayer to the celebrant
   born: number; fly: number; fall: number;
   w: number; h: number; round: boolean; color: string; rot: number; vr: number; flip: number; vf: number; drift: number;
+  note: number; // -1 for confetti, else which naira note picture
 };
 
-export type Emitter = { id: number; x: number; y: number; perSecond: number };
+/** Someone spraying. `money` (0 to 1): how many of their throws are naira notes rather than confetti. */
+export type Emitter = { id: number; x: number; y: number; perSecond: number; money?: number };
 
 /**
- * People spraying: every emitter (a sprayer's name on screen) throws a piece
- * of confetti about once a second (now and then twice), arcing onto the celebrant's
+ * People spraying: every emitter (a sprayer's name on screen) throws naira
+ * notes and confetti at its own pace (the person in the spotlight throws a
+ * fast stream of notes, like spraying a wad by hand), arcing onto the celebrant's
  * `target` area, where it flutters down and fades. Coordinates are in the
  * canvas's own pixels. The drawing loop stops when nobody is spraying.
  */
@@ -75,23 +112,26 @@ export function SprayCanvas({
     if (!canvas || !ctx || reducedMotion()) return;
     const colors = resolveColors(canvas);
     const r = seeded(Date.now());
+    const notes = NOTES.map(noteSprite);
     const pieces: Piece[] = [];
     const nextAt = new Map<number, number>();
     let raf = 0;
     let running = false;
 
     const spawn = (e: Emitter, now: number) => {
+      const isNote = r(0, 1) < (e.money ?? 0);
       const ribbon = r(0, 1) < 0.65;
-      const w = ribbon ? r(20, 30) : r(11, 15);
+      const w = isNote ? r(66, 92) : ribbon ? r(20, 30) : r(11, 15);
       const x1 = r(target.x[0], target.x[1]);
       const y1 = r(target.y[0], target.y[1]);
       pieces.push({
         x0: e.x, y0: e.y, x1, y1,
         cx: (e.x + x1) / 2 + r(-60, 60), cy: Math.min(e.y, y1) - r(90, 220), // the top of the throw
         born: now, fly: r(1100, 1500), fall: r(900, 1300),
-        w, h: ribbon ? w * 0.5 : w, round: !ribbon && r(0, 1) < 0.5,
+        w, h: isNote ? w / 2 : ribbon ? w * 0.5 : w, round: !isNote && !ribbon && r(0, 1) < 0.5,
         color: colors[Math.floor(r(0, colors.length))],
-        rot: r(0, 6.28), vr: r(-7, 7), flip: r(0, 6.28), vf: r(5, 11), drift: r(-40, 40),
+        rot: r(0, 6.28), vr: isNote ? r(-3, 3) : r(-7, 7), flip: r(0, 6.28), vf: isNote ? r(2, 4) : r(5, 11), drift: r(-40, 40),
+        note: isNote ? Math.floor(r(0, notes.length)) : -1,
       });
     };
 
@@ -139,7 +179,8 @@ export function SprayCanvas({
         ctx.rotate(p.rot + p.vr * secs);
         ctx.scale(1, Math.cos(p.flip + p.vf * secs)); // looks like it flips as it flies
         ctx.fillStyle = p.color;
-        if (p.round) {
+        if (p.note >= 0) ctx.drawImage(notes[p.note], -p.w / 2, -p.h / 2, p.w, p.h);
+        else if (p.round) {
           ctx.beginPath();
           ctx.arc(0, 0, p.w / 2, 0, 6.2832);
           ctx.fill();

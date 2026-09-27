@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { CONFETTI_COLORS } from './Confetti';
+import { CONFETTI_COLORS, NOTES, noteSprite } from './Confetti';
 
 // Confetti and naira notes raining down over the whole screen while people are
 // spraying. The steady rain is the same however many people spray (it never
@@ -15,40 +15,6 @@ type Drop = {
   note: number; // -1 for confetti, else which note picture
   w: number; h: number; color: string; round: boolean;
 };
-
-const NOTES = [
-  { base: '#6E4A2E', light: '#B98A5E', label: '1000' }, // brown, like the ₦1000
-  { base: '#2F5FA7', light: '#7FA6DE', label: '500' }, // blue, like the ₦500
-  { base: '#2E7A5A', light: '#79C19F', label: '200' }, // green
-];
-
-/** A naira note, drawn once at twice its size so it stays sharp. */
-function noteSprite(n: (typeof NOTES)[number]): HTMLCanvasElement {
-  const W = 88;
-  const H = 44;
-  const c = document.createElement('canvas');
-  c.width = W * 2;
-  c.height = H * 2;
-  const g = c.getContext('2d')!;
-  g.scale(2, 2);
-  g.fillStyle = n.base;
-  g.beginPath();
-  g.roundRect(0, 0, W, H, 4);
-  g.fill();
-  g.strokeStyle = n.light;
-  g.lineWidth = 2;
-  g.strokeRect(4, 4, W - 8, H - 8);
-  g.fillStyle = n.light;
-  g.beginPath();
-  g.arc(22, H / 2, 11, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#FFFFFF';
-  g.font = '800 17px system-ui, sans-serif';
-  g.textAlign = 'right';
-  g.textBaseline = 'middle';
-  g.fillText(`₦${n.label}`, W - 9, H / 2 + 1);
-  return c;
-}
 
 function reducedMotion() {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

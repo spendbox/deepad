@@ -32,7 +32,10 @@ description. Senders stay anonymous on screen.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
 - The big screen never shows amounts. Each sprayer appears around the celebrant as their first name
-  and initials, throwing confetti (one or two pieces a second) for a while, so many people can spray at once.
+  and initials. Whoever just sprayed gets the **spotlight** for a few seconds (longer for a big spray): their
+  name steps forward and glows, they throw a fast stream of naira notes onto the celebrant, and everyone else
+  fades back. New sprayers take turns in the spotlight (turns get shorter when a crowd is waiting). The
+  confetti falling over the whole screen is kept light, so the sprayer is always the main show.
 - Lines on the screen come only from the planner (dashboard) or guests (the shareable `/write` page).
   Guests' lines wait for the planner's approval (one by one or in bulk); only approved lines show, one at
   a time in the top-left corner, and the screen cycles through them endlessly. A secret view-only page (`/lines/<token>`) shows every line
