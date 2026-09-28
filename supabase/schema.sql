@@ -136,11 +136,6 @@ create table if not exists spray_intents (
   created_at timestamptz not null default now()
 );
 create index if not exists spray_intents_event_idx on spray_intents (event_id);
--- Added later: spraying from the phone. The guest's name for the screen, and the notes thrown so far.
-alter table spray_intents add column if not exists guest_name text;
-alter table spray_intents add column if not exists thrown jsonb not null default '{}'::jsonb;
-alter table spray_intents add column if not exists last_throw_at timestamptz;
-create index if not exists spray_intents_paid_idx on spray_intents (event_id, status, last_throw_at desc);
 
 -- Added later: fun lines for sprays that arrive without a message.
 alter table spray_events add column if not exists hype_lines jsonb not null default '[]'::jsonb;

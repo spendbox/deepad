@@ -200,17 +200,6 @@ export class MemoryStore implements Store {
     data().intents.push(intent);
     return intent;
   }
-  async setIntentThrown(reference: string, thrown: Record<string, number>, at: string) {
-    const i = data().intents.find((x) => x.reference === reference);
-    if (i) Object.assign(i, { thrown, lastThrowAt: at });
-  }
-  async listPaidIntents(eventId: string, limit = 100) {
-    const key = (i: SprayIntent) => i.lastThrowAt ?? i.createdAt;
-    return data().intents.filter((i) => i.eventId === eventId && i.status === 'paid').sort((a, b) => key(b).localeCompare(key(a))).slice(0, limit);
-  }
-  async getTransfer(id: number) {
-    return data().transfers.find((t) => t.id === id) ?? null;
-  }
   async getIntent(reference: string) {
     return data().intents.find((i) => i.reference === reference) ?? null;
   }

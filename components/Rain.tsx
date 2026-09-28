@@ -84,7 +84,7 @@ export default function Rain({
         vf: isNote ? 2 + Math.random() * 2.5 : 5 + Math.random() * 6,
         note: isNote ? Math.floor(Math.random() * notes.length) : -1,
         w,
-        h: isNote ? w * 0.515 : ribbon ? w * 0.45 : w,
+        h: isNote ? w / 2 : ribbon ? w * 0.45 : w,
         color: colors[Math.floor(Math.random() * colors.length)],
         round: !isNote && !ribbon && Math.random() < 0.5,
       });

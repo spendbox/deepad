@@ -80,11 +80,6 @@ export interface Store {
   createIntent(i: NewSprayIntent): Promise<SprayIntent>;
   getIntent(reference: string): Promise<SprayIntent | null>;
   markIntentPaid(reference: string, transferId: number): Promise<void>;
-  /** Save the notes thrown so far from the guest's phone (the full counts, not just the new ones). */
-  setIntentThrown(reference: string, thrown: Record<string, number>, at: string): Promise<void>;
-  /** Paid phone sprays for an event, most recently thrown first. */
-  listPaidIntents(eventId: string, limit?: number): Promise<SprayIntent[]>;
-  getTransfer(id: number): Promise<Transfer | null>;
 
   createLine(l: NewSprayLine): Promise<SprayLine>;
   /** Newest first; only the given statuses if `status` is set. */
