@@ -1,18 +1,18 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { CONFETTI_COLORS, COINS, coinSprite } from './Confetti';
+import { CONFETTI_COLORS, NOTES, noteSprite } from './Confetti';
 
-// Confetti and naira coins raining down over the whole screen while people are
+// Confetti and naira notes raining down over the whole screen while people are
 // spraying. The steady rain is the same however many people spray (it never
 // gets heavier or slower with a crowd); each new sprayer sets off a burst on
-// top of it for a few seconds. Drawn on one <canvas>, with the coins drawn once up front and
+// top of it for a few seconds. Drawn on one <canvas>, with the notes drawn once up front and
 // reused, so it stays smooth.
 
 type Drop = {
   x: number; y: number; vy: number; sway: number; swayF: number; phase: number;
   rot: number; vr: number; flip: number; vf: number;
-  note: number; // -1 for confetti, else which coin picture
+  note: number; // -1 for confetti, else which note picture
   w: number; h: number; color: string; round: boolean;
 };
 
@@ -22,8 +22,8 @@ function reducedMotion() {
 
 /**
  * Rains while `until` (a time in ms) is in the future: `perSecond` pieces a
- * second, of which `money` (0 to 1) are coins; `burst` times as many (with
- * `burstMoney` coins) until `burstUntil`. Sizes are in the canvas's pixels.
+ * second, of which `money` (0 to 1) are notes; `burst` times as many (with
+ * `burstMoney` notes) until `burstUntil`. Sizes are in the canvas's pixels.
  */
 export default function Rain({
   until,
@@ -59,7 +59,7 @@ export default function Rain({
     if (!canvas || !ctx || reducedMotion()) return;
     const accent = getComputedStyle(canvas).getPropertyValue('--s-accent').trim() || '#B3136F';
     const colors = CONFETTI_COLORS.map((c) => (c.startsWith('var(') ? accent : c));
-    const coins = COINS.map(coinSprite);
+    const notes = NOTES.map(noteSprite);
     const k = height / 1080; // falls at the same pace on any screen
     const drops: Drop[] = [];
     let raf = 0;
@@ -70,21 +70,21 @@ export default function Rain({
     const add = (moneyShare: number) => {
       const isNote = Math.random() < moneyShare;
       const ribbon = Math.random() < 0.6;
-      const w = isNote ? 40 + Math.random() * 14 : ribbon ? 16 + Math.random() * 10 : 10 + Math.random() * 5;
+      const w = isNote ? 88 * (0.75 + Math.random() * 0.35) : ribbon ? 16 + Math.random() * 10 : 10 + Math.random() * 5;
       drops.push({
         x: Math.random() * width,
         y: -60,
-        vy: (isNote ? 260 + Math.random() * 120 : 190 + Math.random() * 140) * k,
-        sway: (isNote ? 12 : 30) * (0.5 + Math.random()),
+        vy: (isNote ? 150 + Math.random() * 90 : 190 + Math.random() * 140) * k,
+        sway: (isNote ? 50 : 30) * (0.5 + Math.random()),
         swayF: 0.6 + Math.random() * 0.9,
         phase: Math.random() * 6.28,
         rot: Math.random() * 6.28,
         vr: (Math.random() - 0.5) * (isNote ? 2.5 : 8),
         flip: Math.random() * 6.28,
-        vf: isNote ? 6 + Math.random() * 4 : 5 + Math.random() * 6,
-        note: isNote ? Math.floor(Math.random() * coins.length) : -1,
+        vf: isNote ? 2 + Math.random() * 2.5 : 5 + Math.random() * 6,
+        note: isNote ? Math.floor(Math.random() * notes.length) : -1,
         w,
-        h: isNote ? w : ribbon ? w * 0.45 : w,
+        h: isNote ? w / 2 : ribbon ? w * 0.45 : w,
         color: colors[Math.floor(Math.random() * colors.length)],
         round: !isNote && !ribbon && Math.random() < 0.5,
       });
@@ -117,7 +117,7 @@ export default function Rain({
         ctx.translate(x, d.y);
         ctx.rotate(d.rot + d.vr * t);
         ctx.scale(1, Math.cos(d.flip + d.vf * t)); // looks like it flips as it falls
-        if (d.note >= 0) ctx.drawImage(coins[d.note], -d.w / 2, -d.h / 2, d.w, d.h);
+        if (d.note >= 0) ctx.drawImage(notes[d.note], -d.w / 2, -d.h / 2, d.w, d.h);
         else {
           ctx.fillStyle = d.color;
           if (d.round) {

@@ -32,8 +32,8 @@ description. Senders stay anonymous on screen.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
 - The big screen never shows amounts. Each sprayer appears around the celebrant as their first name
-  and initials, throwing a **naira coin onto the celebrant for every ₦100 sent**.
-  Bigger sprays throw faster (`lib/spray-pace.ts`): ₦5,000 is a coin every 2.5 s (about 2 minutes),
+  and initials, throwing a **₦100 note onto the celebrant for every ₦100 sent**.
+  Bigger sprays throw faster (`lib/spray-pace.ts`): ₦5,000 is a note every 2.5 s (about 2 minutes),
   ₦10,000 every 1.75 s (about 3 minutes), ₦100,000 about twice a second (10 minutes); never over 30 minutes.
   Everyone spraying keeps their full name tag; when the screen fills up, the one spraying longest carries on
   as a small bubble. The confetti falling over the whole screen is kept light, so the sprayers are the show.

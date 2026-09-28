@@ -3,7 +3,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Arena, type BodyKind } from '@/components/arena';
 import Avatar from '@/components/Avatar';
-import { SprayCanvas } from '@/components/Confetti';
+import { NOTE_100, SprayCanvas } from '@/components/Confetti';
 import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import Logo from '@/components/Logo';
@@ -89,14 +89,14 @@ function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean) {
 const LINE_GAP_MS = 900; // pause between one line leaving and the next popping up
 
 /**
- * Someone spraying: their name tag throws a coin for every ₦100 onto the celebrant, one per
+ * Someone spraying: their name tag throws ₦100 notes onto the celebrant, one per
  * ₦100 they sent, until it's all sprayed. When the
  * screen fills up, the one spraying longest carries on as a small bubble.
  * `done`: finished spraying, just resting on screen (no throws).
  */
 export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean; done: boolean };
 
-/** Everyone spraying throws a coin per ₦100 at their own pace: faster for bigger sprays (lib/spray-pace.ts). */
+/** Everyone spraying throws ₦100 notes at their own pace: faster for bigger sprays (lib/spray-pace.ts). */
 function sprayRate(s: ActiveSprayer): { perSecond: number; money: number } {
   if (s.done) return { perSecond: 0, money: 0 };
   return { perSecond: 1000 / noteIntervalMs((s.t.pieces || 1) * NAIRA_PER_NOTE), money: 1 };
@@ -261,7 +261,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
             style={{ left: 0, top: 0, zIndex: 4 }}
           />
           <SprayCanvas
-            source={() => arena.emitters().map((m) => ({ ...m, x: m.x - canvas.left, y: m.y - canvas.top }))}
+            source={() => arena.emitters().map((m) => ({ ...m, note: NOTE_100, x: m.x - canvas.left, y: m.y - canvas.top }))}
             active={spraying}
             target={layout.target}
             width={canvas.width}
