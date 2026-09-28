@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import CopyButton from '@/components/CopyButton';
 import { groupAccountNumber } from '@/lib/money';
 import type { NoteValue } from '@/lib/wad';
-import Wad from './Wad';
+import Bundle from './Bundle';
 import './spray.css';
 
-// Spraying from a guest's phone, right on the event page: choose an amount (and
-// the name and comment for the big screen), get your own account number, and
-// once the money lands, a wad of notes to swipe onto the celebrant.
+// Spraying from a guest's phone, right on the event page: type an amount (and,
+// if you like, the name and comment for the big screen), get your own account
+// number, and once the money lands, a bundle of cash to swipe onto the celebrant.
+// This phone remembers the spray, so refreshing the page carries on where it was.
 
 type WadInfo = {
   reference: string;
@@ -23,7 +24,7 @@ type WadInfo = {
   name: string | null;
 };
 
-const AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000];
+const MIN_NAIRA = 500;
 const naira = (n: number) => `₦${n.toLocaleString('en-NG')}`;
 
 function read(key: string) {
@@ -64,18 +65,34 @@ export default function PhoneSpray({
   const [pendingNaira, setPendingNaira] = useState(0);
   const sending = useRef(false);
 
-  // A spray started earlier on this phone (e.g. the page was reloaded): pick it up again.
+  // Notes thrown but not yet sent are kept on the phone too, so a refresh never loses them.
+  const throwsKey = `${storeKey}-throws`;
+  const savePending = useCallback(() => write(throwsKey, Object.keys(pending.current).length ? JSON.stringify(pending.current) : null), [throwsKey]);
+
+  // A spray started earlier on this phone (e.g. the page was refreshed): carry on right where it was.
   useEffect(() => {
     const ref = read(storeKey);
     if (!ref) return;
     fetch(`/api/spray/${encodeURIComponent(ref)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((w: Omit<WadInfo, 'reference'> | null) => {
-        if (!w || w.state === 'expired' || (w.state === 'paid' && w.amountNaira - w.thrownNaira < 100)) write(storeKey, null);
-        else setWad({ ...w, reference: ref });
+        if (!w || w.state === 'expired' || (w.state === 'paid' && w.amountNaira - w.thrownNaira < 100)) {
+          write(storeKey, null);
+          write(throwsKey, null);
+          return;
+        }
+        try {
+          const saved = JSON.parse(read(throwsKey) ?? '{}') as Record<string, number>;
+          pending.current = saved;
+          setPendingNaira(Object.entries(saved).reduce((s, [k, v]) => s + Number(k) * v, 0));
+        } catch {
+          /* nothing saved */
+        }
+        setWad({ ...w, reference: ref });
+        onOpenChange(true);
       })
       .catch(() => {});
-  }, [storeKey]);
+  }, [storeKey, throwsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Waiting for the transfer: ask every few seconds. The moment it lands, open the wad.
   useEffect(() => {
@@ -101,6 +118,7 @@ export default function PhoneSpray({
     const add = pending.current;
     if (!Object.keys(add).length) return;
     pending.current = {};
+    savePending();
     sending.current = true;
     try {
       const r = await fetch(`/api/spray/${encodeURIComponent(wad.reference)}/throw`, {
@@ -114,10 +132,11 @@ export default function PhoneSpray({
     } catch {
       for (const [k, v] of Object.entries(add)) pending.current[k] = (pending.current[k] ?? 0) + v;
     } finally {
+      savePending();
       sending.current = false;
       setPendingNaira(Object.entries(pending.current).reduce((s, [k, v]) => s + Number(k) * v, 0));
     }
-  }, [wad]);
+  }, [wad, savePending]);
   useEffect(() => {
     if (wad?.state !== 'paid') return;
     const id = setInterval(flush, 300);
@@ -126,8 +145,9 @@ export default function PhoneSpray({
 
   const onThrow = useCallback((value: NoteValue) => {
     pending.current[value] = (pending.current[value] ?? 0) + 1;
+    savePending();
     setPendingNaira((p) => p + value);
-  }, []);
+  }, [savePending]);
 
   const left = wad ? Math.max(0, wad.amountNaira - wad.thrownNaira - pendingNaira) : 0;
   // All thrown: let the last notes finish flying before saying so.
@@ -140,6 +160,7 @@ export default function PhoneSpray({
   }, [emptied]);
   const startAgain = () => {
     write(storeKey, null);
+    write(throwsKey, null);
     setWad(null);
     pending.current = {};
     setPendingNaira(0);
@@ -155,7 +176,7 @@ export default function PhoneSpray({
             <span className="ps-dot" aria-hidden="true" /> Waiting for your transfer…
           </>
         ) : (
-          <>💸 Your wad · {naira(left)} left</>
+          <>💸 Your bundle · {naira(left)} left</>
         )}
       </button>
     );
@@ -201,7 +222,7 @@ export default function PhoneSpray({
           <PayStep wad={wad} onCancel={startAgain} />
         ) : !finished ? (
           <>
-            <Wad amountNaira={wad.amountNaira} leftNaira={left} onThrow={onThrow} muted={muted} />
+            <Bundle amountNaira={wad.amountNaira} leftNaira={left} onThrow={onThrow} muted={muted} />
             <p className="ps-hint">
               <strong>Swipe up</strong> to spray · <strong>tap</strong> for one · <strong>hold</strong> to make it rain
             </p>
@@ -221,18 +242,19 @@ export default function PhoneSpray({
   );
 }
 
-/** Amount, name and comment → their own account number. */
+/** Amount (and, folded away, the name and comment) → their own account number. */
 function SprayForm({ code, canStart, expired, onStarted }: { code: string; canStart: boolean; expired: boolean; onStarted: (w: WadInfo) => void }) {
-  const [amount, setAmount] = useState<number | ''>(5000);
-  const [custom, setCustom] = useState(false);
+  const [amount, setAmount] = useState('');
   const [name, setName] = useState(() => read('dashpad-name') ?? '');
   const [message, setMessage] = useState('');
+  const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const value = Number(amount.replace(/\D/g, '')) || 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!amount) return setError('Choose how much to spray.');
+    if (value < MIN_NAIRA) return setError(`The smallest spray is ${naira(MIN_NAIRA)}.`);
     setBusy(true);
     setError(null);
     write('dashpad-name', name.trim() || null);
@@ -240,7 +262,7 @@ function SprayForm({ code, canStart, expired, onStarted }: { code: string; canSt
       const r = await fetch(`/api/screen/${encodeURIComponent(code)}/spray`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountNaira: amount, name, message }),
+        body: JSON.stringify({ amountNaira: value, name, message }),
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? 'Something went wrong. Please try again.');
@@ -256,42 +278,44 @@ function SprayForm({ code, canStart, expired, onStarted }: { code: string; canSt
   return (
     <form className="ps-form" onSubmit={submit}>
       {expired && <p className="ps-note warn">That account number has expired. Get a new one below.</p>}
-      <fieldset className="ps-field">
-        <legend>How much?</legend>
-        <div className="ps-amounts">
-          {AMOUNTS.map((a) => (
-            <button key={a} type="button" className="ps-amount" aria-pressed={!custom && amount === a} onClick={() => { setCustom(false); setAmount(a); }}>
-              {naira(a)}
-            </button>
-          ))}
-          <button type="button" className="ps-amount" aria-pressed={custom} onClick={() => { setCustom(true); setAmount(''); }}>
-            Other
-          </button>
-        </div>
-        {custom && (
+      <label className="ps-field">
+        <span>How much do you want to spray?</span>
+        <div className="ps-amount-box">
+          <span aria-hidden="true">₦</span>
           <input
-            className="ps-input"
+            className="ps-input ps-amount-input"
             inputMode="numeric"
             autoFocus
-            placeholder="Amount in naira, e.g. 15000"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value ? Number(e.target.value.replace(/\D/g, '')) : '')}
+            placeholder={`${MIN_NAIRA.toLocaleString('en-NG')} or more`}
+            value={amount ? Number(amount.replace(/\D/g, '')).toLocaleString('en-NG') : ''}
+            onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').slice(0, 7))}
+            aria-describedby="ps-min"
           />
-        )}
-      </fieldset>
-      <label className="ps-field">
-        <span>Your name on the screen</span>
-        <input className="ps-input" value={name} maxLength={24} placeholder="e.g. Uncle Tunde" onChange={(e) => setName(e.target.value)} />
+        </div>
+        <span className="ps-small" id="ps-min">The smallest spray is {naira(MIN_NAIRA)}.</span>
       </label>
-      <label className="ps-field">
-        <span>A few words (optional)</span>
-        <input className="ps-input" value={message} maxLength={60} placeholder="e.g. Happy married life!" onChange={(e) => setMessage(e.target.value)} />
-      </label>
+      {more ? (
+        <>
+          <label className="ps-field">
+            <span>Your name on the screen</span>
+            <input className="ps-input" value={name} maxLength={24} placeholder="e.g. Uncle Tunde" onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="ps-field">
+            <span>A few words (optional)</span>
+            <input className="ps-input" value={message} maxLength={60} placeholder="e.g. Happy married life!" onChange={(e) => setMessage(e.target.value)} />
+          </label>
+        </>
+      ) : (
+        <button type="button" className="ps-more" onClick={() => setMore(true)} aria-expanded={false}>
+          <span>{name ? <>Showing as <strong>{name}</strong></> : 'Add your name and a few words'}</span>
+          <span className="ps-more-hint">{name ? 'Change' : 'Optional'} ▾</span>
+        </button>
+      )}
       {error && <p className="ps-note warn" role="alert">{error}</p>}
-      <button type="submit" className="ps-btn" disabled={busy || !amount}>
-        {busy ? 'Getting your account…' : `Get my account number${amount ? ` for ${naira(Number(amount))}` : ''}`}
+      <button type="submit" className="ps-btn" disabled={busy || value < MIN_NAIRA}>
+        {busy ? 'Getting your account…' : `Get my account number${value >= MIN_NAIRA ? ` for ${naira(value)}` : ''}`}
       </button>
-      <p className="ps-small">You’ll get your own account number. Transfer from any bank app, then spray your wad right here.</p>
+      <p className="ps-small">You’ll get your own account number. Transfer from any bank app, then spray your bundle of cash right here.</p>
     </form>
   );
 }
@@ -326,7 +350,7 @@ function PayStep({ wad, onCancel }: { wad: WadInfo; onCancel: () => void }) {
       <div className="ps-wait" role="status">
         <span className="ps-spin" aria-hidden="true" />
         <span>
-          Waiting for your transfer… your wad appears here the moment it lands.
+          Waiting for your transfer… your bundle of cash appears here the moment it lands.
           <br />
           <span className="ps-small">This account works for {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')} more.</span>
         </span>

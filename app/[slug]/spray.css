@@ -1,4 +1,4 @@
-/* Spraying from a guest's phone (PhoneSpray + Wad), in the event's colours (--s-*). */
+/* Spraying from a guest's phone (PhoneSpray + Bundle), in the event's colours (--s-*). */
 .ps { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; font-family: var(--body); }
 .ps-backdrop { position: absolute; inset: 0; background: rgba(12, 4, 16, .62); animation: psFade .2s ease both; }
 .ps-sheet {
@@ -19,6 +19,16 @@
 .ps-form { display: flex; flex-direction: column; gap: 14px; }
 .ps-field { display: flex; flex-direction: column; gap: 8px; border: 0; margin: 0; padding: 0; font-weight: 700; font-size: 15px; }
 .ps-field legend { padding: 0; margin-bottom: 8px; }
+.ps-amount-box { display: flex; align-items: center; gap: 8px; }
+.ps-amount-box > span { font-family: var(--display); font-weight: 800; font-size: 28px; color: var(--s-accent); }
+.ps-amount-input { min-height: 60px; font-family: var(--display); font-weight: 800; font-size: 28px; font-variant-numeric: tabular-nums; }
+.ps-more {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 0 14px; border-radius: 12px;
+  border: 1.5px dashed color-mix(in srgb, var(--s-text) 28%, transparent); background: transparent; color: inherit; font-size: 15px; font-weight: 600;
+  text-align: left; cursor: pointer;
+}
+.ps-more-hint { color: var(--s-muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.ps-more:focus-visible { outline: 3px solid var(--s-accent); outline-offset: 2px; }
 .ps-amounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .ps-amount {
   min-height: 48px; border-radius: 12px; border: 1.5px solid color-mix(in srgb, var(--s-text) 22%, transparent);
@@ -57,7 +67,7 @@
 .ps-wait { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--s-accent) 16%, transparent); font-size: 15px; line-height: 1.4; }
 .ps-spin { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--s-accent) 30%, transparent); border-top-color: var(--s-accent); animation: psSpin .8s linear infinite; }
 
-/* The wad: the whole screen, dark, with the notes in the middle */
+/* The bundle of cash: the whole screen, dark, with the bundle standing near the bottom */
 .ps.ps-full { align-items: stretch; }
 .ps.ps-full .ps-sheet {
   max-width: none; max-height: none; height: 100dvh; border-radius: 0; display: flex; flex-direction: column; overflow: hidden;
@@ -73,18 +83,18 @@
 /* The notes fly all the way up, behind the amount and buttons (which stay on top and tappable) */
 .ps.ps-full .ps-head { position: relative; z-index: 2; pointer-events: none; }
 .ps.ps-full .ps-head button { pointer-events: auto; }
-.wad { position: relative; flex: 1; min-height: 0; margin: -150px -16px 0; }
-.wad-canvas { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
-.wad-canvas:active { cursor: grabbing; }
-.wad-notes { position: absolute; left: 16px; right: 16px; bottom: 6px; display: flex; gap: 8px; justify-content: center; }
-.wad-note-btn {
+.bundle { position: relative; flex: 1; min-height: 0; margin: -150px -16px 0; }
+.bundle-canvas { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.bundle-canvas:active { cursor: grabbing; }
+.bundle-notes { position: absolute; left: 16px; right: 16px; bottom: 6px; display: flex; gap: 8px; justify-content: center; }
+.bundle-note-btn {
   flex: 1; max-width: 104px; padding: 6px 6px 5px; border-radius: 12px; border: 2px solid rgba(255, 246, 230, .18);
   background: rgba(255, 255, 255, .05); color: rgba(255, 246, 230, .8); font-weight: 800; font-size: 13px; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 4px; transition: transform .15s ease, border-color .15s ease;
 }
-.wad-note-img { width: 100%; height: auto; border-radius: 3px; box-shadow: 0 3px 8px -3px rgba(0, 0, 0, .6); }
-.wad-note-btn[aria-checked='true'] { border-color: #f2b437; background: rgba(242, 180, 55, .16); color: #f2b437; transform: translateY(-3px); }
-.wad-note-btn:disabled { opacity: .3; }
+.bundle-note-img { width: 100%; height: auto; border-radius: 3px; box-shadow: 0 3px 8px -3px rgba(0, 0, 0, .6); }
+.bundle-note-btn[aria-checked='true'] { border-color: #f2b437; background: rgba(242, 180, 55, .16); color: #f2b437; transform: translateY(-3px); }
+.bundle-note-btn:disabled { opacity: .3; }
 .ps-hint { margin: 8px 0 0; text-align: center; font-size: 14px; color: rgba(255, 246, 230, .75); }
 .ps-hint strong { color: #fff6e6; }
 .ps-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
