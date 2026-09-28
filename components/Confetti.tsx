@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import './confetti.css';
-import { drawNaira } from './naira';
 
 // All confetti is drawn on a <canvas>: one layer the browser can paint
 // cheaply, instead of hundreds of moving page elements. That keeps the big
@@ -10,14 +9,60 @@ import { drawNaira } from './naira';
 
 export const CONFETTI_COLORS = ['var(--s-accent)', '#F4A6CB', '#E2A62B', '#F6D38A', '#5B1E6B', '#FFFFFF', '#1F7A5C'];
 
-/** The notes that fly on the big screen, in picture order (see NOTE_100 and the phone's note values). */
-export const NOTES = [{ value: 1000 }, { value: 500 }, { value: 200 }, { value: 100 }] as const;
-/** The ₦100 note: what each sprayer throws (one note per ₦100 they sent). */
-export const NOTE_100 = 3;
+/** The coins that fly on the big screen: gold and silver naira coins, catching the light as they spin. */
+export const COINS = [
+  { rim: '#8A5A12', face: '#F2C44E', shine: '#FFF1B8', deep: '#B7801F', mark: '#7A4E0E' }, // gold
+  { rim: '#6F7479', face: '#D9DDE1', shine: '#FFFFFF', deep: '#9CA3AA', mark: '#4F555B' }, // silver
+  { rim: '#8B4A1C', face: '#E7A15A', shine: '#FFE0BC', deep: '#B06A2E', mark: '#6E3512' }, // bronze
+];
 
-/** A naira note for the big screen, drawn once at twice its size so it stays sharp. */
-export function noteSprite(n: (typeof NOTES)[number]): HTMLCanvasElement {
-  return drawNaira(n.value, 88, 2);
+/** A naira coin, drawn once at twice its size so it stays sharp. */
+export function coinSprite(c: (typeof COINS)[number]): HTMLCanvasElement {
+  const D = 64;
+  const R = D / 2;
+  const cv = document.createElement('canvas');
+  cv.width = D * 2;
+  cv.height = D * 2;
+  const g = cv.getContext('2d')!;
+  g.scale(2, 2);
+  // The rim
+  g.fillStyle = c.rim;
+  g.beginPath();
+  g.arc(R, R, R, 0, Math.PI * 2);
+  g.fill();
+  // The face, lit from the top left
+  const face = g.createRadialGradient(R * 0.7, R * 0.6, 2, R, R, R);
+  face.addColorStop(0, c.shine);
+  face.addColorStop(0.45, c.face);
+  face.addColorStop(1, c.deep);
+  g.fillStyle = face;
+  g.beginPath();
+  g.arc(R, R, R - 3, 0, Math.PI * 2);
+  g.fill();
+  // A raised ring of beads just inside the edge
+  g.fillStyle = c.mark;
+  g.globalAlpha = 0.55;
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    g.beginPath();
+    g.arc(R + Math.cos(a) * (R - 7.5), R + Math.sin(a) * (R - 7.5), 1.1, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalAlpha = 1;
+  // ₦ in the middle, stamped in (a light edge under it, like a raised letter)
+  g.font = '900 34px Arial, Helvetica, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(255,255,255,.45)';
+  g.fillText('₦', R, R + 2.2);
+  g.fillStyle = c.mark;
+  g.fillText('₦', R, R + 1.2);
+  // A glint
+  g.fillStyle = 'rgba(255,255,255,.55)';
+  g.beginPath();
+  g.ellipse(R * 0.62, R * 0.5, 7, 3.2, -0.7, 0, Math.PI * 2);
+  g.fill();
+  return cv;
 }
 
 /** A little random number generator that gives the same pieces for the same seed. */
@@ -43,16 +88,16 @@ type Piece = {
   x0: number; y0: number; cx: number; cy: number; x1: number; y1: number; // arc from the sprayer to the celebrant
   born: number; fly: number; fall: number;
   w: number; h: number; round: boolean; color: string; rot: number; vr: number; flip: number; vf: number; drift: number;
-  note: number; // -1 for confetti, else which naira note picture
+  note: number; // -1 for confetti, else which coin picture
 };
 
-/** Someone spraying. `money` (0 to 1): how many of their throws are naira notes rather than confetti. */
-export type Emitter = { id: number; x: number; y: number; perSecond: number; money?: number; note?: number; queued?: number };
+/** Someone spraying. `money` (0 to 1): how many of their throws are coins rather than confetti. */
+export type Emitter = { id: number; x: number; y: number; perSecond: number; money?: number; note?: number };
 
 /**
  * People spraying: every emitter (a sprayer's name on screen) throws naira
- * notes and confetti at its own pace (the person in the spotlight throws a
- * fast stream of notes, like spraying a wad by hand), arcing onto the celebrant's
+ * coins (and confetti, if `money` is under 1) at its own pace, spinning and
+ * glinting as they arc onto the celebrant's
  * `target` area, where it flutters down and fades. Coordinates are in the
  * canvas's own pixels. The drawing loop stops when nobody is spraying.
  */
@@ -65,13 +110,7 @@ export function SprayCanvas({
   height,
   className = '',
   style,
-  dequeue,
-  wake = 0,
 }: {
-  /** Change this number to wake the drawing loop (e.g. notes just queued from a phone). */
-  wake?: number;
-  /** Notes waiting to be thrown by a sprayer (from their phone): the next one, or undefined. */
-  dequeue?: (id: number) => number | undefined;
   emitters?: Emitter[];
   /** Live positions (e.g. from moving name tags), asked for every frame instead of `emitters`. */
   source?: () => Emitter[];
@@ -88,8 +127,6 @@ export function SprayCanvas({
   const readRef = useRef(read);
   const kick = useRef<() => void>(() => {});
   readRef.current = read;
-  const dequeueRef = useRef(dequeue);
-  dequeueRef.current = dequeue;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -97,28 +134,26 @@ export function SprayCanvas({
     if (!canvas || !ctx || reducedMotion()) return;
     const colors = resolveColors(canvas);
     const r = seeded(Date.now());
-    const notes = NOTES.map(noteSprite);
+    const coins = COINS.map(coinSprite);
     const pieces: Piece[] = [];
     const nextAt = new Map<number, number>();
-    const nextQueued = new Map<number, number>();
     let raf = 0;
     let running = false;
 
-    const spawn = (e: Emitter, now: number, forced?: number) => {
-      const isNote = forced !== undefined || r(0, 1) < (e.money ?? 0);
+    const spawn = (e: Emitter, now: number) => {
+      const isNote = r(0, 1) < (e.money ?? 0);
       const ribbon = r(0, 1) < 0.65;
-      // Notes thrown by hand from a guest's phone are bigger: each one is someone's own throw.
-      const w = forced !== undefined ? r(104, 128) : isNote ? r(66, 92) : ribbon ? r(20, 30) : r(11, 15);
+      const w = isNote ? r(40, 52) : ribbon ? r(20, 30) : r(11, 15);
       const x1 = r(target.x[0], target.x[1]);
       const y1 = r(target.y[0], target.y[1]);
       pieces.push({
         x0: e.x, y0: e.y, x1, y1,
-        cx: (e.x + x1) / 2 + r(-60, 60), cy: Math.max(20, Math.min(e.y, y1) - r(90, 220)), // the top of the throw (kept on screen)
+        cx: (e.x + x1) / 2 + r(-60, 60), cy: Math.min(e.y, y1) - r(90, 220), // the top of the throw
         born: now, fly: r(1100, 1500), fall: r(900, 1300),
-        w, h: isNote ? w * 0.515 : ribbon ? w * 0.5 : w, round: !isNote && !ribbon && r(0, 1) < 0.5,
+        w, h: isNote ? w : ribbon ? w * 0.5 : w, round: !isNote && !ribbon && r(0, 1) < 0.5,
         color: colors[Math.floor(r(0, colors.length))],
-        rot: r(0, 6.28), vr: isNote ? r(-3, 3) : r(-7, 7), flip: r(0, 6.28), vf: isNote ? r(2, 4) : r(5, 11), drift: r(-40, 40),
-        note: isNote ? forced ?? e.note ?? Math.floor(r(0, notes.length)) : -1,
+        rot: r(0, 6.28), vr: isNote ? r(-3, 3) : r(-7, 7), flip: r(0, 6.28), vf: isNote ? r(6, 10) : r(5, 11), drift: r(-40, 40),
+        note: isNote ? e.note ?? Math.floor(r(0, coins.length)) : -1,
       });
     };
 
@@ -128,14 +163,6 @@ export function SprayCanvas({
       const ids = new Set(live.map((e) => e.id));
       for (const id of [...nextAt.keys()]) if (!ids.has(id)) nextAt.delete(id);
       for (const e of live) {
-        // Notes thrown from the guest's phone: spread out a little, so a quick burst still looks like a hand spraying.
-        if (e.queued && dequeueRef.current && now >= (nextQueued.get(e.id) ?? 0)) {
-          const note = dequeueRef.current(e.id);
-          if (note !== undefined) {
-            spawn(e, now, note);
-            nextQueued.set(e.id, now + Math.max(70, Math.min(450, 900 / e.queued)));
-          }
-        }
         const due = nextAt.get(e.id);
         if (e.perSecond <= 0) continue;
         if (due === undefined) nextAt.set(e.id, now + r(200, 600));
@@ -173,9 +200,9 @@ export function SprayCanvas({
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(p.rot + p.vr * secs);
-        ctx.scale(1, Math.cos(p.flip + p.vf * secs)); // looks like it flips as it flies
+        ctx.scale(1, Math.cos(p.flip + p.vf * secs)); // looks like it spins as it flies
         ctx.fillStyle = p.color;
-        if (p.note >= 0) ctx.drawImage(notes[p.note], -p.w / 2, -p.h / 2, p.w, p.h);
+        if (p.note >= 0) ctx.drawImage(coins[p.note], -p.w / 2, -p.h / 2, p.w, p.h);
         else if (p.round) {
           ctx.beginPath();
           ctx.arc(0, 0, p.w / 2, 0, 6.2832);
@@ -202,10 +229,10 @@ export function SprayCanvas({
     };
   }, [width, height, target.x[0], target.x[1], target.y[0], target.y[1]]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Wake the loop when someone new starts spraying, or notes arrive from a phone.
+  // Wake the loop when someone new starts spraying.
   useEffect(() => {
-    if (emitters?.length || active || wake) kick.current();
-  }, [emitters, active, wake]);
+    if (emitters?.length || active) kick.current();
+  }, [emitters, active]);
 
   return <canvas ref={ref} className={`cf-canvas ${className}`} width={width} height={height} style={style} aria-hidden="true" />;
 }

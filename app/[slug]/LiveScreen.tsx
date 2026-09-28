@@ -1,29 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ScreenFeed, ScreenTransfer } from '@/lib/events';
 import { groupAccountNumber } from '@/lib/money';
 import { isCutout } from '@/lib/photos';
 import { keepAwake } from '@/lib/wake';
 import { alertSoundBlocked, playAlert, unlockAlertSound } from '@/lib/alert-sound';
 import { sprayDurationMs } from '@/lib/spray-pace';
-import { ThrowBus } from '@/lib/throw-bus';
-import { NOTE_VALUES } from '@/lib/wad';
-import PhoneSpray from './PhoneSpray';
 import { resolveTheme, themeVars as toThemeVars } from '@/lib/themes';
 import StageScreen, { type ActiveSprayer, type StageMode, type StageSize } from './StageScreen';
 import { screenIdFor, useLiveCamera } from './useLiveCamera';
 import './stage.css';
 
 const POLL_MS = 2000;
-const FAST_POLL_MS = 1000; // while someone is throwing from their phone, so their notes fly promptly
-// Spraying from a phone: after paying, their name waits this long for their first swipe…
-const PHONE_WAIT_MS = 45_000;
-// …and once they stop throwing, it stays this long before slowly fading away (it comes back if they throw again).
-const PHONE_IDLE_MS = 12_000;
-const PHONE_FADE_MS = 2600;
-// Which note picture (NOTES in components/Confetti) each note value uses.
-const NOTE_PICTURE: Record<number, number> = { 1000: 0, 500: 1, 200: 2, 100: 3 };
 const PHOTO_MS = 7000; // each celebrant photo shows this long
 const JOIN_GAP_MS = 600; // new sprayers step in one after another, not all at once
 const LEAVE_MS = 700; // time for a name tag to fade away
@@ -45,23 +34,7 @@ type Sprayer = ActiveSprayer & { until: number; joinedAt: number; leftAt?: numbe
 
 /** How long someone keeps spraying: one ₦100 note per throw, faster for bigger sprays (lib/spray-pace.ts). */
 function stayMs(t: ScreenTransfer) {
-  if (t.phone) return PHONE_WAIT_MS; // they throw by hand: kept up while they're throwing (see below)
   return sprayDurationMs(t.pieces || 1);
-}
-
-/** Notes thrown since last time, as note pictures (for the confetti). */
-function newNotes(before: Record<string, number>, now: Record<string, number>): number[] {
-  const out: number[] = [];
-  for (const v of NOTE_VALUES) {
-    const d = Math.max(0, (now[String(v)] ?? 0) - (before[String(v)] ?? 0));
-    for (let i = 0; i < Math.min(d, 80); i++) out.push(NOTE_PICTURE[v]);
-  }
-  // Mixed notes come out mixed, like a real wad.
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
 }
 
 export default function LiveScreen({ code, initialFeed }: Props) {
@@ -73,29 +46,16 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const [waiting, setWaiting] = useState<ScreenTransfer[]>([]);
   const [sprayers, setSprayers] = useState<Sprayer[]>([]);
   const [burst, setBurst] = useState({ until: 0, big: false });
-  // Spraying from phones: what each phone had thrown when we last looked, notes waiting for their
-  // thrower to (re)appear, and when each last threw.
-  const throwBus = useMemo(() => new ThrowBus(), []);
-  const phoneSeen = useRef(new Map(initialFeed.recent.filter((t) => t.phone).map((t) => [t.id, t.phone!.thrown])));
-  const pendingNotes = useRef(new Map<number, number[]>());
-  const lastThrow = useRef(new Map<number, number>());
-  const sprayersRef = useRef<Sprayer[]>([]);
-  // Who has already had their moment (someone coming back to throw more doesn't get the alert sound again).
-  const joinedOnce = useRef(new Set<number>());
   // The screen was opened (or reloaded) while people were spraying: they carry on where they were.
   // The most recent ones get full name tags; others continue as small bubbles. If nobody's spray is
   // still going, the most recent sprayer lingers, as they would have on screen.
   useEffect(() => {
     const at = Date.now();
     const recent = initialFeed.recent.map((t) => ({ t, at: new Date(t.createdAt).getTime() }));
-    // Until when each would still be spraying (someone throwing from their phone: while they keep throwing).
-    const endOf = (t: ScreenTransfer, made: number) =>
-      Math.max(made + stayMs(t), t.phone?.lastThrowAt ? new Date(t.phone.lastThrowAt).getTime() + PHONE_IDLE_MS : 0);
-    const still = recent.filter(({ t, at: made }) => endOf(t, made) > at + 2000).slice(-(LIMITS.tv.tags + LIMITS.tv.minis));
+    const still = recent.filter(({ t, at: made }) => made + stayMs(t) > at + 2000).slice(-(LIMITS.tv.tags + LIMITS.tv.minis));
     const resumed: Sprayer[] = still.map(({ t, at: made }, i) => ({
-      t, slot: i, leaving: false, mini: i < still.length - LIMITS.tv.tags, done: false, joinedAt: made, until: endOf(t, made),
+      t, slot: i, leaving: false, mini: i < still.length - LIMITS.tv.tags, done: false, joinedAt: made, until: made + stayMs(t),
     }));
-    for (const { t } of recent) joinedOnce.current.add(t.id);
     const last = recent[recent.length - 1];
     if (!resumed.length && last && last.at + stayMs(last.t) + LINGER_MS > at) {
       resumed.push({ t: last.t, slot: 0, leaving: false, mini: false, done: true, joinedAt: last.at, lingering: true, until: last.at + stayMs(last.t) + LINGER_MS });
@@ -154,34 +114,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
         setWaiting((list) => (list.some(changed) ? list.map((x) => (changed(x) ? byId.get(x.id)! : x)) : list));
         // Big sprays skip the queue and show straight away.
         if (fresh.length) setWaiting((w) => [...fresh.filter((t) => t.big), ...w, ...fresh.filter((t) => !t.big)]);
-        // Notes thrown from guests' phones since last time: they fly from the thrower's name.
-        for (const t of data.recent) {
-          if (!t.phone) continue;
-          const notes = newNotes(phoneSeen.current.get(t.id) ?? {}, t.phone.thrown);
-          phoneSeen.current.set(t.id, t.phone.thrown);
-          if (!notes.length) continue;
-          lastThrow.current.set(t.id, Date.now());
-          const on = sprayersRef.current.find((s) => s.t.id === t.id);
-          if (on && !on.leaving) {
-            throwBus.emit(t.id, notes);
-            // Back to spraying: no longer just resting on screen.
-            if (on.done || on.lingering) setSprayers((list) => list.map((s) => (s.t.id === t.id ? { ...s, done: false, lingering: false } : s)));
-          } else if (on) {
-            // Fading away, but threw again: come right back.
-            setSprayers((list) => list.map((s) => (s.t.id === t.id ? { ...s, leaving: false, leftAt: undefined, done: false, lingering: false } : s)));
-            setTimeout(() => throwBus.emit(t.id, notes), 60);
-          } else {
-            // Gone from the screen: step back in, then throw.
-            pendingNotes.current.set(t.id, [...(pendingNotes.current.get(t.id) ?? []), ...notes]);
-            setWaiting((w) => (w.some((x) => x.id === t.id) ? w : [...w, t]));
-          }
-        }
       } catch {
         fails += 1;
         if (alive) setOnline(false);
       }
-      const phoneBusy = sprayersRef.current.some((s) => s.t.phone && !s.leaving);
-      if (alive) timer = setTimeout(poll, fails ? Math.min(POLL_MS * 2 ** fails, 8000) : phoneBusy ? FAST_POLL_MS : POLL_MS);
+      if (alive) timer = setTimeout(poll, fails ? Math.min(POLL_MS * 2 ** fails, 8000) : POLL_MS);
     };
     timer = setTimeout(poll, POLL_MS);
     return () => {
@@ -201,12 +138,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   const mode: StageMode = compact ? 'phone' : 'tv';
   useEffect(() => {
     const limits = LIMITS[mode];
-    let list = sprayers.filter((s) => !(s.leaving && now - (s.leftAt ?? now) >= (s.t.phone ? PHONE_FADE_MS : LEAVE_MS))); // faded out: gone
-    // Spraying from a phone: once they've started throwing, they stay only while they keep throwing.
-    list = list.map((s) => {
-      const thrown = s.t.phone ? lastThrow.current.get(s.t.id) : undefined;
-      return thrown && !s.leaving && s.until !== thrown + PHONE_IDLE_MS ? { ...s, until: thrown + PHONE_IDLE_MS } : s;
-    });
+    let list = sprayers.filter((s) => !(s.leaving && now - (s.leftAt ?? now) >= LEAVE_MS)); // faded out: gone
     let minis = list.filter((s) => s.mini && !s.leaving).length;
     // The last person still spraying: if their spray runs out with nobody else spraying or waiting,
     // they carry on (up to 2 more minutes) so the screen isn't left empty; someone new replaces them.
@@ -215,8 +147,7 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     list = list.map((s) => {
       if (s.leaving) return s;
       if (now >= s.until) {
-        // (Someone spraying from their phone just fades away when they stop.)
-        if (!s.t.phone && !s.lingering && !lingerTaken && !waiting.length && !othersSpraying(s)) {
+        if (!s.lingering && !lingerTaken && !waiting.length && !othersSpraying(s)) {
           lingerTaken = true;
           // Alone on screen: back to the full name tag, resting (no longer throwing).
           return { ...s, lingering: true, done: true, mini: false, until: now + LINGER_MS };
@@ -244,19 +175,11 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           const first = bubbles.sort((a, b) => a.until - b.until)[0];
           list = list.map((s) => (s === first ? { ...s, leaving: true, leftAt: now } : s));
         }
-        const returning = joinedOnce.current.has(next.id);
-        joinedOnce.current.add(next.id);
-        list = [...list, { t: next, slot: list.length, leaving: false, mini: false, done: false, joinedAt: now, until: returning ? now + PHONE_IDLE_MS : until }];
+        list = [...list, { t: next, slot: list.length, leaving: false, mini: false, done: false, joinedAt: now, until }];
         setWaiting(rest);
         lastJoin.current = now;
-        // Notes they threw while off screen: thrown as soon as their name is up.
-        const held = pendingNotes.current.get(next.id);
-        if (held?.length) {
-          pendingNotes.current.delete(next.id);
-          setTimeout(() => throwBus.emit(next.id, held), 120);
-        }
-        // The bank-alert sound, as each new sprayer steps in (if the planner left it on). Not again for someone coming back.
-        if (feed.event.alertSound && !returning) playAlert(next.big);
+        // The bank-alert sound, as each new sprayer steps in (if the planner left it on).
+        if (feed.event.alertSound) playAlert(next.big);
         // A fresh burst of rain for each new sprayer; bigger sprays, bigger burst.
         const len = next.big ? BIG_BURST_MS : BURST_MS[next.weight] ?? 3000;
         setBurst((b) => ({ until: Math.max(b.until, now + len), big: next.big || (b.big && b.until > now) }));
@@ -264,7 +187,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
     }
     if (list.length !== sprayers.length || list.some((s, i) => s !== sprayers[i])) setSprayers(list);
   }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
-  sprayersRef.current = sprayers;
 
   // --- Fit the design to any screen: a TV or projector, or a phone. ---
   useEffect(() => {
@@ -327,10 +249,6 @@ export default function LiveScreen({ code, initialFeed }: Props) {
   }, []);
 
   const e = feed.event;
-  // On a phone at the party: spray from this phone (own account number, then a wad to throw).
-  const [sprayOpen, setSprayOpen] = useState(false);
-  const canSprayHere = compact && e.phase === 'live' && !e.paused && !!e.accountNumber;
-  const openSpray = useCallback(() => setSprayOpen(true), []);
   // Live video of the celebrant: only on the big screen, never on guests' phones.
   const cam = useLiveCamera(code, sid, feed.camera, ready && !compact && e.phase !== 'ended');
   const camNotice = cam.source ? null : cam.phoneProblem;
@@ -385,13 +303,8 @@ export default function LiveScreen({ code, initialFeed }: Props) {
           burstUntil={burst.until}
           burstBig={burst.big}
           accountNumber={e.accountNumber}
-          throwBus={throwBus}
-          onSpray={canSprayHere ? openSpray : undefined}
         />
       </div>
-      {compact && (
-        <PhoneSpray code={code} celebrantName={e.celebrantName} open={sprayOpen} onOpenChange={setSprayOpen} canStart={canSprayHere} />
-      )}
       {/* Only on a computer, and only while the mouse moves: never seen on the projected picture. */}
       {!compact && (
       <div className={`scr-controls${controlsOn ? '' : ' hidden'}`}>

@@ -32,18 +32,11 @@ description. Senders stay anonymous on screen.
 - Transfers only count between the event's start and end time. At the end the account
   is switched off and the planner is emailed a report of who sprayed.
 - The big screen never shows amounts. Each sprayer appears around the celebrant as their first name
-  and initials, throwing a **₦100 note onto the celebrant for every ₦100 sent**.
-  Bigger sprays throw faster (`lib/spray-pace.ts`): ₦5,000 is a note every 2.5 s (about 2 minutes),
+  and initials, throwing a **naira coin onto the celebrant for every ₦100 sent**.
+  Bigger sprays throw faster (`lib/spray-pace.ts`): ₦5,000 is a coin every 2.5 s (about 2 minutes),
   ₦10,000 every 1.75 s (about 3 minutes), ₦100,000 about twice a second (10 minutes); never over 30 minutes.
   Everyone spraying keeps their full name tag; when the screen fills up, the one spraying longest carries on
   as a small bubble. The confetti falling over the whole screen is kept light, so the sprayers are the show.
-- **Spray from your phone**: on a phone, the event link shows no account number, just a "Spray …" button.
-  The guest types an amount (₦500 or more) and, if they like, the name to show and a comment, and gets
-  their own account number for that spray (Paystack "Pay with Transfer", 30 minutes; split like every other
-  payment). When the money lands, a bundle of cash stands on their phone (₦100/₦200/₦500/₦1,000 notes, as
-  thick as what's left): swipe up to throw a note, tap for a flick, hold to make it rain. Each note flies from
-  their name on the big screen; if they stop, their name fades away and comes back when they throw again.
-  They can never throw more than they paid. The phone remembers the spray, so a refresh carries on.
 - Lines on the screen come only from the planner (dashboard) or guests (the shareable `/write` page).
   The write-a-line page has a "no cash needed" note under the form (planners can turn it off or reword it),
   and planners can download a QR code for the page (for invitations or table cards).

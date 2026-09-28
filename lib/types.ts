@@ -165,8 +165,6 @@ export type IntentStatus = 'pending' | 'paid';
 export type SprayIntent = {
   reference: string;
   eventId: string;
-  /** The name the guest typed, shown on screen instead of their bank name. */
-  guestName?: string | null;
   message: string | null;
   amountKobo: number;
   accountNumber: string;
@@ -175,13 +173,10 @@ export type SprayIntent = {
   expiresAt: string;
   status: IntentStatus;
   transferId: number | null;
-  /** Notes the guest has thrown from their phone so far, by value in naira: {"500": 12, "100": 3}. */
-  thrown?: Record<string, number> | null;
-  lastThrowAt?: string | null;
   createdAt: string;
 };
 
-export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transferId' | 'thrown' | 'lastThrowAt'>;
+export type NewSprayIntent = Omit<SprayIntent, 'createdAt' | 'status' | 'transferId'>;
 
 /**
  * A line shown on the big screen: a short wish for the celebrant, written by
