@@ -224,7 +224,7 @@ export function receiverNames(event: SprayEvent): string[] {
 // ---------- Spraying from the phone (a one-time account per spray, then a wad to throw) ----------
 
 export const ONE_TIME_MINUTES = 30;
-export const MIN_SPRAY_NAIRA = 100;
+export const MIN_SPRAY_NAIRA = 500;
 export const MAX_SPRAY_NAIRA = 5_000_000;
 export class SprayInputError extends Error {}
 
