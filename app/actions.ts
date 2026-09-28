@@ -5,7 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { ADMIN_COOKIE, checkAdminPassword, makeAdminToken } from '@/lib/auth';
-import { eventPhase, EVENT_TYPES, isEventType, MAX_EVENT_HOURS } from '@/lib/event-info';
+import { eventPhase, EVENT_TYPES, isEventType, MAX_CASHLESS_NOTE, MAX_EVENT_HOURS } from '@/lib/event-info';
 import { escapeHtml, sendEmail } from '@/lib/email';
 import { checkPaystackForTransfers, recleanMessages, sendEventReport, setupEventPayments } from '@/lib/events';
 import { deactivateDedicatedAccount, paystackConfigured } from '@/lib/paystack';
@@ -15,7 +15,7 @@ import { endPlannerSession, requireAdmin, requirePlanner, startPlannerSession } 
 import { siteUrl } from '@/lib/site';
 import { slugProblem } from '@/lib/slug';
 import { getStore } from '@/lib/store';
-import { cleanDisplayName, cleanLine } from '@/lib/text';
+import { cleanDisplayName, cleanLine, filterProfanity } from '@/lib/text';
 import { cleanThemeColors, isEventThemeId } from '@/lib/themes';
 import { cutoutsConfigured, removeBackground } from '@/lib/cutouts';
 import type { Planner, SprayEvent, SprayLine } from '@/lib/types';
@@ -429,6 +429,11 @@ export async function saveEventSettings(eventId: string, _prev: FormState, form:
   const label = cleanDisplayName(str(form, 'recipientLabel'));
   if (label) patch.recipientLabel = label;
   if (cashless === 'yes' || cashless === 'no') patch.showCashlessNote = cashless === 'yes';
+  // The note's wording: sent together with the switch (empty = the default wording).
+  if (form.has('cashlessNote')) {
+    const note = filterProfanity(str(form, 'cashlessNote').replace(/\s+/g, ' ')).slice(0, MAX_CASHLESS_NOTE).trim();
+    patch.cashlessNote = note || null;
+  }
   // The big-screen switches: comments under names, the AI check of comments, the bank-alert sound.
   for (const key of ['showComments', 'aiCommentFilter', 'alertSound'] as const) {
     const v = str(form, key);

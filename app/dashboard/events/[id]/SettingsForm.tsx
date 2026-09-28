@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { RECIPIENT_CHOICES } from '@/lib/event-info';
+import { cashlessNoteText, MAX_CASHLESS_NOTE, RECIPIENT_CHOICES } from '@/lib/event-info';
 import DateTimeField from '@/components/DateTimeField';
 import SlugField from '@/components/SlugField';
 import ThemePicker from '@/components/ThemePicker';
@@ -17,6 +17,8 @@ type Values = {
   bigSprayNaira: number;
   endsAt: string;
   showCashlessNote: boolean;
+  cashlessNote: string;
+  celebrantName: string;
 };
 
 function toLocalInput(iso: string): string {
@@ -46,11 +48,13 @@ export function DetailsForm({ eventId, ended, values }: { eventId: string; ended
   const [label, setLabel] = useState(values.recipientLabel);
   const [endLocal, setEndLocal] = useState(() => toLocalInput(values.endsAt));
   const [cashless, setCashless] = useState(values.showCashlessNote);
+  const [note, setNote] = useState(values.cashlessNote);
 
   return (
     <form action={action} className="settings-form">
       <input type="hidden" name="recipientLabel" value={label} />
       <input type="hidden" name="showCashlessNote" value={cashless ? 'yes' : 'no'} />
+      <input type="hidden" name="cashlessNote" value={note} />
       {/* Sent as a full date with time zone, so the server reads it correctly. */}
       <input type="hidden" name="endsAt" value={ended ? '' : localToIso(endLocal)} />
       <div className="settings-grid">
@@ -76,6 +80,30 @@ export function DetailsForm({ eventId, ended, values }: { eventId: string; ended
         </div>
       </div>
       <CashlessToggle on={cashless} onChange={setCashless} />
+      {cashless && (
+        <div className="field">
+          <label htmlFor="s-cash-note">The note guests see</label>
+          <textarea
+            id="s-cash-note"
+            className="input"
+            rows={4}
+            style={{ minHeight: 110, resize: 'vertical' }}
+            maxLength={MAX_CASHLESS_NOTE}
+            value={note}
+            placeholder={cashlessNoteText({ celebrantName: values.celebrantName })}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <span className="hint">
+            Leave it empty to use the wording shown. {note.length}/{MAX_CASHLESS_NOTE}
+            {note && (
+              <>
+                {' · '}
+                <button type="button" className="link-btn" style={{ minHeight: 0 }} onClick={() => setNote('')}>Use the default</button>
+              </>
+            )}
+          </span>
+        </div>
+      )}
       <div className="settings-foot">
         <Result state={state} />
         <button type="submit" className="btn btn-dark" disabled={pending}>{pending ? 'Saving…' : 'Save details'}</button>
@@ -222,7 +250,7 @@ export function CashlessToggle({ on, onChange }: { on: boolean; onChange: (on: b
       <span className="switch-text">
         <strong>Tell guests they don’t need cash</strong>
         <span className="hint">
-          Shows a short note on your “write a line” page: no need to hunt for mint notes, they can spray the celebrant by transfer at the party.
+          Shows a short note under the form on your “write a line” page: they can spray the celebrant digitally at the party.
         </span>
       </span>
     </label>

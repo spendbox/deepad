@@ -136,6 +136,11 @@ create table if not exists spray_intents (
   created_at timestamptz not null default now()
 );
 create index if not exists spray_intents_event_idx on spray_intents (event_id);
+-- Added later: spraying from the phone. The guest's name for the screen, and the notes thrown so far.
+alter table spray_intents add column if not exists guest_name text;
+alter table spray_intents add column if not exists thrown jsonb not null default '{}'::jsonb;
+alter table spray_intents add column if not exists last_throw_at timestamptz;
+create index if not exists spray_intents_paid_idx on spray_intents (event_id, status, last_throw_at desc);
 
 -- Added later: fun lines for sprays that arrive without a message.
 alter table spray_events add column if not exists hype_lines jsonb not null default '[]'::jsonb;
@@ -180,6 +185,8 @@ alter table spray_events add column if not exists camera_screen text;
 alter table spray_events add column if not exists camera_screen_seen_at timestamptz;
 -- Show guests "no need to bring mint cash, spray by transfer" on the write-a-line page.
 alter table spray_events add column if not exists show_cashless_note boolean not null default true;
+-- The planner's own wording for that note (empty = the default).
+alter table spray_events add column if not exists cashless_note text;
 -- Bank transfer comments on the big screen, the AI rude-comment check, and the bank-alert sound (all on by default).
 alter table spray_events add column if not exists show_comments boolean not null default true;
 alter table spray_events add column if not exists ai_comment_filter boolean not null default true;

@@ -38,3 +38,13 @@ export function formatWhen(iso: string): string {
     timeZone: 'Africa/Lagos',
   });
 }
+
+export const MAX_CASHLESS_NOTE = 240;
+
+/** The "no need to bring cash" note on the write-a-line page: the planner's wording, or this default. */
+export function cashlessNoteText(event: { celebrantName: string; cashlessNote?: string | null }): string {
+  return (
+    event.cashlessNote?.trim() ||
+    `You don’t need to bring cash to spray ${event.celebrantName}. An account number will show on the big screen at the event, so you can spray digitally.`
+  );
+}

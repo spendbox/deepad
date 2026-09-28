@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Avatar from '@/components/Avatar';
 import SectionCard from '@/components/SectionCard';
 import CopyButton from '@/components/CopyButton';
+import DownloadQrButton from '@/components/DownloadQrButton';
 import LineForm from '@/components/LineForm';
 import type { LineStatus, SprayLine } from '@/lib/types';
 import { addLine, deleteLine, linesViewLink, setLinesStatus } from '../../../actions';
@@ -105,11 +106,12 @@ export default function LinesCard({
           {!ended && (
             <div className="subcard">
               <strong>Let guests write lines</strong>
-              <span className="hint">They write a line, add their name and (if they like) a photo. You approve before it shows.</span>
+              <span className="hint">They write a line, add their name and (if they like) a photo. You approve before it shows. Put the QR code on invitations or table cards.</span>
               <span className="share-url">{writeLink}</span>
               <div className="actions">
                 <CopyButton text={writeLink} label="Copy link" />
                 <a href={whatsapp} target="_blank" rel="noreferrer" className="btn btn-sm">Share on WhatsApp</a>
+                <DownloadQrButton url={writeLink} heading={`Write a line for ${celebrantName}`} fileName={`write-a-line-${celebrantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.png`} />
               </div>
             </div>
           )}

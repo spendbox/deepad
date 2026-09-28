@@ -47,6 +47,8 @@ export class Arena {
           }
         });
   private bodyOf = new WeakMap<Element, Body>();
+  /** Notes waiting to be thrown by each sprayer (from their phone), as note-picture numbers. */
+  private queues = new Map<string, number[]>();
 
   constructor(
     private bounds: Rect,
@@ -119,6 +121,7 @@ export class Arena {
 
   remove(id: string) {
     this.stuckSince.delete(id);
+    this.queues.delete(id);
     const b = this.bodies.get(id);
     if (b) this.sizer?.unobserve(b.el);
     this.bodies.delete(id);
@@ -136,12 +139,36 @@ export class Arena {
     if (b) { b.perSecond = perSecond; b.money = money; }
   }
 
+  /** Notes thrown from a sprayer's phone: they fly from this sprayer's name, one after another. */
+  enqueue(id: string, notes: number[]) {
+    if (!this.bodies.has(id) || !notes.length) return;
+    const q = this.queues.get(id) ?? [];
+    q.push(...notes);
+    this.queues.set(id, q.slice(-200));
+    this.start();
+  }
+
+  /** The next queued note for this sprayer (by the emitter id `emitters()` gives), and a little bounce of their name. */
+  dequeue(emitterId: number): number | undefined {
+    for (const [id, q] of this.queues) {
+      if (hash(id) !== emitterId || !q.length) continue;
+      const note = q.shift();
+      (this.bodies.get(id)?.el.firstElementChild?.firstElementChild as HTMLElement | null)?.animate?.(
+        [{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }],
+        { duration: 260, easing: 'ease-out' },
+      );
+      return note;
+    }
+    return undefined;
+  }
+
   /** Where the sprayers are right now, for the confetti. */
   emitters() {
-    const out: { id: number; x: number; y: number; perSecond: number; money: number }[] = [];
+    const out: { id: number; x: number; y: number; perSecond: number; money: number; queued: number }[] = [];
     for (const b of this.bodies.values()) {
-      if (b.kind !== 'sprayer' || b.leaving || b.perSecond <= 0) continue;
-      out.push({ id: hash(b.id), x: b.x, y: b.y, perSecond: b.perSecond, money: b.money });
+      const queued = this.queues.get(b.id)?.length ?? 0;
+      if (b.kind !== 'sprayer' || b.leaving || (b.perSecond <= 0 && !queued)) continue;
+      out.push({ id: hash(b.id), x: b.x, y: b.y, perSecond: b.perSecond, money: b.money, queued });
     }
     return out;
   }

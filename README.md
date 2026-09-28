@@ -37,7 +37,15 @@ description. Senders stay anonymous on screen.
   ₦10,000 every 1.75 s (about 3 minutes), ₦100,000 about twice a second (10 minutes); never over 30 minutes.
   Everyone spraying keeps their full name tag; when the screen fills up, the one spraying longest carries on
   as a small bubble. The confetti falling over the whole screen is kept light, so the sprayers are the show.
+- **Spray from your phone**: when the event link is opened on a phone during the party, a "Spray … from this
+  phone" button appears. The guest picks an amount, the name to show and an optional comment, and gets their
+  own account number for that spray (Paystack "Pay with Transfer", 30 minutes). When the money lands, a wad
+  of notes appears on their phone (₦100/₦200/₦500/₦1,000): swipe up to throw one, tap for a flick, hold to
+  make it rain. Each note flies from their name on the big screen; if they stop, their name fades away and
+  comes back when they throw again. They can never throw more than they paid.
 - Lines on the screen come only from the planner (dashboard) or guests (the shareable `/write` page).
+  The write-a-line page has a "no cash needed" note under the form (planners can turn it off or reword it),
+  and planners can download a QR code for the page (for invitations or table cards).
   Guests' lines wait for the planner's approval (one by one or in bulk); only approved lines show, one at
   a time in the top-left corner, and the screen cycles through them endlessly. A secret view-only page (`/lines/<token>`) shows every line
   live.

@@ -4,12 +4,12 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { Arena, type BodyKind } from '@/components/arena';
 import Avatar from '@/components/Avatar';
 import { NOTE_100, SprayCanvas } from '@/components/Confetti';
-import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import Logo from '@/components/Logo';
 import Rain from '@/components/Rain';
 import type { ScreenFeed, ScreenLine, ScreenTransfer } from '@/lib/events';
 import { isCutout } from '@/lib/photos';
+import type { ThrowBus } from '@/lib/throw-bus';
 import { NAIRA_PER_NOTE, noteIntervalMs } from '@/lib/spray-pace';
 import type { ScreenTheme } from '@/lib/themes';
 
@@ -28,8 +28,8 @@ export type StageSize = { w: number; h: number };
 export type StageMode = 'tv' | 'phone';
 
 /** Room kept at the bottom for the transfer card (smaller while live video plays, so it hides less of it). */
-function cardSpace(mode: StageMode, video: boolean) {
-  if (mode === 'phone') return 274;
+function cardSpace(mode: StageMode, video: boolean, spray = false) {
+  if (mode === 'phone') return spray ? 176 : 274; // just the "Spray" button on phones
   return video ? 244 : 366;
 }
 
@@ -38,9 +38,9 @@ function cardSpace(mode: StageMode, video: boolean) {
  * middle, as tall as the screen allows (their lower half tucks behind the
  * transfer card); names and lines float around them.
  */
-function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean) {
+function layoutFor({ w, h }: StageSize, mode: StageMode, video: boolean, spray = false) {
   const cx = w / 2;
-  const card = cardSpace(mode, video);
+  const card = cardSpace(mode, video, spray);
   if (mode === 'phone') {
     const photoTop = 64;
     const cutoutH = h - photoTop - 30;
@@ -96,9 +96,12 @@ const LINE_GAP_MS = 900; // pause between one line leaving and the next popping 
  */
 export type ActiveSprayer = { t: ScreenTransfer; slot: number; leaving: boolean; mini: boolean; done: boolean };
 
-/** Everyone spraying throws ₦100 notes at their own pace: faster for bigger sprays (lib/spray-pace.ts). */
+/**
+ * Everyone spraying throws ₦100 notes at their own pace: faster for bigger sprays (lib/spray-pace.ts).
+ * Someone spraying from their phone throws only when they swipe (their notes come through `throwBus`).
+ */
 function sprayRate(s: ActiveSprayer): { perSecond: number; money: number } {
-  if (s.done) return { perSecond: 0, money: 0 };
+  if (s.done || s.t.phone) return { perSecond: 0, money: 1 };
   return { perSecond: 1000 / noteIntervalMs((s.t.pieces || 1) * NAIRA_PER_NOTE), money: 1 };
 }
 
@@ -174,16 +177,20 @@ type Props = {
   burstBig: boolean;
   /** The full account number, for the phone's copy button. */
   accountNumber?: string | null;
+  /** Notes thrown from guests' phones, to fly from their names. */
+  throwBus?: ThrowBus;
+  /** On a phone: open "spray from this phone". */
+  onSpray?: () => void;
 };
 
-function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video, size, mode, rainUntil, burstUntil, burstBig, accountNumber }: Props) {
+function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, video, size, mode, rainUntil, burstUntil, burstBig, accountNumber, throwBus, onSpray }: Props) {
   const [videoOn, setVideoOn] = useState(false);
   const live = e.phase === 'live';
   const phone = mode === 'phone';
   const cutout = photo ? isCutout(photo) : false;
   // Each photo's shape (height ÷ width), learnt when it loads, so short ones can sit higher.
   const [shape, setShape] = useState<Record<string, number>>({});
-  const layout = useMemo(() => layoutFor(size, mode, videoOn), [size, mode, videoOn]);
+  const layout = useMemo(() => layoutFor(size, mode, videoOn, !!onSpray), [size, mode, videoOn, onSpray]);
   // True while confetti and money are raining.
   const [raining, setRaining] = useState(false);
   useEffect(() => {
@@ -199,6 +206,16 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
   useEffect(() => arena.setBounds(layout.arena, hasLines ? [layout.zone, layout.lineZone] : [layout.zone]), [arena, layout, hasLines]);
   useEffect(() => () => arena.stop(), [arena]);
   const { canvas } = layout;
+  // Notes thrown from phones: queue them on the thrower's name, and wake the confetti.
+  const [wake, setWake] = useState(0);
+  useEffect(
+    () =>
+      throwBus?.on((id, notes) => {
+        arena.enqueue(`s${id}`, notes);
+        setWake((w) => w + 1);
+      }),
+    [throwBus, arena],
+  );
   const spraying = sprayers.some((s) => !s.leaving);
   const crowd = sprayers.filter((s) => !s.leaving && !s.mini).length + Math.floor(sprayers.filter((s) => !s.leaving && s.mini).length / 2);
   // Names shrink a little as the screen fills (2 or fewer: full size), never below about three-quarters.
@@ -262,6 +279,8 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
           />
           <SprayCanvas
             source={() => arena.emitters().map((m) => ({ ...m, note: NOTE_100, x: m.x - canvas.left, y: m.y - canvas.top }))}
+            dequeue={(id) => arena.dequeue(id)}
+            wake={wake}
             active={spraying}
             target={layout.target}
             width={canvas.width}
@@ -283,7 +302,7 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
                 {...sprayRate(s)}
                 leaving={s.leaving}
               >
-                <div className={`sp-unit${s.done ? ' done' : ''}${s.leaving ? ' leaving' : ''}`}>
+                <div className={`sp-unit${s.done ? ' done' : ''}${s.leaving ? ' leaving' : ''}${s.t.phone ? ' from-phone' : ''}`}>
                 <div className={`sp-tag${s.t.big && !s.mini ? ' big' : ''}${s.mini ? ' mini' : ''}${s.done ? '' : ' active'}${s.t.comment && !s.mini ? ' has-cmt' : ''}${s.leaving ? ' leaving' : ''}`}>
                   {s.t.big && !s.mini && <span className="sp-badge">Big spray!</span>}
                   <Avatar
@@ -317,29 +336,20 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
       {/* How to spray: a clean card with the account number, and the bank right beside it */}
       {live && acct ? (
         phone ? (
-          <footer className="st-pay m">
-            <div className="st-pay-tab"><BankIcon />Transfer to spray {e.celebrantName}</div>
-            <div className="mp-top">
-              <div className="st-pay-field">
-                <div className="st-pay-label">Account number</div>
-                <FitText className="st-acct" text={acct} max={60} />
-              </div>
-              {accountNumber && <CopyButton text={accountNumber} label="Copy" />}
-            </div>
-            <div className="mp-bottom">
-              <div className="st-pay-field">
-                <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={19} />
-              </div>
-              {e.accountName && (
-                <div className="st-pay-field right">
-                  <div className="st-pay-label">Account name</div>
-                  <FitText className="st-acct-name-v" text={e.accountName} max={20} />
-                </div>
-              )}
-            </div>
-            <div className="mp-note">Transfers can take up to a minute to show. Amounts are never shown.</div>
-          </footer>
+          // Phones: no account number, just one button. It gives the guest their own account number,
+          // then (once paid) their wad of notes to spray, all without leaving this page.
+          onSpray ? (
+            <footer className="st-pay m spray-only">
+              <button type="button" className="mp-spray big" onClick={onSpray}>
+                <SprayIcon /> Spray {e.celebrantName}
+              </button>
+              <div className="mp-note center">Tap, pay by transfer, then spray your notes right here. Amounts are never shown.</div>
+            </footer>
+          ) : (
+            <footer className="st-pay quiet m">
+              <div className="st-pay-quiet">{paused ? 'Spraying is paused for a moment' : 'Spraying opens soon'}</div>
+            </footer>
+          )
         ) : videoOn ? (
           // Slimmer while live video plays, so it hides less of the picture.
           <footer className="st-pay slim">
@@ -404,6 +414,14 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
         </footer>
       )}
     </div>
+  );
+}
+
+function SprayIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="8" width="14" height="9" rx="1.5" transform="rotate(-12 10 12.5)" /><path d="M16 5l2-2M19 9h3M18 12.5l2.5 1.5" />
+    </svg>
   );
 }
 
