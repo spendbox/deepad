@@ -239,7 +239,13 @@
 .st.phone .ln-text { font-size: 19px; }
 .st.phone .st-monogram { width: 300px; height: 300px; }
 
-.st-pay.m.has-spray { height: 294px; }
+/* Phones: just the Spray button */
+.st-pay.m.spray-only { height: 150px; padding: 18px 16px 14px; gap: 10px; justify-content: center; }
+.mp-spray.big { min-height: 64px; border-radius: 18px; font-size: 22px; gap: 10px; width: 100%; animation: mpPulse 2.4s ease-in-out infinite; }
+.mp-spray.big svg { width: 26px; height: 26px; }
+.mp-note.center { text-align: center; }
+@keyframes mpPulse { 0%, 100% { box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--s-accent) 80%, #000), 0 0 0 0 color-mix(in srgb, var(--s-accent) 45%, transparent); } 50% { box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--s-accent) 80%, #000), 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) { .mp-spray.big { animation: none; } }
 .st-pay.m { left: 12px; right: 12px; bottom: 12px; height: 232px; padding: 34px 20px 16px; gap: 10px; border-radius: 26px; justify-content: flex-start; }
 .st-pay.m .st-pay-tab { left: 18px; gap: 8px; padding: 7px 16px 7px 12px; font-size: 17px; }
 .st-pay.m .st-pay-tab svg { width: 18px; height: 18px; }

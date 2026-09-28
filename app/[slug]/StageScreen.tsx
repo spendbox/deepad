@@ -4,7 +4,6 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { Arena, type BodyKind } from '@/components/arena';
 import Avatar from '@/components/Avatar';
 import { NOTE_100, SprayCanvas } from '@/components/Confetti';
-import CopyButton from '@/components/CopyButton';
 import FitText from '@/components/FitText';
 import Logo from '@/components/Logo';
 import Rain from '@/components/Rain';
@@ -30,7 +29,7 @@ export type StageMode = 'tv' | 'phone';
 
 /** Room kept at the bottom for the transfer card (smaller while live video plays, so it hides less of it). */
 function cardSpace(mode: StageMode, video: boolean, spray = false) {
-  if (mode === 'phone') return spray ? 336 : 274; // taller with the "Spray from this phone" button
+  if (mode === 'phone') return spray ? 176 : 274; // just the "Spray" button on phones
   return video ? 244 : 366;
 }
 
@@ -337,34 +336,20 @@ function StageScreen({ e, theme, acct, sprayers, paused, online, photo, lines, v
       {/* How to spray: a clean card with the account number, and the bank right beside it */}
       {live && acct ? (
         phone ? (
-          <footer className={`st-pay m${onSpray ? ' has-spray' : ''}`}>
-            <div className="st-pay-tab"><BankIcon />Transfer to spray {e.celebrantName}</div>
-            <div className="mp-top">
-              <div className="st-pay-field">
-                <div className="st-pay-label">Account number</div>
-                <FitText className="st-acct" text={acct} max={60} />
-              </div>
-              {accountNumber && <CopyButton text={accountNumber} label="Copy" />}
-            </div>
-            {onSpray && (
-              <button type="button" className="mp-spray" onClick={onSpray}>
-                <SprayIcon /> Spray {e.celebrantName} from this phone
+          // Phones: no account number, just one button. It gives the guest their own account number,
+          // then (once paid) their wad of notes to spray, all without leaving this page.
+          onSpray ? (
+            <footer className="st-pay m spray-only">
+              <button type="button" className="mp-spray big" onClick={onSpray}>
+                <SprayIcon /> Spray {e.celebrantName}
               </button>
-            )}
-            <div className="mp-bottom">
-              <div className="st-pay-field">
-                <div className="st-pay-label">Bank</div>
-                <FitText className="st-bank" text={e.accountBank ?? ''} max={19} />
-              </div>
-              {e.accountName && (
-                <div className="st-pay-field right">
-                  <div className="st-pay-label">Account name</div>
-                  <FitText className="st-acct-name-v" text={e.accountName} max={20} />
-                </div>
-              )}
-            </div>
-            <div className="mp-note">Transfers can take up to a minute to show. Amounts are never shown.</div>
-          </footer>
+              <div className="mp-note center">Tap, pay by transfer, then spray your notes right here. Amounts are never shown.</div>
+            </footer>
+          ) : (
+            <footer className="st-pay quiet m">
+              <div className="st-pay-quiet">{paused ? 'Spraying is paused for a moment' : 'Spraying opens soon'}</div>
+            </footer>
+          )
         ) : videoOn ? (
           // Slimmer while live video plays, so it hides less of the picture.
           <footer className="st-pay slim">

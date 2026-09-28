@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import './confetti.css';
+import { drawNaira } from './naira';
 
 // All confetti is drawn on a <canvas>: one layer the browser can paint
 // cheaply, instead of hundreds of moving page elements. That keeps the big
@@ -9,41 +10,14 @@ import './confetti.css';
 
 export const CONFETTI_COLORS = ['var(--s-accent)', '#F4A6CB', '#E2A62B', '#F6D38A', '#5B1E6B', '#FFFFFF', '#1F7A5C'];
 
-export const NOTES = [
-  { base: '#6E4A2E', light: '#B98A5E', label: '1000' }, // brown, like the ₦1000
-  { base: '#2F5FA7', light: '#7FA6DE', label: '500' }, // blue, like the ₦500
-  { base: '#2E7A5A', light: '#79C19F', label: '200' }, // green
-  { base: '#8C2F5C', light: '#D98AB0', label: '100' }, // red-violet, like the ₦100
-];
+/** The notes that fly on the big screen, in picture order (see NOTE_100 and the phone's note values). */
+export const NOTES = [{ value: 1000 }, { value: 500 }, { value: 200 }, { value: 100 }] as const;
 /** The ₦100 note: what each sprayer throws (one note per ₦100 they sent). */
 export const NOTE_100 = 3;
 
-/** A naira note, drawn once at twice its size so it stays sharp. */
+/** A naira note for the big screen, drawn once at twice its size so it stays sharp. */
 export function noteSprite(n: (typeof NOTES)[number]): HTMLCanvasElement {
-  const W = 88;
-  const H = 44;
-  const c = document.createElement('canvas');
-  c.width = W * 2;
-  c.height = H * 2;
-  const g = c.getContext('2d')!;
-  g.scale(2, 2);
-  g.fillStyle = n.base;
-  g.beginPath();
-  g.roundRect(0, 0, W, H, 4);
-  g.fill();
-  g.strokeStyle = n.light;
-  g.lineWidth = 2;
-  g.strokeRect(4, 4, W - 8, H - 8);
-  g.fillStyle = n.light;
-  g.beginPath();
-  g.arc(22, H / 2, 11, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#FFFFFF';
-  g.font = '800 17px system-ui, sans-serif';
-  g.textAlign = 'right';
-  g.textBaseline = 'middle';
-  g.fillText(`₦${n.label}`, W - 9, H / 2 + 1);
-  return c;
+  return drawNaira(n.value, 88, 2);
 }
 
 /** A little random number generator that gives the same pieces for the same seed. */
@@ -141,7 +115,7 @@ export function SprayCanvas({
         x0: e.x, y0: e.y, x1, y1,
         cx: (e.x + x1) / 2 + r(-60, 60), cy: Math.max(20, Math.min(e.y, y1) - r(90, 220)), // the top of the throw (kept on screen)
         born: now, fly: r(1100, 1500), fall: r(900, 1300),
-        w, h: isNote ? w / 2 : ribbon ? w * 0.5 : w, round: !isNote && !ribbon && r(0, 1) < 0.5,
+        w, h: isNote ? w * 0.515 : ribbon ? w * 0.5 : w, round: !isNote && !ribbon && r(0, 1) < 0.5,
         color: colors[Math.floor(r(0, colors.length))],
         rot: r(0, 6.28), vr: isNote ? r(-3, 3) : r(-7, 7), flip: r(0, 6.28), vf: isNote ? r(2, 4) : r(5, 11), drift: r(-40, 40),
         note: isNote ? forced ?? e.note ?? Math.floor(r(0, notes.length)) : -1,

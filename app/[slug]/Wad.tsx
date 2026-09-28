@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { drawNaira } from '@/components/naira';
 import { biggestNoteFor, NOTE_VALUES, type NoteValue } from '@/lib/wad';
 
 // The guest's wad of notes on their phone. Swipe the top note up to throw it,
@@ -9,138 +10,9 @@ import { biggestNoteFor, NOTE_VALUES, type NoteValue } from '@/lib/wad';
 // air (which flies up and away toward the stage, slowing, drifting, spinning
 // and flipping over like real paper).
 
-type NoteStyle = { base: string; light: string; dark: string; words: string };
-const STYLE: Record<NoteValue, NoteStyle> = {
-  100: { base: '#8C2F5C', light: '#E3A2C2', dark: '#5A1B3A', words: 'ONE HUNDRED NAIRA' },
-  200: { base: '#2E7A5A', light: '#8FD1B0', dark: '#1B4E39', words: 'TWO HUNDRED NAIRA' },
-  500: { base: '#2F5FA7', light: '#9BBDEB', dark: '#1C3D72', words: 'FIVE HUNDRED NAIRA' },
-  1000: { base: '#6E4A2E', light: '#D2A676', dark: '#462C18', words: 'ONE THOUSAND NAIRA' },
-};
-
 /** A good note to start with: enough throws to enjoy, not so many that it takes all night. */
 export function defaultNote(amountNaira: number): NoteValue {
   return amountNaira >= 20_000 ? 1000 : amountNaira >= 5_000 ? 500 : amountNaira >= 1_000 ? 200 : 100;
-}
-
-/** One note, drawn once at full sharpness and reused. */
-function drawNote(value: NoteValue, w: number, h: number, dpr: number): HTMLCanvasElement {
-  const s = STYLE[value];
-  const c = document.createElement('canvas');
-  c.width = Math.round(w * dpr);
-  c.height = Math.round(h * dpr);
-  const g = c.getContext('2d')!;
-  g.scale(dpr, dpr);
-  const r = h * 0.07;
-  const shape = () => {
-    g.beginPath();
-    g.moveTo(r, 0);
-    g.arcTo(w, 0, w, h, r);
-    g.arcTo(w, h, 0, h, r);
-    g.arcTo(0, h, 0, 0, r);
-    g.arcTo(0, 0, w, 0, r);
-    g.closePath();
-  };
-  // Paper
-  const body = g.createLinearGradient(0, 0, w, h);
-  body.addColorStop(0, s.light);
-  body.addColorStop(0.45, s.base);
-  body.addColorStop(1, s.dark);
-  shape();
-  g.fillStyle = body;
-  g.fill();
-  g.save();
-  shape();
-  g.clip();
-  // Fine wavy lines across the note
-  g.strokeStyle = 'rgba(255,255,255,0.13)';
-  g.lineWidth = Math.max(0.6, h * 0.006);
-  for (let i = 0; i < 16; i++) {
-    g.beginPath();
-    for (let x = 0; x <= w; x += 6) {
-      const y = (h / 16) * i + Math.sin(x / (w * 0.08) + i) * h * 0.035;
-      if (x === 0) g.moveTo(x, y);
-      else g.lineTo(x, y);
-    }
-    g.stroke();
-  }
-  // A soft light patch (the watermark area)
-  const wm = g.createRadialGradient(w * 0.24, h * 0.5, 0, w * 0.24, h * 0.5, h * 0.55);
-  wm.addColorStop(0, 'rgba(255,255,255,0.35)');
-  wm.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = wm;
-  g.fillRect(0, 0, w, h);
-  g.restore();
-  // Inner border
-  g.strokeStyle = 'rgba(255,255,255,0.55)';
-  g.lineWidth = Math.max(1, h * 0.012);
-  g.strokeRect(h * 0.06, h * 0.06, w - h * 0.12, h - h * 0.12);
-  // Portrait medallion
-  g.beginPath();
-  g.arc(w * 0.24, h * 0.5, h * 0.27, 0, Math.PI * 2);
-  g.fillStyle = 'rgba(255,255,255,0.18)';
-  g.fill();
-  g.lineWidth = Math.max(1, h * 0.014);
-  g.strokeStyle = 'rgba(255,255,255,0.6)';
-  g.stroke();
-  g.beginPath();
-  g.arc(w * 0.24, h * 0.44, h * 0.09, 0, Math.PI * 2);
-  g.moveTo(w * 0.24 - h * 0.17, h * 0.72);
-  g.quadraticCurveTo(w * 0.24, h * 0.5, w * 0.24 + h * 0.17, h * 0.72);
-  g.fillStyle = 'rgba(255,255,255,0.35)';
-  g.fill();
-  // Value
-  g.fillStyle = '#FFFFFF';
-  g.textAlign = 'right';
-  g.textBaseline = 'alphabetic';
-  g.shadowColor = 'rgba(0,0,0,0.25)';
-  g.shadowBlur = h * 0.03;
-  g.font = `900 ${Math.round(h * 0.36)}px system-ui, sans-serif`;
-  g.fillText(`₦${value.toLocaleString('en-NG')}`, w - h * 0.14, h * 0.6);
-  g.shadowBlur = 0;
-  g.font = `800 ${Math.round(h * 0.085)}px system-ui, sans-serif`;
-  g.fillStyle = 'rgba(255,255,255,0.9)';
-  g.fillText(s.words, w - h * 0.14, h * 0.8);
-  g.textAlign = 'left';
-  g.font = `900 ${Math.round(h * 0.12)}px system-ui, sans-serif`;
-  g.fillText(String(value), h * 0.13, h * 0.24);
-  return c;
-}
-
-/** The back of a note, seen while it flips over in the air: the same paper, no writing. */
-function drawNoteBack(value: NoteValue, w: number, h: number, dpr: number): HTMLCanvasElement {
-  const s = STYLE[value];
-  const c = document.createElement('canvas');
-  c.width = Math.round(w * dpr);
-  c.height = Math.round(h * dpr);
-  const g = c.getContext('2d')!;
-  g.scale(dpr, dpr);
-  const r = h * 0.07;
-  g.beginPath();
-  g.moveTo(r, 0);
-  g.arcTo(w, 0, w, h, r);
-  g.arcTo(w, h, 0, h, r);
-  g.arcTo(0, h, 0, 0, r);
-  g.arcTo(0, 0, w, 0, r);
-  g.closePath();
-  const body = g.createLinearGradient(w, 0, 0, h);
-  body.addColorStop(0, s.base);
-  body.addColorStop(1, s.dark);
-  g.fillStyle = body;
-  g.fill();
-  g.save();
-  g.clip();
-  g.strokeStyle = 'rgba(255,255,255,0.1)';
-  g.lineWidth = Math.max(0.6, h * 0.006);
-  for (let i = 0; i < 12; i++) {
-    g.beginPath();
-    g.ellipse(w / 2, h / 2, h * 0.08 * (i + 1), h * 0.05 * (i + 1), 0, 0, Math.PI * 2);
-    g.stroke();
-  }
-  g.restore();
-  g.strokeStyle = 'rgba(255,255,255,0.4)';
-  g.lineWidth = Math.max(1, h * 0.012);
-  g.strokeRect(h * 0.06, h * 0.06, w - h * 0.12, h - h * 0.12);
-  return c;
 }
 
 type Flying = {
@@ -165,6 +37,11 @@ export default function Wad({
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [note, setNote] = useState<NoteValue>(() => defaultNote(amountNaira));
+  // Little pictures of each note for the note picker.
+  const [thumbs, setThumbs] = useState<Partial<Record<NoteValue, string>>>({});
+  useEffect(() => {
+    setThumbs(Object.fromEntries(NOTE_VALUES.map((v) => [v, drawNaira(v, 120, 2).toDataURL()])));
+  }, []);
   const leftRef = useRef(leftNaira);
   leftRef.current = leftNaira;
   const noteRef = useRef(note);
@@ -202,10 +79,10 @@ export default function Wad({
       canvas.height = Math.round(H * dpr);
       canvas.style.width = `${W}px`;
       canvas.style.height = `${H}px`;
-      noteW = Math.min(W * 0.78, 360);
-      noteH = noteW * 0.48;
-      sprites = new Map(NOTE_VALUES.map((v) => [v, drawNote(v, noteW, noteH, dpr)]));
-      backs = new Map(NOTE_VALUES.map((v) => [v, drawNoteBack(v, noteW, noteH, dpr)]));
+      noteW = Math.min(W * 0.84, 380);
+      noteH = Math.round(noteW * 0.515);
+      sprites = new Map(NOTE_VALUES.map((v) => [v, drawNaira(v, noteW, dpr, 'front')]));
+      backs = new Map(NOTE_VALUES.map((v) => [v, drawNaira(v, noteW, dpr, 'back')]));
     };
     resize();
     window.addEventListener('resize', resize);
@@ -468,8 +345,11 @@ export default function Wad({
             className={`wad-note-btn n${v}`}
             disabled={leftNaira < v}
             onClick={() => setNote(v)}
+            aria-label={`₦${v.toLocaleString('en-NG')} notes`}
           >
-            ₦{v.toLocaleString('en-NG')}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {thumbs[v] && <img src={thumbs[v]} alt="" className="wad-note-img" />}
+            <span>₦{v.toLocaleString('en-NG')}</span>
           </button>
         ))}
       </div>
